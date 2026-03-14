@@ -9,902 +9,1237 @@
 <meta name="apple-mobile-web-app-title" content="CI Scheme">
 <link rel="manifest" href="manifest.json">
 <title>CI Scheme Karnataka</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="cases.js"></script>
+
 <style>
 :root {
-  --green-dark:#0a3d2e; --green:#1a6b4a; --green-mid:#1D9E75; --green-light:#E1F5EE; --green-border:#9FE1CB;
-  --blue:#1a4a7a; --blue-mid:#378ADD; --blue-light:#E6F1FB;
-  --amber:#7a4a0a; --amber-mid:#EF9F27; --amber-light:#FAEEDA;
-  --purple:#3a1a6a; --purple-mid:#7F77DD; --purple-light:#EEEDFE;
-  --red:#A32D2D; --red-light:#FCEBEB;
-  --gray:#f5f3ef; --gray-mid:#e0ddd6; --gray-dark:#6b6358;
-  --text:#1a1612; --text-mid:#4a453f; --text-light:#8a8278;
-  --surface:#fffcf8; --border:#e8e4dc;
-  --r:12px; --rs:8px;
+  --green-dark: #0a3d2e;
+  --green: #1a6b4a;
+  --green-mid: #1D9E75;
+  --green-light: #E1F5EE;
+  --green-border: #9FE1CB;
+  --blue: #1a4a7a;
+  --blue-mid: #378ADD;
+  --blue-light: #E6F1FB;
+  --amber: #8a5a0a;
+  --amber-mid: #EF9F27;
+  --amber-light: #FAEEDA;
+  --purple: #4a2a7a;
+  --purple-mid: #7F77DD;
+  --purple-light: #EEEDFE;
+  --red: #A32D2D;
+  --red-light: #FCEBEB;
+  --gray: #f5f3ef;
+  --gray-mid: #e0ddd6;
+  --gray-dark: #6b6358;
+  --text: #1a1612;
+  --text-mid: #4a453f;
+  --text-light: #8a8278;
+  --surface: #fffcf8;
+  --border: #e8e4dc;
+  --radius: 12px;
+  --radius-sm: 8px;
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--gray);color:var(--text);font-size:14px;line-height:1.5;}
 
-/* SCREENS */
-.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--gray);transition:transform .3s cubic-bezier(.4,0,.2,1),opacity .3s;}
-.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none;}
-.screen.slide-left{transform:translateX(-30%);opacity:0;pointer-events:none;}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
 
-/* ── ROLE SELECTION ── */
-#screen-role{background:var(--green-dark);padding:0;justify-content:flex-start;overflow-y:auto;}
-.role-hero{padding:40px 28px 24px;text-align:center;}
-.role-hero-icon{font-size:48px;margin-bottom:14px;}
-.role-hero h1{color:#fff;font-size:22px;font-weight:700;letter-spacing:-.3px;}
-.role-hero p{color:rgba(255,255,255,.55);font-size:13px;margin-top:6px;}
-.role-cards{padding:0 20px 40px;display:flex;flex-direction:column;gap:12px;}
-.role-card{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .2s;}
-.role-card:active{transform:scale(.98);background:rgba(255,255,255,.15);}
-.role-card-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
-.role-card-text h3{color:#fff;font-size:15px;font-weight:600;margin-bottom:3px;}
-.role-card-text p{color:rgba(255,255,255,.55);font-size:12px;}
-.role-card-arrow{margin-left:auto;color:rgba(255,255,255,.4);font-size:18px;}
-.rc-hospital .role-card-icon{background:rgba(29,158,117,.3);}
-.rc-rehab .role-card-icon{background:rgba(55,138,221,.3);}
-.rc-district .role-card-icon{background:rgba(239,159,39,.3);}
-.rc-state .role-card-icon{background:rgba(127,119,221,.3);}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--gray);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
 
-/* ── LOGIN ── */
-#screen-login{overflow-y:auto;}
-.login-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;min-height:100%;}
-.login-back{position:absolute;top:16px;left:16px;width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;color:#fff;z-index:10;}
-.login-card{background:var(--surface);border-radius:24px;padding:32px 26px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
-.login-role-badge{display:flex;align-items:center;gap:10px;margin-bottom:24px;}
-.login-badge-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;}
-.login-badge-title{font-size:16px;font-weight:700;color:var(--text);}
-.login-badge-sub{font-size:11px;color:var(--text-light);margin-top:2px;}
-.lfield{margin-bottom:16px;}
-.lfield label{font-size:12px;color:var(--text-mid);display:block;margin-bottom:5px;font-weight:500;}
-.lfield input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;background:var(--surface);color:var(--text);font-family:inherit;transition:border-color .15s;}
-.lfield input:focus{outline:none;}
-.lfield input:focus.h{border-color:var(--green-mid);}
-.lfield input:focus.r{border-color:var(--blue-mid);}
-.lfield input:focus.d{border-color:var(--amber-mid);}
-.lfield input:focus.s{border-color:var(--purple-mid);}
-.login-err{background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:14px;display:none;}
-.lbtn{width:100%;padding:14px;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s;color:#fff;margin-top:4px;}
-.lbtn:active{opacity:.85;}
-.lbtn-h{background:var(--green-dark);}
-.lbtn-r{background:var(--blue);}
-.lbtn-d{background:var(--amber);}
-.lbtn-s{background:var(--purple);}
-.login-footer{text-align:center;font-size:11px;color:var(--text-light);margin-top:16px;}
+/* ─── SCREENS ─── */
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--gray); transition: transform 0.3s cubic-bezier(.4,0,.2,1), opacity 0.3s; }
+.screen.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+.screen.slide-left { transform: translateX(-30%); opacity: 0; pointer-events: none; }
 
-/* ── HOME SHELL ── */
-.user-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;flex-shrink:0;}
-.ub-left{display:flex;align-items:center;gap:10px;}
-.ub-avatar{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;}
-.ub-name{font-size:13px;font-weight:600;}
-.ub-role{font-size:10px;color:var(--text-light);}
-.ub-logout{font-size:11px;background:var(--gray-mid);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-family:inherit;color:var(--text-mid);}
+/* ─── LOGIN SCREEN ─── */
+#screen-login {
+  background: var(--green-dark);
+  align-items: center;
+  justify-content: center;
+  padding: 40px 28px;
+}
+.login-logo { margin-bottom: 32px; text-align: center; }
+.login-logo-ring {
+  width: 72px; height: 72px; border-radius: 20px;
+  background: rgba(255,255,255,0.12);
+  border: 1.5px solid rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px; font-size: 32px;
+}
+.login-logo h1 { color: #fff; font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+.login-logo p { color: rgba(255,255,255,0.55); font-size: 12px; margin-top: 4px; }
+.login-card {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 360px;
+}
+.login-card h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.login-card p { font-size: 12px; color: var(--text-light); margin-bottom: 20px; }
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.role-btn {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--surface);
+}
+.role-btn:active { transform: scale(0.97); }
+.role-btn .role-icon { font-size: 24px; margin-bottom: 6px; }
+.role-btn .role-label { font-size: 12px; font-weight: 500; color: var(--text); }
+.role-btn .role-desc { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+.role-btn.r-hospital:hover, .role-btn.r-hospital.sel { border-color: var(--green-mid); background: var(--green-light); }
+.role-btn.r-rehab:hover, .role-btn.r-rehab.sel { border-color: var(--blue-mid); background: var(--blue-light); }
+.role-btn.r-district:hover, .role-btn.r-district.sel { border-color: var(--amber-mid); background: var(--amber-light); }
+.role-btn.r-state:hover, .role-btn.r-state.sel { border-color: var(--purple-mid); background: var(--purple-light); }
+.login-btn {
+  width: 100%; margin-top: 16px; padding: 13px;
+  background: var(--green-dark); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: opacity 0.15s;
+}
+.login-btn:disabled { opacity: 0.4; }
+.login-btn:active { opacity: 0.85; }
 
-/* ── TAB BAR ── */
-.tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
-.tab{flex:1;padding:10px 4px;text-align:center;cursor:pointer;font-size:11px;font-weight:500;color:var(--text-light);border-bottom:2px solid transparent;transition:all .15s;}
-.tab.active{color:var(--green-dark);border-bottom-color:var(--green-dark);}
-.tab-icon{font-size:18px;display:block;margin-bottom:2px;}
+/* ─── APP HEADER ─── */
+.app-header {
+  padding: 12px 16px 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.back-btn {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--surface); border: 0.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; color: var(--text-mid);
+}
+.header-title { font-size: 15px; font-weight: 600; }
+.header-sub { font-size: 11px; color: var(--text-light); }
+.role-chip {
+  font-size: 10px; font-weight: 500; padding: 4px 10px;
+  border-radius: 12px; white-space: nowrap;
+}
+.chip-hospital { background: var(--green-light); color: var(--green); }
+.chip-rehab { background: var(--blue-light); color: var(--blue); }
+.chip-district { background: var(--amber-light); color: var(--amber); }
+.chip-state { background: var(--purple-light); color: var(--purple); }
 
-/* ── TAB CONTENT ── */
-.tab-content{flex:1;overflow-y:auto;display:none;}
-.tab-content.active{display:block;}
+/* ─── HOME SCREEN ─── */
+.home-hero {
+  background: var(--green-dark);
+  padding: 16px 16px 24px;
+  color: #fff;
+}
+.home-hero h2 { font-size: 18px; font-weight: 600; }
+.home-hero p { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 3px; }
+.home-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 16px; }
+.home-stat { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; text-align: center; }
+.home-stat-num { font-size: 20px; font-weight: 600; }
+.home-stat-label { font-size: 9px; color: rgba(255,255,255,0.6); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
 
-/* ── DASHBOARD ── */
-.dash-body{padding:14px;}
-.filter-bar{display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;}
-.fchip{white-space:nowrap;font-size:11px;font-weight:500;padding:6px 12px;border-radius:16px;border:1px solid var(--border);background:var(--surface);color:var(--text-mid);cursor:pointer;flex-shrink:0;transition:all .15s;}
-.fchip.active{background:var(--green-dark);color:#fff;border-color:var(--green-dark);}
-select.fchip{-webkit-appearance:none;appearance:none;padding-right:20px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238a8278'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;}
-select.fchip.active{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23ffffff'/%3E%3C/svg%3E");}
+.home-body { flex: 1; overflow-y: auto; padding: 16px; }
+.section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-light); margin-bottom: 10px; margin-top: 18px; }
+.section-label:first-child { margin-top: 0; }
 
-.metric-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
-.metric-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:14px;position:relative;overflow:hidden;}
-.metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
-.mc-green::before{background:var(--green-mid);}
-.mc-blue::before{background:var(--blue-mid);}
-.mc-amber::before{background:var(--amber-mid);}
-.mc-purple::before{background:var(--purple-mid);}
-.mc-red::before{background:var(--red);}
-.metric-card .ml{font-size:10px;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
-.metric-card .mv{font-size:28px;font-weight:700;line-height:1;}
-.metric-card .ms{font-size:10px;color:var(--text-light);margin-top:4px;}
+.action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.action-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.action-card:active { transform: scale(0.97); }
+.action-icon { font-size: 22px; }
+.action-title { font-size: 13px; font-weight: 500; }
+.action-desc { font-size: 11px; color: var(--text-light); }
+.action-card.primary { background: var(--green-dark); border-color: var(--green-dark); grid-column: span 2; flex-direction: row; align-items: center; gap: 14px; }
+.action-card.primary .action-title { color: #fff; font-size: 14px; }
+.action-card.primary .action-desc { color: rgba(255,255,255,0.6); }
+.action-card.primary .action-arrow { margin-left: auto; color: rgba(255,255,255,0.5); font-size: 18px; }
 
-.chart-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:12px;}
-.cc-title{font-size:13px;font-weight:600;margin-bottom:4px;}
-.cc-sub{font-size:11px;color:var(--text-light);margin-bottom:12px;}
-.chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
-.cl-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-light);}
-.cl-sq{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.alert-card {
+  background: var(--red-light);
+  border: 0.5px solid #f5c6c2;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.alert-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-top: 4px; flex-shrink: 0; }
+.alert-name { font-size: 13px; font-weight: 500; }
+.alert-detail { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.alert-tag { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 6px; background: var(--red-light); color: var(--red); border: 0.5px solid #f5c6c2; white-space: nowrap; margin-left: auto; }
 
-/* Funnel */
-.funnel{padding:6px 0;}
-.funnel-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-.funnel-lbl{width:80px;font-size:11px;color:var(--text-mid);text-align:right;flex-shrink:0;}
-.funnel-track{flex:1;background:var(--gray-mid);border-radius:6px;height:28px;overflow:hidden;}
-.funnel-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding-left:10px;transition:width .6s ease;}
-.funnel-fill span{font-size:11px;font-weight:600;color:#fff;white-space:nowrap;}
-.funnel-pct{width:36px;font-size:11px;color:var(--text-light);}
+/* ─── SEARCH / CASE LIST ─── */
+.search-bar {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.search-bar input {
+  border: none; outline: none; flex: 1;
+  font-size: 13px; background: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+}
+.search-bar input::placeholder { color: var(--text-light); }
+.search-icon { color: var(--text-light); font-size: 15px; }
 
-/* ── CASES ── */
-.cases-body{padding:14px;}
-.search-row{display:flex;gap:8px;margin-bottom:10px;}
-.search-box{flex:1;display:flex;align-items:center;gap:8px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rs);padding:9px 12px;}
-.search-box input{border:none;outline:none;flex:1;font-size:13px;background:transparent;font-family:inherit;color:var(--text);}
-.search-box input::placeholder{color:var(--text-light);}
-.case-list{display:flex;flex-direction:column;gap:8px;}
-.case-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:12px 14px;cursor:pointer;transition:all .15s;}
-.case-card:active{transform:scale(.98);}
-.case-header{display:flex;align-items:center;gap:8px;}
-.case-name{font-size:13px;font-weight:600;flex:1;}
-.spill{font-size:10px;font-weight:500;padding:2px 8px;border-radius:8px;white-space:nowrap;}
-.sp-paid{background:var(--green-light);color:var(--green);}
-.sp-risk{background:var(--red-light);color:var(--red);}
-.sp-rehab{background:var(--blue-light);color:var(--blue);}
-.sp-pending{background:var(--amber-light);color:var(--amber);}
-.case-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:5px;}
-.case-meta span{font-size:11px;color:var(--text-light);}
-.prog-track{height:4px;background:var(--gray-mid);border-radius:2px;overflow:hidden;margin-top:7px;}
-.prog-fill{height:100%;border-radius:2px;background:var(--green-mid);}
-.prog-lbl{font-size:9px;color:var(--text-light);margin-top:2px;}
+.filter-row { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+.filter-chip {
+  white-space: nowrap; font-size: 11px; font-weight: 500;
+  padding: 6px 12px; border-radius: 16px;
+  border: 0.5px solid var(--border);
+  background: var(--surface); color: var(--text-mid);
+  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+}
+.filter-chip.active { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
 
-/* ── FORM ── */
-.form-header-bar{padding:12px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:0.5px solid var(--border);flex-shrink:0;}
-.back-btn{width:34px;height:34px;border-radius:10px;background:var(--surface);border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:var(--text-mid);}
-.fh-title{font-size:15px;font-weight:600;}
-.fh-sub{font-size:11px;color:var(--text-light);}
-.role-chip{font-size:10px;font-weight:500;padding:4px 10px;border-radius:12px;white-space:nowrap;margin-left:auto;}
-.chip-hospital{background:var(--green-light);color:var(--green);}
-.chip-rehab{background:var(--blue-light);color:var(--blue);}
-.chip-district{background:var(--amber-light);color:var(--amber);}
-.chip-state{background:var(--purple-light);color:var(--purple);}
+.case-list { display: flex; flex-direction: column; gap: 8px; }
+.case-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.case-card:active { transform: scale(0.98); }
+.case-card.selected { border-color: var(--green-mid); border-width: 1.5px; background: var(--green-light); }
+.case-header { display: flex; align-items: center; gap: 8px; }
+.case-name { font-size: 13px; font-weight: 500; flex: 1; }
+.status-pill { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+.pill-paid { background: var(--green-light); color: var(--green); }
+.pill-pending { background: var(--amber-light); color: var(--amber); }
+.pill-risk { background: var(--red-light); color: var(--red); }
+.pill-rehab { background: var(--blue-light); color: var(--blue); }
+.case-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+.case-meta span { font-size: 11px; color: var(--text-light); }
+.case-progress { margin-top: 7px; }
+.progress-track { height: 4px; background: var(--gray-mid); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 2px; background: var(--green-mid); transition: width 0.4s; }
+.progress-label { font-size: 9px; color: var(--text-light); margin-top: 3px; }
 
-.form-scroll{flex:1;overflow-y:auto;padding:16px;}
-.fsect-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-light);margin-bottom:12px;padding-bottom:6px;border-bottom:0.5px solid var(--border);}
-.field{margin-bottom:14px;}
-.field-label{font-size:12px;color:var(--text-mid);margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
-.req{color:var(--red);font-size:11px;}
-.pf-badge{font-size:9px;background:var(--green-light);color:var(--green);padding:1px 6px;border-radius:4px;font-weight:500;}
-.field-input{width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--rs);font-size:13px;background:var(--surface);color:var(--text);font-family:inherit;transition:border-color .15s;-webkit-appearance:none;appearance:none;}
-.field-input:focus{outline:none;border-color:var(--green-mid);}
-.field-input.hv{background:#fafaf8;}
-.field-hint{font-size:10px;color:var(--text-light);margin-top:3px;}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.info-banner{background:var(--green-light);border:0.5px solid var(--green-border);border-radius:var(--rs);padding:10px 12px;margin-bottom:14px;display:flex;gap:8px;}
-.ib-icon{font-size:14px;flex-shrink:0;}
-.ib-name{font-size:13px;font-weight:600;color:var(--green-dark);margin-bottom:3px;}
-.ib-text{font-size:11px;color:var(--green);line-height:1.5;}
-.warn-banner{background:var(--amber-light);border:0.5px solid #FAC775;border-radius:var(--rs);padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--amber);display:flex;gap:8px;}
-.radio-group{display:flex;flex-direction:column;gap:7px;}
-.radio-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--rs);cursor:pointer;font-size:12px;color:var(--text);transition:all .15s;}
-.radio-item.checked{border-color:var(--green-mid);background:var(--green-light);color:var(--green);}
-.radio-dot{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s;}
-.radio-item.checked .radio-dot{border-color:var(--green-mid);background:var(--green-mid);}
-.radio-item.checked .radio-dot::after{content:'';width:6px;height:6px;border-radius:50%;background:#fff;}
-.sdots{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;margin-bottom:6px;}
-.sdot{height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:500;}
-.sd-done{background:var(--green-light);color:var(--green);}
-.sd-today{background:var(--blue-mid);color:#fff;}
-.sd-pending{background:var(--gray-mid);color:var(--text-light);}
+/* ─── FORM ─── */
+.form-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+.form-section { margin-bottom: 20px; }
+.form-section-title {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--text-light);
+  margin-bottom: 12px; padding-bottom: 6px;
+  border-bottom: 0.5px solid var(--border);
+}
+.field { margin-bottom: 14px; }
+.field-label {
+  font-size: 12px; color: var(--text-mid); margin-bottom: 5px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.req { color: var(--red); font-size: 11px; }
+.field-input {
+  width: 100%; padding: 10px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px; background: var(--surface);
+  color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: border-color 0.15s;
+  -webkit-appearance: none; appearance: none;
+}
+.field-input:focus { outline: none; border-color: var(--green-mid); }
+.field-input.has-value { background: #fafaf8; }
+.field-input.error { border-color: var(--red); background: var(--red-light); }
+.field-hint { font-size: 10px; color: var(--text-light); margin-top: 3px; }
+.field-error { font-size: 10px; color: var(--red); margin-top: 3px; display: none; }
+.field-input.error + .field-error { display: block; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-.bottom-bar{padding:12px 16px;border-top:0.5px solid var(--border);background:var(--surface);display:flex;gap:10px;flex-shrink:0;}
-.btn-submit{flex:1;padding:13px;border:none;border-radius:var(--rs);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s;color:#fff;}
-.btn-submit:active{opacity:.85;}
-.bs-h{background:var(--green-dark);}
-.bs-r{background:var(--blue);}
-.bs-d{background:var(--amber);}
-.bs-s{background:var(--purple);}
-.btn-back-sm{padding:13px 16px;border:0.5px solid var(--border);border-radius:var(--rs);background:transparent;font-size:13px;color:var(--text-mid);cursor:pointer;font-family:inherit;}
+.prefilled-badge {
+  font-size: 9px; background: var(--green-light); color: var(--green);
+  padding: 1px 6px; border-radius: 4px; font-weight: 500;
+}
 
-/* ── ALERTS ── */
-.alerts-body{padding:14px;}
-.alert-card{background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:var(--r);padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;gap:10px;}
-.alert-dot{width:8px;height:8px;border-radius:50%;background:var(--red);margin-top:4px;flex-shrink:0;}
-.alert-name{font-size:13px;font-weight:600;}
-.alert-detail{font-size:11px;color:var(--text-light);margin-top:2px;}
-.alert-tag{font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;background:var(--red-light);color:var(--red);border:0.5px solid #f5c6c2;white-space:nowrap;margin-left:auto;}
-.warn-card{background:var(--amber-light);border:0.5px solid #FAC775;border-radius:var(--r);padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;gap:10px;}
-.warn-dot{width:8px;height:8px;border-radius:50%;background:var(--amber-mid);margin-top:4px;flex-shrink:0;}
-.warn-tag{font-size:10px;font-weight:500;padding:2px 7px;border-radius:6px;background:var(--amber-light);color:var(--amber);border:0.5px solid #FAC775;white-space:nowrap;margin-left:auto;}
+.radio-group { display: flex; flex-direction: column; gap: 7px; }
+.radio-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  font-size: 12px; color: var(--text); transition: all 0.15s;
+}
+.radio-item.checked { border-color: var(--green-mid); background: var(--green-light); color: var(--green); }
+.radio-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.radio-item.checked .radio-dot { border-color: var(--green-mid); background: var(--green-mid); }
+.radio-item.checked .radio-dot::after { content:''; width:6px; height:6px; border-radius:50%; background:#fff; }
 
-/* ── SUCCESS ── */
-#screen-success{align-items:center;justify-content:center;padding:40px 28px;text-align:center;}
-.succ-ring{width:80px;height:80px;border-radius:50%;background:var(--green-light);border:2px solid var(--green-border);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 20px;}
-.succ-title{font-size:20px;font-weight:700;margin-bottom:8px;}
-.succ-sub{font-size:13px;color:var(--text-light);margin-bottom:24px;line-height:1.6;}
-.succ-id{background:var(--gray);border-radius:8px;padding:10px 16px;display:inline-block;font-size:12px;color:var(--text-mid);margin-bottom:24px;}
-.btn-home{width:100%;padding:13px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--rs);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+.info-banner {
+  background: var(--green-light);
+  border: 0.5px solid var(--green-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.info-banner-icon { font-size: 14px; flex-shrink: 0; }
+.info-banner-text { font-size: 11px; color: var(--green); line-height: 1.5; }
+.info-banner-name { font-size: 13px; font-weight: 500; color: var(--green-dark); margin-bottom: 3px; }
 
-/* ── SET PASSWORD ── */
-#screen-setpwd{overflow-y:auto;}
-.setpwd-wrap{padding:24px 20px;}
+.warn-banner {
+  background: var(--amber-light);
+  border: 0.5px solid #FAC775;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 11px; color: var(--amber); line-height: 1.5;
+  display: flex; gap: 8px;
+}
 
-/* ── OFFLINE CHIP ── */
-.offline-chip{position:fixed;top:8px;left:50%;transform:translateX(-50%) translateY(-60px);background:var(--text);color:#fff;border-radius:20px;padding:6px 14px;font-size:11px;font-weight:500;z-index:999;transition:transform .3s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
-.offline-chip.show{transform:translateX(-50%) translateY(0);}
-.offline-chip .x-btn{background:rgba(255,255,255,.2);border:none;border-radius:50%;width:16px;height:16px;cursor:pointer;font-size:10px;color:#fff;display:flex;align-items:center;justify-content:center;}
+.session-dots { display: grid; grid-template-columns: repeat(9,1fr); gap: 3px; margin-bottom: 6px; }
+.sdot { height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 500; }
+.sdot-done { background: var(--green-light); color: var(--green); }
+.sdot-today { background: var(--blue-mid); color: #fff; }
+.sdot-pending { background: var(--gray-mid); color: var(--text-light); }
 
-/* ── SPINNER ── */
-.spinner{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;}
-@keyframes spin{to{transform:rotate(360deg);}}
-::-webkit-scrollbar{width:3px;}
-::-webkit-scrollbar-thumb{background:var(--gray-mid);border-radius:3px;}
+/* ─── BOTTOM BAR ─── */
+.bottom-bar {
+  padding: 12px 16px;
+  border-top: 0.5px solid var(--border);
+  background: var(--surface);
+  display: flex; gap: 10px;
+  flex-shrink: 0;
+}
+.btn-submit {
+  flex: 1; padding: 13px;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: opacity 0.15s;
+}
+.btn-submit:active { opacity: 0.85; }
+.btn-submit.hospital { background: var(--green-dark); color: #fff; }
+.btn-submit.rehab { background: var(--blue); color: #fff; }
+.btn-submit.district { background: var(--amber); color: #fff; }
+.btn-submit.state { background: var(--purple); color: #fff; }
+.btn-back-sm {
+  padding: 13px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent; font-size: 13px;
+  color: var(--text-mid); cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
 
-.section-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-light);margin:16px 0 10px;}
-.section-lbl:first-child{margin-top:0;}
+/* ─── NAV ─── */
+.bottom-nav {
+  display: flex; border-top: 0.5px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; padding: 10px 4px;
+  cursor: pointer; transition: all 0.15s;
+}
+.nav-icon { font-size: 18px; }
+.nav-label { font-size: 9px; color: var(--text-light); }
+.nav-item.active .nav-label { color: var(--green-dark); font-weight: 600; }
+.nav-item.active .nav-icon { transform: translateY(-1px); }
+
+/* ─── SUCCESS ─── */
+#screen-success {
+  align-items: center; justify-content: center; padding: 40px 28px; text-align: center;
+}
+.success-ring {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: var(--green-light); border: 2px solid var(--green-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; margin: 0 auto 20px;
+}
+.success-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+.success-sub { font-size: 13px; color: var(--text-light); margin-bottom: 28px; line-height: 1.6; }
+.success-id { background: var(--gray); border-radius: 8px; padding: 10px 16px; display: inline-block; font-size: 12px; color: var(--text-mid); margin-bottom: 24px; }
+.success-id span { font-weight: 500; color: var(--text); }
+.btn-home {
+  width: 100%; padding: 13px; background: var(--green-dark); color: #fff;
+  border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ─── OFFLINE TOAST ─── */
+.offline-toast {
+  position: fixed; bottom: 80px; left: 16px; right: 16px;
+  background: var(--text); color: #fff;
+  border-radius: 10px; padding: 12px 16px;
+  font-size: 12px; display: flex; align-items: center; gap: 8px;
+  transform: translateY(120%); transition: transform 0.3s;
+  z-index: 999;
+}
+.offline-toast.show { transform: translateY(0); }
+
+/* ─── LOADING ─── */
+.spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: var(--gray-mid); border-radius: 3px; }
 </style>
+<script src="cases.js"></script>
 </head>
 <body>
 
-<!-- OFFLINE CHIP -->
-<div class="offline-chip" id="offline-chip">
-  📶 No internet — entries saved locally
-  <button class="x-btn" onclick="document.getElementById('offline-chip').classList.remove('show')">×</button>
-</div>
-
-<!-- ══ SCREEN: ROLE SELECTION ══ -->
-<div class="screen" id="screen-role">
-  <div class="role-hero">
-    <div class="role-hero-icon">🦻</div>
-    <h1>CI Scheme Karnataka</h1>
-    <p>Cochlear Implant Programme · NPPCD<br>Select your role to continue</p>
-  </div>
-  <div class="role-cards">
-    <div class="role-card rc-hospital" onclick="pickRole('hospital')">
-      <div class="role-card-icon">🏥</div>
-      <div class="role-card-text"><h3>Hospital coordinator</h3><p>Register surgeries · device details · switch-on</p></div>
-      <div class="role-card-arrow">›</div>
+<!-- ══════════════════ SCREEN: ROLE SELECTION ══════════════════ -->
+<div class="screen" id="screen-login">
+  <div style="background:var(--green-dark);min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;overflow-y:auto;">
+    <div style="text-align:center;margin-bottom:32px;">
+      <div style="font-size:52px;margin-bottom:14px;">🦻</div>
+      <h1 style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-.3px;">CI Scheme Karnataka</h1>
+      <p style="color:rgba(255,255,255,.55);font-size:13px;margin-top:6px;">Cochlear Implant Programme · NPPCD</p>
     </div>
-    <div class="role-card rc-rehab" onclick="pickRole('rehab')">
-      <div class="role-card-icon">🎧</div>
-      <div class="role-card-text"><h3>Rehab institute</h3><p>Log AVT sessions · track attendance</p></div>
-      <div class="role-card-arrow">›</div>
-    </div>
-    <div class="role-card rc-district" onclick="pickRole('district')">
-      <div class="role-card-icon">📍</div>
-      <div class="role-card-text"><h3>District programme officer</h3><p>Follow-up · field notes · dropout tracking</p></div>
-      <div class="role-card-arrow">›</div>
-    </div>
-    <div class="role-card rc-state" onclick="pickRole('state')">
-      <div class="role-card-icon">🏛️</div>
-      <div class="role-card-text"><h3>State team / admin</h3><p>Full dashboard · analytics · all districts</p></div>
-      <div class="role-card-arrow">›</div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ SCREEN: LOGIN ══ -->
-<div class="screen hidden" id="screen-login">
-  <div class="login-back" onclick="showScreen('role')">←</div>
-  <div class="login-wrap" id="login-wrap">
-    <div class="login-card">
-      <div class="login-role-badge" id="login-badge">
-        <div class="login-badge-icon" id="login-badge-icon"></div>
-        <div><div class="login-badge-title" id="login-badge-title"></div><div class="login-badge-sub" id="login-badge-sub"></div></div>
+    <div style="background:var(--surface);border-radius:20px;padding:24px 20px;width:100%;max-width:360px;">
+      <h2 style="font-size:15px;font-weight:600;margin-bottom:6px;">Select your role</h2>
+      <p style="font-size:12px;color:var(--text-light);margin-bottom:20px;">Choose how you are connected to the programme</p>
+      <div class="role-grid">
+        <div class="role-btn r-hospital" onclick="selectRole('hospital', this)">
+          <div class="role-icon">🏥</div>
+          <div class="role-label">Hospital</div>
+          <div class="role-desc">Surgery &amp; device data</div>
+        </div>
+        <div class="role-btn r-rehab" onclick="selectRole('rehab', this)">
+          <div class="role-icon">🎧</div>
+          <div class="role-label">Rehab Institute</div>
+          <div class="role-desc">AVT session logs</div>
+        </div>
+        <div class="role-btn r-district" onclick="selectRole('district', this)">
+          <div class="role-icon">📍</div>
+          <div class="role-label">District Officer</div>
+          <div class="role-desc">Follow-up &amp; field notes</div>
+        </div>
+        <div class="role-btn r-state" onclick="selectRole('state', this)">
+          <div class="role-icon">🏛️</div>
+          <div class="role-label">State Team</div>
+          <div class="role-desc">Outcomes &amp; overview</div>
+        </div>
       </div>
-      <div class="login-err" id="login-err"></div>
-      <div class="lfield">
-        <label>Username</label>
-        <input type="text" id="login-username" autocomplete="username" autocapitalize="none" placeholder="e.g. h_kims_hubli">
-      </div>
-      <div class="lfield">
-        <label>Password</label>
-        <input type="password" id="login-password" autocomplete="current-password" placeholder="Enter your password" onkeydown="if(event.key==='Enter')doLogin()">
-      </div>
-      <button class="lbtn" id="login-btn" onclick="doLogin()">Sign in →</button>
-      <div class="login-footer">Forgot password? Contact cochlearkar@gmail.com</div>
+      <button class="login-btn" id="login-btn" disabled onclick="doLogin()">Continue →</button>
     </div>
   </div>
 </div>
 
-<!-- ══ SCREEN: SET PASSWORD ══ -->
-<div class="screen hidden" id="screen-setpwd">
-  <div class="form-header-bar">
-    <div><div class="fh-title">Set new password</div><div class="fh-sub">First login — choose a personal password</div></div>
-  </div>
-  <div class="form-scroll setpwd-wrap">
-    <div class="warn-banner" style="margin-bottom:16px"><span>⚠</span>Your account uses the default password. Please set a personal password before continuing.</div>
-    <div class="field"><div class="field-label">Current password</div><input type="password" class="field-input" id="sp-current" placeholder="CIScheme@2025"></div>
-    <div class="field"><div class="field-label">New password <span class="req">*</span></div><input type="password" class="field-input" id="sp-new" placeholder="Min 8 characters"></div>
-    <div class="field"><div class="field-label">Confirm new password <span class="req">*</span></div><input type="password" class="field-input" id="sp-confirm" placeholder="Repeat new password"></div>
-    <div id="sp-error" style="color:var(--red);font-size:12px;margin-top:8px;display:none"></div>
-  </div>
-  <div class="bottom-bar">
-    <button class="btn-submit bs-h" onclick="submitPasswordChange()">Set password & continue →</button>
+<!-- ══════════════════ SCREEN: AUTH ══════════════════ -->
+<div class="screen hidden" id="screen-auth">
+  <div id="login-bg" style="min-height:100%;display:flex;flex-direction:column;padding:0;overflow-y:auto;">
+
+    <!-- Top hero section - colour changes per role -->
+    <div id="login-hero" style="padding:48px 28px 32px;text-align:center;flex-shrink:0;">
+      <div id="login-hero-icon" style="font-size:52px;margin-bottom:16px;"></div>
+      <div id="login-hero-title" style="color:#fff;font-size:20px;font-weight:700;letter-spacing:-.3px;"></div>
+      <div id="login-hero-sub" style="color:rgba(255,255,255,.55);font-size:12px;margin-top:5px;">CI Scheme Karnataka · NPPCD</div>
+    </div>
+
+    <!-- White card at bottom -->
+    <div style="background:var(--surface);border-radius:28px 28px 0 0;flex:1;padding:32px 24px 40px;">
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px;" id="login-card-title">Sign in</div>
+      <div style="font-size:12px;color:var(--text-light);margin-bottom:28px;" id="login-card-sub">Enter your credentials to continue</div>
+
+      <div id="login-err" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:16px;display:none;"></div>
+
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px;color:var(--text-mid);display:block;margin-bottom:6px;font-weight:500;">Username</label>
+        <input type="text" id="login-username" autocomplete="username" autocapitalize="none" spellcheck="false"
+          style="width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:14px;background:var(--surface);color:var(--text);font-family:inherit;transition:border-color .2s;outline:none;"
+          placeholder="e.g. h_kims_hubli"
+          onfocus="this.style.borderColor=loginAccentColor"
+          onblur="this.style.borderColor='var(--border)'">
+      </div>
+
+      <div style="margin-bottom:8px;">
+        <label style="font-size:12px;color:var(--text-mid);display:block;margin-bottom:6px;font-weight:500;">Password</label>
+        <div style="position:relative;">
+          <input type="password" id="login-password" autocomplete="current-password"
+            style="width:100%;padding:13px 44px 13px 14px;border:1.5px solid var(--border);border-radius:12px;font-size:14px;background:var(--surface);color:var(--text);font-family:inherit;transition:border-color .2s;outline:none;"
+            placeholder="Enter your password"
+            onfocus="this.style.borderColor=loginAccentColor"
+            onblur="this.style.borderColor='var(--border)'"
+            onkeydown="if(event.key==='Enter')doLogin()">
+          <span onclick="togglePwd()" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;color:var(--text-light);" id="pwd-eye">👁</span>
+        </div>
+      </div>
+
+      <div style="text-align:right;margin-bottom:28px;">
+        <span style="font-size:11px;color:var(--text-light);">Forgot password? Contact cochlearkar@gmail.com</span>
+      </div>
+
+      <button id="login-submit-btn" onclick="authenticateAndLogin()"
+        style="width:100%;padding:15px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;color:#fff;transition:opacity .15s;"
+        id="login-submit-btn">Sign in →</button>
+
+      <div onclick="goBackToRoles()" style="text-align:center;margin-top:20px;font-size:12px;color:var(--text-light);cursor:pointer;">
+        ← Change role
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- ══ SCREEN: HOME ══ -->
+<!-- ══════════════════ SCREEN: HOME ══════════════════ -->
 <div class="screen hidden" id="screen-home">
-  <!-- User bar -->
-  <div class="user-bar" id="user-bar">
-    <div class="ub-left">
-      <div class="ub-avatar" id="ub-avatar"></div>
-      <div><div class="ub-name" id="ub-name">—</div><div class="ub-role" id="ub-role">—</div></div>
-    </div>
-    <button class="ub-logout" onclick="doLogout()">Sign out</button>
+  <div class="user-info-bar">
+    <div><div class="user-info-name" id="user-display-name">—</div><div class="user-info-role" id="user-display-role">—</div></div>
+    <button class="logout-btn" onclick="doLogout()">Sign out</button>
   </div>
-  <!-- Tab bar -->
-  <div class="tab-bar">
-    <div class="tab active" id="tab-dash" onclick="switchTab('dash')"><span class="tab-icon">📊</span>Dashboard</div>
-    <div class="tab" id="tab-cases" onclick="switchTab('cases')"><span class="tab-icon">📋</span>Cases</div>
-    <div class="tab" id="tab-entry" onclick="switchTab('entry')"><span class="tab-icon">✏️</span>New entry</div>
-    <div class="tab" id="tab-alerts" onclick="switchTab('alerts')"><span class="tab-icon">🔔</span>Alerts</div>
-  </div>
-  <!-- Dashboard tab -->
-  <div class="tab-content active" id="tc-dash">
-    <div class="dash-body">
-      <div class="filter-bar" id="dash-filters"></div>
-      <div class="metric-grid" id="dash-metrics"></div>
-      <div id="dash-charts"></div>
-    </div>
-  </div>
-  <!-- Cases tab -->
-  <div class="tab-content" id="tc-cases">
-    <div class="cases-body">
-      <div class="search-row">
-        <div class="search-box"><span style="color:var(--text-light)">⌕</span><input type="text" placeholder="Search name, village, district..." oninput="filterCases(this.value)" id="case-search"></div>
+  <div class="app-header" id="home-header" style="background:var(--green-dark)">
+    <div class="header-left">
+      <div>
+        <div class="header-title" style="color:#fff" id="home-title">—</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.55)" id="home-sub">—</div>
       </div>
-      <div class="filter-bar" id="cases-filters"></div>
-      <div style="font-size:11px;color:var(--text-light);margin-bottom:10px" id="case-count"></div>
-      <div class="case-list" id="case-list"></div>
+    </div>
+    <div class="role-chip" id="home-chip">—</div>
+  </div>
+  <div class="home-hero" style="padding-top:0">
+    <div class="home-stats">
+      <div class="home-stat">
+        <div class="home-stat-num" id="stat1">—</div>
+        <div class="home-stat-label" id="stat1-label">Cases</div>
+      </div>
+      <div class="home-stat">
+        <div class="home-stat-num" id="stat2">—</div>
+        <div class="home-stat-label" id="stat2-label">On track</div>
+      </div>
+      <div class="home-stat">
+        <div class="home-stat-num" id="stat3" style="color:#FAC775">—</div>
+        <div class="home-stat-label" id="stat3-label">Alerts</div>
+      </div>
     </div>
   </div>
-  <!-- Entry tab -->
-  <div class="tab-content" id="tc-entry">
-    <div class="form-scroll" id="entry-form-body" style="padding:16px"></div>
-    <div class="bottom-bar">
-      <button class="btn-submit" id="entry-submit-btn" onclick="submitForm()">Submit →</button>
-    </div>
-  </div>
-  <!-- Alerts tab -->
-  <div class="tab-content" id="tc-alerts">
-    <div class="alerts-body" id="alerts-body"></div>
+  <div class="home-body" id="home-body"></div>
+  <div class="bottom-nav" id="home-nav">
+    <div class="nav-item active" onclick="navTo('home')"><div class="nav-icon">🏠</div><div class="nav-label">Home</div></div>
+    <div class="nav-item" onclick="navTo('cases')"><div class="nav-icon">📋</div><div class="nav-label">Cases</div></div>
+    <div class="nav-item" onclick="navTo('form')"><div class="nav-icon">✏️</div><div class="nav-label">New entry</div></div>
+    <div class="nav-item" onclick="navTo('pending')"><div class="nav-icon">🔔</div><div class="nav-label">Alerts</div></div>
   </div>
 </div>
 
-<!-- ══ SCREEN: CASE DETAIL / FORM ══ -->
+<!-- ══════════════════ SCREEN: CASE LIST ══════════════════ -->
+<div class="screen hidden" id="screen-cases">
+  <div class="app-header">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()">←</div>
+      <div>
+        <div class="header-title" id="cases-title">Cases</div>
+        <div class="header-sub" id="cases-sub">Select to view or update</div>
+      </div>
+    </div>
+    <div class="role-chip" id="cases-chip"></div>
+  </div>
+  <div class="form-scroll">
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" placeholder="Search by name, village or taluk..." oninput="filterCases(this.value)" id="case-search">
+    </div>
+    <div class="filter-row" id="filter-row"></div>
+    <div style="font-size:11px;color:var(--text-light);margin-bottom:10px" id="case-count"></div>
+    <div class="case-list" id="case-list"></div>
+  </div>
+</div>
+
+<!-- ══════════════════ SCREEN: FORM ══════════════════ -->
 <div class="screen hidden" id="screen-form">
-  <div class="form-header-bar">
-    <div class="back-btn" onclick="goBack()">←</div>
-    <div><div class="fh-title" id="form-title">Entry</div><div class="fh-sub" id="form-sub"></div></div>
+  <div class="app-header">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()">←</div>
+      <div>
+        <div class="header-title" id="form-title">New Entry</div>
+        <div class="header-sub" id="form-sub"></div>
+      </div>
+    </div>
     <div class="role-chip" id="form-chip"></div>
   </div>
   <div class="form-scroll" id="form-body"></div>
   <div class="bottom-bar">
     <button class="btn-back-sm" onclick="goBack()">Cancel</button>
-    <button class="btn-submit" id="form-submit-btn" onclick="submitForm()">Submit →</button>
+    <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit →</button>
   </div>
 </div>
 
-<!-- ══ SCREEN: SUCCESS ══ -->
+
+<!-- ══════════════════ SCREEN: SUCCESS ══════════════════ -->
 <div class="screen hidden" id="screen-success">
-  <div class="succ-ring">✓</div>
-  <div class="succ-title">Submitted!</div>
-  <div class="succ-sub" id="succ-msg">Entry recorded and synced to programme register.</div>
-  <div class="succ-id">Entry ID: <strong id="succ-id">—</strong></div>
-  <button class="btn-home" onclick="showScreen('home',false)">Back to home</button>
+  <div class="success-ring">✓</div>
+  <div class="success-title">Submitted!</div>
+  <div class="success-sub" id="success-msg">Your entry has been recorded and will sync to the programme register.</div>
+  <div class="success-id">Entry ID: <span id="success-id">—</span></div>
+  <div class="success-id" style="background:var(--green-light);color:var(--green)" id="offline-note" style="display:none">
+    📶 Saved offline — will sync when connected
+  </div>
+  <button class="btn-home" onclick="showScreen('home')">Back to home</button>
+</div>
+
+<!-- ══════════════════ OFFLINE TOAST ══════════════════ -->
+<div class="offline-toast" id="offline-toast">
+  📶 No internet — entry saved locally, will sync automatically
 </div>
 
 <script>
-const PRELOADED_CASES = [];
-let SAMPLE_CASES = [];
-// Cases loaded from cases.js after page ready
-
 // ══════════════════════════════════════════
-// CONFIG
+// CONFIG — replace with your Apps Script URL
 // ══════════════════════════════════════════
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXOFLbvK6lCpTaAlToPaYgbwCBzgLCuATZPJn9M3_PR-xXCNAHN_yxTzVxsC5a98Ad/exec';
+// cochlearkar@gmail.com — paste your deployed Apps Script URL above
 
 // ══════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════
 let currentRole = null;
-let currentUser = JSON.parse(sessionStorage.getItem('ci_user')||'null');
-let currentScreen = 'role';
-let screenHistory = [];
+let currentScreen = 'login';
 let selectedCase = null;
-let filteredCases = [];
-let dashFY = 'all', dashDistrict = 'all', dashHospital = 'all';
-const chartInstances = {};
+let screenHistory = [];
 
 const ROLE_META = {
-  hospital:{label:'Hospital coordinator',icon:'🏥',avatarBg:'#E1F5EE',btnClass:'bs-h',chipClass:'chip-hospital',loginBg:'linear-gradient(135deg,#0a3d2e,#1a6b4a)',lbtnClass:'lbtn-h'},
-  rehab:{label:'Rehab institute',icon:'🎧',avatarBg:'#E6F1FB',btnClass:'bs-r',chipClass:'chip-rehab',loginBg:'linear-gradient(135deg,#1a4a7a,#378ADD)',lbtnClass:'lbtn-r'},
-  district:{label:'District officer',icon:'📍',avatarBg:'#FAEEDA',btnClass:'bs-d',chipClass:'chip-district',loginBg:'linear-gradient(135deg,#7a4a0a,#EF9F27)',lbtnClass:'lbtn-d'},
-  state:{label:'State team',icon:'🏛️',avatarBg:'#EEEDFE',btnClass:'bs-s',chipClass:'chip-state',loginBg:'linear-gradient(135deg,#3a1a6a,#7F77DD)',lbtnClass:'lbtn-s'},
+  hospital: { label: 'Hospital', chip: 'chip-hospital', color: '#0a3d2e', icon: '🏥',
+    orgLabel: 'Hospital', orgOptions: ['KIMS Hubli','Akash Hospital Devanahalli','Mandya MIMS','NIMHANS Bengaluru','Samspanda Mandya','SDM Dharwad','BGS Kengeri','Other'],
+    yearLabel: 'Surgery year' },
+  rehab: { label: 'Rehab Institute', chip: 'chip-rehab', color: '#1a4a7a', icon: '🎧',
+    orgLabel: 'Institute', orgOptions: ['AIISH Mysuru','NIMHANS Bengaluru','Samspanda Mandya','KSAD Dharwad','Other'],
+    yearLabel: 'Enrolment year' },
+  district: { label: 'District Officer', chip: 'chip-district', color: '#8a5a0a', icon: '📍',
+    orgLabel: 'District', orgOptions: ['Belagavi','Raichur','Mysuru','Tumakuru','Mandya','Bagalkote','Davangere','Shivamogga','Bengaluru','Koppal','Bidar','Dharwad','Kalaburagi','Hassan','Ramanagara','Other'],
+    yearLabel: 'FY' },
+  state: { label: 'State Team', chip: 'chip-state', color: '#4a2a7a', icon: '🏛️',
+    orgLabel: 'View', orgOptions: ['All Karnataka'],
+    yearLabel: 'FY' },
 };
+
+const PRELOADED_CASES = [];
+let SAMPLE_CASES = (typeof PRELOADED_CASES_DATA !== "undefined") ? PRELOADED_CASES_DATA : [];
+
+let filteredCases = [...SAMPLE_CASES];
+let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
 
 // ══════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════
-function showScreen(name, push=true) {
-  if (push && currentScreen !== name) screenHistory.push(currentScreen);
+function showScreen(name, pushHistory = true) {
+  if (pushHistory && currentScreen !== name) screenHistory.push(currentScreen);
   document.querySelectorAll('.screen').forEach(s => {
-    const isTarget = s.id === 'screen-'+name;
-    s.classList.toggle('hidden', !isTarget);
-    s.classList.toggle('slide-left', false);
+    s.classList.remove('hidden', 'slide-left');
   });
+  document.querySelectorAll('.screen').forEach(s => {
+    if (!s.id.endsWith(name)) s.classList.add(currentScreen === name ? 'slide-left' : 'hidden');
+  });
+  document.getElementById('screen-' + name).classList.remove('hidden', 'slide-left');
   currentScreen = name;
 }
+
 function goBack() {
-  const prev = screenHistory.pop()||'home';
+  const prev = screenHistory.pop() || 'home';
   showScreen(prev, false);
 }
 
-// ══════════════════════════════════════════
-// ROLE PICK
-// ══════════════════════════════════════════
-function pickRole(role) {
-  try {
-    currentRole = role;
-    currentUser = { role: role, unit: ROLE_META[role].label, username: role, district: 'ALL' };
-    sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
-    if (typeof PRELOADED_CASES_DATA !== 'undefined') SAMPLE_CASES = PRELOADED_CASES_DATA;
-    buildHome();
-    showScreen('home');
-  } catch(err) {
-    alert('Error: ' + err.message + '
-' + err.stack);
-  }
+function navTo(dest) {
+  if (dest === 'home') showScreen('home');
+  else if (dest === 'cases') { buildCaseList(); showScreen('cases'); }
+  else if (dest === 'form') { buildForm(null); showScreen('form'); }
+  else if (dest === 'pending') { buildCaseList('risk'); showScreen('cases'); }
 }
 
 // ══════════════════════════════════════════
 // LOGIN
 // ══════════════════════════════════════════
-async function doLogin() {
-  const username = document.getElementById('login-username').value.trim();
-  const password = document.getElementById('login-password').value.trim();
-  const errEl = document.getElementById('login-err');
-  const btn = document.getElementById('login-btn');
-  errEl.style.display = 'none';
-  if (!username||!password) { errEl.textContent='Please enter username and password.'; errEl.style.display='block'; return; }
-  btn.innerHTML = '<span class="spinner"></span> Signing in...'; btn.disabled = true;
-  try {
-    const res = await fetch(SCRIPT_URL, {method:'POST', body:JSON.stringify({action:'login',username,password})});
-    const data = await res.json();
-    if (data.status==='ok') {
-      currentUser = data; currentRole = data.role;
-      sessionStorage.setItem('ci_user', JSON.stringify(data));
-      if (data.mustChangePassword) {
-        document.getElementById('sp-current').value = password;
-        showScreen('setpwd');
-      } else { buildHome(); showScreen('home'); }
-    } else { errEl.textContent=data.message||'Login failed.'; errEl.style.display='block'; }
-  } catch(e) { errEl.textContent='Cannot connect. Check your internet.'; errEl.style.display='block'; }
-  btn.innerHTML = 'Sign in →'; btn.disabled = false;
+function selectRole(role, el) {
+  currentRole = role;
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('login-btn').disabled = false;
 }
 
 async function submitPasswordChange() {
-  const cur=document.getElementById('sp-current').value.trim();
-  const nw=document.getElementById('sp-new').value.trim();
-  const cf=document.getElementById('sp-confirm').value.trim();
-  const err=document.getElementById('sp-error'); err.style.display='none';
-  if (nw.length<8) { err.textContent='Min 8 characters.'; err.style.display='block'; return; }
-  if (nw!==cf) { err.textContent='Passwords do not match.'; err.style.display='block'; return; }
+  const current = document.getElementById('sp-current').value.trim();
+  const newPwd = document.getElementById('sp-new').value.trim();
+  const confirm = document.getElementById('sp-confirm').value.trim();
+  const errEl = document.getElementById('sp-error');
+  errEl.style.display = 'none';
+  if (newPwd.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = 'block'; return; }
+  if (newPwd !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
   try {
-    const res=await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'change_password',username:currentUser.username,oldPassword:cur,newPassword:nw})});
-    const data=await res.json();
-    if (data.status==='ok') { currentUser.mustChangePassword=false; sessionStorage.setItem('ci_user',JSON.stringify(currentUser)); buildHome(); showScreen('home'); }
-    else { err.textContent=data.message; err.style.display='block'; }
-  } catch(e) { err.textContent='Connection error.'; err.style.display='block'; }
+    const res = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'change_password', username: currentUser.username, oldPassword: current, newPassword: newPwd }) });
+    const data = await res.json();
+    if (data.status === 'ok') {
+      currentUser.mustChangePassword = false;
+      sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
+      buildHome(); showScreen('home');
+    } else {
+      errEl.textContent = data.message; errEl.style.display = 'block';
+    }
+  } catch(e) {
+    errEl.textContent = 'Connection error. Please try again.'; errEl.style.display = 'block';
+  }
 }
 
 function doLogout() {
-  currentUser=null; sessionStorage.removeItem('ci_user'); currentRole=null; screenHistory=[];
-  showScreen('role', false);
+  currentUser = null; sessionStorage.removeItem('ci_user');
+  currentRole = null; screenHistory = [];
+  showScreen('login', false);
 }
 
+function doLogin() {
+  if (!currentRole) return;
+  styleLoginForRole(currentRole);
+  showScreen('auth');
+}
+
+const ROLE_STYLES = {
+  hospital:{bg:'linear-gradient(160deg,#0a3d2e,#1a6b4a)',accent:'#1D9E75',icon:'🏥',label:'Hospital coordinator',btn:'#0a3d2e'},
+  rehab:   {bg:'linear-gradient(160deg,#0d2d4f,#1a4a7a)',accent:'#378ADD',icon:'🎧',label:'Rehab institute',btn:'#1a4a7a'},
+  district:{bg:'linear-gradient(160deg,#4a2a00,#8a5a0a)',accent:'#EF9F27',icon:'📍',label:'District officer',btn:'#7a4a0a'},
+  state:   {bg:'linear-gradient(160deg,#1e0a3c,#4a2a7a)',accent:'#7F77DD',icon:'🏛️',label:'State team',btn:'#3a1a6a'},
+};
+let loginAccentColor = '#1D9E75';
+
+function styleLoginForRole(role) {
+  const s = ROLE_STYLES[role]||ROLE_STYLES.state;
+  loginAccentColor = s.accent;
+  document.getElementById('login-bg').style.background = s.bg;
+  document.getElementById('login-hero-icon').textContent = s.icon;
+  document.getElementById('login-hero-title').textContent = s.label;
+  document.getElementById('login-card-title').textContent = 'Welcome back';
+  document.getElementById('login-card-sub').textContent = 'Sign in to access the ' + s.label.toLowerCase() + ' dashboard';
+  document.getElementById('login-submit-btn').style.background = s.btn;
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-err').style.display = 'none';
+}
+
+function togglePwd() {
+  const inp = document.getElementById('login-password');
+  inp.type = inp.type==='password'?'text':'password';
+  document.getElementById('pwd-eye').textContent = inp.type==='password'?'👁':'🙈';
+}
+
+function goBackToRoles() { showScreen('login'); }
+
 // ══════════════════════════════════════════
-// BUILD HOME
+// HOME
 // ══════════════════════════════════════════
+function filterCasesByUser(cases) {
+  if (!currentUser || currentUser.role === 'state') return cases;
+  if (currentUser.role === 'hospital') {
+    const u = (currentUser.unit||'').toLowerCase();
+    return cases.filter(c => c.hospital && c.hospital.toLowerCase().includes(u.substring(0,10)));
+  }
+  if (currentUser.role === 'rehab') {
+    const u = (currentUser.unit||'').toLowerCase();
+    return cases.filter(c => (c.rehab||'').toLowerCase().includes(u.substring(0,8)));
+  }
+  if (currentUser.role === 'district') {
+    const d = (currentUser.district||currentUser.unit||'').toUpperCase();
+    return cases.filter(c => (c.district||'').toUpperCase() === d);
+  }
+  return cases;
+}
+
 function buildHome() {
   const meta = ROLE_META[currentRole];
-  // User bar
-  const ub = document.getElementById('ub-avatar');
-  ub.textContent = meta.icon; ub.style.background = meta.avatarBg;
-  document.getElementById('ub-name').textContent = currentUser.unit||currentUser.username;
-  document.getElementById('ub-role').textContent = meta.label;
-  const bar = document.getElementById('user-bar');
-  bar.style.background = currentRole==='hospital'?'var(--green-dark)':currentRole==='rehab'?'var(--blue)':currentRole==='district'?'var(--amber)':'var(--purple)';
-  bar.querySelectorAll('.ub-name,.ub-role,.ub-logout').forEach(el=>el.style.color='rgba(255,255,255,0.9)');
-  document.getElementById('ub-logout').style.background='rgba(255,255,255,0.15)';
-  document.getElementById('ub-logout').style.color='#fff';
-  buildDashboard();
-  buildCasesList();
-  buildEntryForm();
-  buildAlerts();
-}
-
-// ══════════════════════════════════════════
-// TAB SWITCHING
-// ══════════════════════════════════════════
-function switchTab(tab) {
-  ['dash','cases','entry','alerts'].forEach(t => {
-    document.getElementById('tab-'+t).classList.toggle('active', t===tab);
-    document.getElementById('tc-'+t).classList.toggle('active', t===tab);
-  });
-}
-
-// ══════════════════════════════════════════
-// CASE FILTERING
-// ══════════════════════════════════════════
-function getMyCase() {
-  if (!currentUser||currentRole==='state') return SAMPLE_CASES;
-  if (currentRole==='hospital') {
-    const u=(currentUser.unit||'').toLowerCase();
-    return SAMPLE_CASES.filter(c=>c.hospital&&c.hospital.toLowerCase().includes(u.substring(0,12)));
+  const unitName = (currentUser && currentUser.unit) ? currentUser.unit : meta.orgOptions[0];
+  document.getElementById('home-title').textContent = meta.icon + '  ' + unitName;
+  document.getElementById('home-sub').textContent = meta.label + ' · CI Scheme Karnataka';
+  const chip = document.getElementById('home-chip');
+  chip.textContent = meta.label;
+  chip.className = 'role-chip ' + meta.chip;
+  // User info bar
+  if (currentUser) {
+    document.getElementById('user-display-name').textContent = currentUser.username;
+    document.getElementById('user-display-role').textContent = meta.label + (currentUser.unit ? ' · ' + currentUser.unit.substring(0,30) : '');
   }
-  if (currentRole==='rehab') {
-    const u=(currentUser.unit||'').toLowerCase();
-    return SAMPLE_CASES.filter(c=>(c.rehab||'').toLowerCase().includes(u.substring(0,8)));
+
+  const myCases = filterCasesByUser(SAMPLE_CASES);
+  const risks = myCases.filter(c => c.risk);
+  const ontrack = myCases.filter(c => !c.risk);
+  document.getElementById('stat1').textContent = myCases.length;
+  document.getElementById('stat2').textContent = myCases.filter(c=>c.status==='paid'||c.status==='rehab1'||c.status==='rehab2').length;
+  document.getElementById('stat3').textContent = risks.length;
+  document.getElementById('stat2').textContent = ontrack.length;
+  document.getElementById('stat3').textContent = risks.length;
+  document.getElementById('stat1-label').textContent = currentRole === 'district' ? 'In district' : 'Total cases';
+
+  const body = document.getElementById('home-body');
+  let html = '';
+
+  // Primary action
+  html += `<div class="section-label">Quick action</div>`;
+  html += `<div class="action-grid">`;
+  if (currentRole === 'hospital') {
+    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">➕</div><div><div class="action-title">Register new surgery</div><div class="action-desc">Log device & operative details</div></div><div class="action-arrow">→</div></div>`;
+  } else if (currentRole === 'rehab') {
+    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">✏️</div><div><div class="action-title">Log today's session</div><div class="action-desc">Mark attendance & session number</div></div><div class="action-arrow">→</div></div>`;
+  } else if (currentRole === 'district') {
+    html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk babies</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
+  } else {
+    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">📊</div><div><div class="action-title">Update milestone / outcomes</div><div class="action-desc">Record audiogram & milestones</div></div><div class="action-arrow">→</div></div>`;
   }
-  if (currentRole==='district') {
-    const d=(currentUser.district||currentUser.unit||'').toUpperCase();
-    return SAMPLE_CASES.filter(c=>(c.district||'').toUpperCase()===d);
+  html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">${currentRole === 'district' ? 'By district' : 'By ' + meta.orgLabel.toLowerCase()}</div></div>`;
+  html += `<div class="action-card" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">🔔</div><div class="action-title">Alerts</div><div class="action-desc">${risks.length} need attention</div></div>`;
+  html += `</div>`;
+
+  // Alerts
+  if (risks.length) {
+    html += `<div class="section-label" style="margin-top:20px">Needs attention</div>`;
+    risks.forEach(c => {
+      html += `<div class="alert-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
+        <div class="alert-dot"></div>
+        <div style="flex:1"><div class="alert-name">${c.name}</div><div class="alert-detail">${c.village} · ${c.phase} · Last contact: ${c.lastContact}</div></div>
+        <span class="alert-tag">At risk</span>
+      </div>`;
+    });
   }
-  return SAMPLE_CASES;
-}
 
-// ══════════════════════════════════════════
-// DASHBOARD
-// ══════════════════════════════════════════
-function buildDashboard() {
-  try {
-  const myCases = getMyCase();
-  // Build filter bar
-  const fys = ['all',...new Set(myCases.map(c=>c.fy).filter(Boolean))].sort();
-  const districts = ['all',...new Set(myCases.map(c=>c.district).filter(Boolean))].sort();
-  const bar = document.getElementById('dash-filters');
-  bar.innerHTML = `
-    <select class="fchip ${dashFY!=='all'?'active':''}" onchange="dashFY=this.value;renderDash()">
-      ${fys.map(f=>`<option value="${f}" ${dashFY===f?'selected':''}>${f==='all'?'All years':f}</option>`).join('')}
-    </select>
-    <select class="fchip ${dashDistrict!=='all'?'active':''}" onchange="dashDistrict=this.value;renderDash()">
-      ${districts.map(d=>`<option value="${d}" ${dashDistrict===d?'selected':''}>${d==='all'?'All districts':d}</option>`).join('')}
-    </select>`;
-  renderDash(myCases);
-}
-
-function renderDash(baseCases) {
-  baseCases = baseCases||getMyCase();
-  let cases = baseCases;
-  if (dashFY!=='all') cases=cases.filter(c=>c.fy===dashFY);
-  if (dashDistrict!=='all') cases=cases.filter(c=>c.district===dashDistrict);
-
-  const total = cases.length;
-  const surgDone = cases.filter(c=>c.surgStatus&&c.surgStatus.toUpperCase().includes('PAID')).length;
-  const r1Done = cases.filter(c=>c.r1Status&&c.r1Status.toUpperCase().includes('PAID')).length;
-  const r2Done = cases.filter(c=>c.r2Status&&c.r2Status.toUpperCase().includes('PAID')).length;
-  const atRisk = cases.filter(c=>c.risk).length;
-  const totalNet = cases.reduce((s,c)=>{const n=parseFloat(c.totalNet||0);return s+(isNaN(n)?0:n);},0);
-
-  // Metrics
-  document.getElementById('dash-metrics').innerHTML = `
-    <div class="metric-card mc-green"><div class="ml">Total enrolled</div><div class="mv">${total}</div><div class="ms">Unique beneficiaries</div></div>
-    <div class="metric-card mc-blue"><div class="ml">Net paid</div><div class="mv">${totalNet>=1e7?'₹'+(totalNet/1e7).toFixed(1)+'Cr':'₹'+(totalNet/1e5).toFixed(0)+'L'}</div><div class="ms">Disbursed to date</div></div>
-    <div class="metric-card mc-amber"><div class="ml">Surgery paid</div><div class="mv">${surgDone}</div><div class="ms">${total?Math.round(surgDone/total*100):0}% of enrolled</div></div>
-    <div class="metric-card mc-red"><div class="ml">At risk</div><div class="mv">${atRisk}</div><div class="ms">Need follow-up</div></div>`;
-
-  // Charts
-  const cc = document.getElementById('dash-charts');
-  cc.innerHTML = `
-    <div class="chart-card">
-      <div class="cc-title">Patient journey funnel</div>
-      <div class="cc-sub">How many babies progress through each stage</div>
-      <div class="funnel" id="dash-funnel"></div>
-    </div>
-    <div class="chart-card">
-      <div class="cc-title">Enrollment by financial year</div>
-      <div class="cc-sub">Babies enrolled per FY</div>
-      <div style="position:relative;height:180px"><canvas id="ch-fy"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="cc-title">Top 10 patient districts</div>
-      <div class="cc-sub">Where beneficiaries come from</div>
-      <div style="position:relative;height:260px"><canvas id="ch-dist"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="cc-title">Claim status by stage</div>
-      <div class="cc-sub">Paid vs pending vs need info</div>
-      <div class="chart-legend">
-        <div class="cl-item"><div class="cl-sq" style="background:#1D9E75"></div>Paid</div>
-        <div class="cl-item"><div class="cl-sq" style="background:#EF9F27"></div>Need info</div>
-        <div class="cl-item"><div class="cl-sq" style="background:#378ADD"></div>Approved</div>
-      </div>
-      <div style="position:relative;height:160px"><canvas id="ch-status"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="cc-title">Gender distribution</div>
-      <div class="chart-legend" id="leg-gender"></div>
-      <div style="position:relative;height:160px"><canvas id="ch-gender"></canvas></div>
-    </div>
-    <div class="chart-card">
-      <div class="cc-title">Age at surgery</div>
-      <div style="position:relative;height:160px"><canvas id="ch-age"></canvas></div>
-    </div>`;
-
-  // Funnel
-  const funnelData = [
-    {l:'Enrolled',n:total,c:'#1a4a7a'},
-    {l:'Surgery done',n:surgDone,c:'#1D9E75'},
-    {l:'Rehab 1 paid',n:r1Done,c:'#EF9F27'},
-    {l:'Rehab 2 paid',n:r2Done,c:'#7F77DD'},
-  ];
-  document.getElementById('dash-funnel').innerHTML = funnelData.map(f=>{
-    const w=total?Math.max(6,Math.round(f.n/total*100)):6;
-    const pct=total?Math.round(f.n/total*100):0;
-    return `<div class="funnel-row"><div class="funnel-lbl">${f.l}</div><div class="funnel-track"><div class="funnel-fill" style="width:${w}%;background:${f.c}"><span>${f.n.toLocaleString('en-IN')}</span></div></div><div class="funnel-pct">${pct}%</div></div>`;
-  }).join('');
-
-  // FY chart
-  const fyMap={};
-  cases.forEach(c=>{if(c.fy)fyMap[c.fy]=(fyMap[c.fy]||0)+1;});
-  const fyKeys=Object.keys(fyMap).sort();
-  mkChart('ch-fy','bar',{labels:fyKeys,datasets:[{data:fyKeys.map(k=>fyMap[k]),backgroundColor:'#534AB7aa',borderColor:'#534AB7',borderWidth:1,borderRadius:3}]},
-    {plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'#e0d9cc55'}}}});
-
-  // District chart
-  const dMap={};
-  cases.forEach(c=>{if(c.district)dMap[c.district]=(dMap[c.district]||0)+1;});
-  const dTop=Object.entries(dMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  mkChart('ch-dist','bar',{labels:dTop.map(e=>e[0]),datasets:[{data:dTop.map(e=>e[1]),backgroundColor:'#0F6E56bb',borderColor:'#0F6E56',borderWidth:1,borderRadius:3}]},
-    {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:9}},grid:{color:'#e0d9cc55'}},y:{ticks:{font:{size:9}},grid:{display:false}}}});
-
-  // Status chart
-  function sg(v){const s=(v||'').toUpperCase();return s.includes('PAID')?'Paid':s.includes('NEED')||s.includes('INFO')?'Need info':s.includes('APPROVED')?'Approved':'Other';}
-  const stages=['Surgery','Rehab 1','Rehab 2'];
-  const stageFields=[['surgStatus'],['r1Status'],['r2Status']];
-  mkChart('ch-status','bar',{labels:stages,datasets:[
-    {label:'Paid',data:stageFields.map(([f])=>cases.filter(c=>sg(c[f])==='Paid').length),backgroundColor:'#1D9E75cc',borderRadius:3},
-    {label:'Need info',data:stageFields.map(([f])=>cases.filter(c=>sg(c[f])==='Need info').length),backgroundColor:'#EF9F27cc',borderRadius:3},
-    {label:'Approved',data:stageFields.map(([f])=>cases.filter(c=>sg(c[f])==='Approved').length),backgroundColor:'#378ADDcc',borderRadius:3},
-  ]},{plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:11}},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'#e0d9cc55'}}}});
-
-  // Gender
-  const gMap={};
-  cases.forEach(c=>{if(c.gender)gMap[c.gender]=(gMap[c.gender]||0)+1;});
-  const gK=Object.keys(gMap);
-  const gC=['#378ADD','#D4537E','#888780'];
-  document.getElementById('leg-gender').innerHTML=gK.map((k,i)=>`<div class="cl-item"><div class="cl-sq" style="background:${gC[i]}"></div>${k} (${gMap[k]})</div>`).join('');
-  mkChart('ch-gender','doughnut',{labels:gK,datasets:[{data:gK.map(k=>gMap[k]),backgroundColor:gC,borderWidth:1.5,borderColor:'#ffffff20'}]},
-    {plugins:{legend:{display:false}},cutout:'60%'});
-
-  // Age
-  const ageOrder=['<1 yr','1 yr','2 yrs','3 yrs','4 yrs','5 yrs','6 yrs','7+ yrs'];
-  const aMap={'<1 yr':0,'1 yr':0,'2 yrs':0,'3 yrs':0,'4 yrs':0,'5 yrs':0,'6 yrs':0,'7+ yrs':0};
-  cases.forEach(c=>{
-    const a=String(c.age||'').trim();
-    const m=a.match(/(\d+)\s*(Year|Month)/i);
-    if(!m)return;
-    const n=+m[1],u=m[2].toLowerCase();
-    if(u.startsWith('month'))aMap['<1 yr']++;
-    else if(n<=6)aMap[n+' yrs']=(aMap[n+' yrs']||0)+1;
-    else aMap['7+ yrs']++;
-    // fix 1 yr
-    if(n===1&&u.startsWith('year')){aMap['1 yr']++;aMap['1 yrs']=(aMap['1 yrs']||0)-1;}
-  });
-  mkChart('ch-age','bar',{labels:ageOrder,datasets:[{data:ageOrder.map(a=>aMap[a]||0),backgroundColor:'#D85A30bb',borderColor:'#D85A30',borderWidth:1,borderRadius:3}]},
-    {plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10}},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'#e0d9cc55'}}}});
-}
-
-function mkChart(id, type, data, opts) {
-  if (chartInstances[id]) chartInstances[id].destroy();
-  const canvas = document.getElementById(id);
-  if (!canvas) return;
-  chartInstances[id] = new Chart(canvas, {type, data, options:{responsive:true, maintainAspectRatio:false, ...opts}});
-}
-
-// ══════════════════════════════════════════
-// CASES LIST
-// ══════════════════════════════════════════
-function buildCasesList() {
-  filteredCases = getMyCase();
-  const filters = document.getElementById('cases-filters');
-  filters.innerHTML = ['All','On track','At risk','Surgery only','Rehab 1','Rehab 2'].map((f,i)=>
-    `<div class="fchip ${i===0?'active':''}" onclick="applyCaseFilter('${f}',this)">${f}</div>`).join('');
-  renderCaseList();
-}
-
-function applyCaseFilter(f, el) {
-  document.querySelectorAll('#cases-filters .fchip').forEach(c=>c.classList.remove('active'));
-  el.classList.add('active');
-  const base = getMyCase();
-  if (f==='All') filteredCases=[...base];
-  else if (f==='On track') filteredCases=base.filter(c=>!c.risk);
-  else if (f==='At risk') filteredCases=base.filter(c=>c.risk);
-  else filteredCases=base.filter(c=>c.journey&&c.journey.toLowerCase().includes(f.toLowerCase()));
-  document.getElementById('case-search').value='';
-  renderCaseList();
-}
-
-function filterCases(q) {
-  const s=q.toLowerCase();
-  filteredCases=getMyCase().filter(c=>
-    c.name.toLowerCase().includes(s)||c.village.toLowerCase().includes(s)||
-    c.district.toLowerCase().includes(s)||c.id.includes(s));
-  renderCaseList();
-}
-
-function renderCaseList() {
-  document.getElementById('case-count').textContent=`Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''}`;
-  const list=document.getElementById('case-list');
-  if (!filteredCases.length) { list.innerHTML='<div style="text-align:center;color:var(--text-light);padding:32px;font-size:13px">No cases found</div>'; return; }
-  list.innerHTML=filteredCases.map(c=>{
-    const pct=c.totalSessions?Math.round(c.sessions/c.totalSessions*100):0;
-    const pillCls=c.risk?'sp-risk':c.status==='paid'?'sp-paid':c.status==='rehab1'||c.status==='rehab2'?'sp-rehab':'sp-pending';
-    const pillLbl=c.risk?'At risk':c.status==='paid'?'On track':c.journey||'Pending';
-    return `<div class="case-card" onclick="openCase('${c.id}')">
-      <div class="case-header"><div class="case-name">${c.name}</div><span class="spill ${pillCls}">${pillLbl}</span></div>
-      <div class="case-meta"><span>${c.gender}, ${c.age}</span><span>${c.village}, ${c.district}</span>${c.surgAdmit?`<span>Surgery: ${c.surgAdmit}</span>`:''}</div>
-      ${c.surgRefNo?`<div style="font-size:10px;color:var(--text-light);margin-top:4px">SAST: ${c.surgRefNo}</div>`:''}
-      ${c.sessions>0?`<div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div><div class="prog-lbl">${c.sessions} of ${c.totalSessions} sessions</div>`:''}
-    </div>`;
-  }).join('');
-}
-
-function openCase(id) {
-  selectedCase = SAMPLE_CASES.find(c=>c.id===id);
-  buildForm(selectedCase, 'screen-form');
-  showScreen('form');
-}
-
-// ══════════════════════════════════════════
-// ALERTS
-// ══════════════════════════════════════════
-function buildAlerts() {
-  const my = getMyCase();
-  const risks = my.filter(c=>c.risk);
-  const noRehab = my.filter(c=>!c.risk&&c.status==='rehab1'&&c.sessions===0);
-  const body = document.getElementById('alerts-body');
-  let html = `<div class="section-lbl">Dropout risk — ${risks.length} babies</div>`;
-  if (!risks.length) html += '<div style="font-size:13px;color:var(--text-light);margin-bottom:16px">No at-risk cases right now.</div>';
-  risks.forEach(c=>{
-    html+=`<div class="alert-card" onclick="openCase('${c.id}')"><div class="alert-dot"></div><div style="flex:1"><div class="alert-name">${c.name}</div><div class="alert-detail">${c.village}, ${c.district} · ${c.phase} · Last contact: ${c.lastContact}</div></div><span class="alert-tag">At risk</span></div>`;
-  });
-  html += `<div class="section-lbl" style="margin-top:16px">Rehab not started — ${noRehab.length} babies</div>`;
-  if (!noRehab.length) html += '<div style="font-size:13px;color:var(--text-light)">All surgery cases have begun rehab.</div>';
-  noRehab.forEach(c=>{
-    html+=`<div class="warn-card" onclick="openCase('${c.id}')"><div class="warn-dot"></div><div style="flex:1"><div class="alert-name">${c.name}</div><div class="alert-detail">${c.village}, ${c.district} · Surgery done · Rehab not started</div></div><span class="warn-tag">Not started</span></div>`;
-  });
   body.innerHTML = html;
 }
 
 // ══════════════════════════════════════════
-// FORMS
+// CASE LIST
 // ══════════════════════════════════════════
-function buildEntryForm() {
-  const body = document.getElementById('entry-form-body');
-  const btn = document.getElementById('entry-submit-btn');
-  btn.className = 'btn-submit ' + ROLE_META[currentRole].btnClass;
-  btn.textContent = currentRole==='hospital'?'Submit surgery record →':currentRole==='rehab'?'Submit session →':currentRole==='district'?'Save follow-up →':'Submit outcomes →';
-  body.innerHTML = buildFormHTML(null);
-}
-
-function buildForm(cas, screenId) {
+function buildCaseList(filter = 'all') {
   const meta = ROLE_META[currentRole];
-  document.getElementById('form-title').textContent = cas?'Update — '+cas.name:'New entry';
-  document.getElementById('form-sub').textContent = cas?cas.village+', '+cas.district:'';
-  const chip = document.getElementById('form-chip');
-  chip.textContent = meta.label; chip.className = 'role-chip '+meta.chipClass;
-  const btn = document.getElementById('form-submit-btn');
-  btn.className = 'btn-submit '+meta.btnClass;
-  btn.textContent = 'Submit →';
-  document.getElementById('form-body').innerHTML = buildFormHTML(cas);
+  document.getElementById('cases-title').textContent = meta.orgOptions[0] + ' — Cases';
+  document.getElementById('cases-sub').textContent = 'Tap a case to view or update';
+  const chip = document.getElementById('cases-chip');
+  chip.textContent = meta.label;
+  chip.className = 'role-chip ' + meta.chip;
+
+  const filterRow = document.getElementById('filter-row');
+  filterRow.innerHTML = ['All','On track','At risk','Rehab 1','Rehab 2','Completed'].map((f,i) =>
+    `<div class="filter-chip ${(filter==='risk'&&f==='At risk')||(f==='All'&&filter==='all')?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
+  ).join('');
+
+  const userCases = filterCasesByUser(SAMPLE_CASES);
+  filteredCases = filter === 'risk' ? userCases.filter(c=>c.risk) : [...userCases];
+  renderCaseList();
 }
 
-function buildFormHTML(cas) {
-  if (currentRole==='hospital') return buildHospitalForm(cas);
-  if (currentRole==='rehab') return buildRehabForm(cas);
-  if (currentRole==='district') return buildDistrictForm(cas);
-  return buildStateForm(cas);
+function applyFilter(f, el) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  const uc = filterCasesByUser(SAMPLE_CASES);
+  if (f === 'All') filteredCases = [...uc];
+  else if (f === 'On track') filteredCases = uc.filter(c => !c.risk);
+  else if (f === 'At risk') filteredCases = uc.filter(c => c.risk);
+  else filteredCases = uc.filter(c => c.phase && c.phase.toLowerCase().includes(f.toLowerCase()));
+  document.getElementById('case-search').value = '';
+  renderCaseList();
+}
+
+function filterCases(q) {
+  const s = q.toLowerCase();
+  filteredCases = SAMPLE_CASES.filter(c =>
+    c.name.toLowerCase().includes(s) || c.village.toLowerCase().includes(s) ||
+    c.district.toLowerCase().includes(s) || c.id.includes(s)
+  );
+  renderCaseList();
+}
+
+function renderCaseList() {
+  document.getElementById('case-count').textContent = `Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''}`;
+  const list = document.getElementById('case-list');
+  list.innerHTML = filteredCases.map(c => {
+    const pct = c.totalSessions ? Math.round(c.sessions / c.totalSessions * 100) : 0;
+    const pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':c.status==='rehab'?'pill-rehab':'pill-pending';
+    const pillLabel = c.status==='paid'?'On track':c.status==='risk'?'At risk':c.status==='rehab1'?'Needs Rehab 1':c.status==='rehab2'?'Needs Rehab 2':c.status==='pending'?'Pending':'Unknown';
+    return `<div class="case-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
+      <div class="case-header">
+        <div class="case-name">${c.name}</div>
+        <span class="status-pill ${pillClass}">${pillLabel}</span>
+      </div>
+      <div class="case-meta">
+        <span>${c.gender}, ${c.age}</span>
+        <span>${c.village}, ${c.district}</span>
+        <span>Surgery: ${c.surgery}</span>
+      </div>
+      ${c.sessions>0?`<div class="case-progress"><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="progress-label">${c.sessions} of ${c.totalSessions} sessions · ${pct}%</div></div>`:''}
+    </div>`;
+  }).join('') || '<div style="text-align:center;color:var(--text-light);padding:32px;font-size:13px">No cases found</div>';
+}
+
+// ══════════════════════════════════════════
+// FORMS — role-specific
+// ══════════════════════════════════════════
+function buildForm(cas) {
+  const meta = ROLE_META[currentRole];
+  const chip = document.getElementById('form-chip');
+  chip.textContent = meta.label;
+  chip.className = 'role-chip ' + meta.chip;
+
+  const btn = document.getElementById('submit-btn');
+  btn.className = 'btn-submit ' + currentRole;
+
+  let title, sub, html = '';
+
+  if (currentRole === 'hospital') {
+    title = cas ? 'Update case — ' + cas.name : 'New surgery registration';
+    sub = 'Device & operative details';
+    btn.textContent = cas ? 'Update record →' : 'Submit registration →';
+    html = buildHospitalForm(cas);
+  } else if (currentRole === 'rehab') {
+    title = cas ? cas.name + ' — session log' : 'Log AVT session';
+    sub = cas ? `${cas.phase} · Session ${cas.sessions+1} of ${cas.totalSessions}` : 'Find beneficiary first';
+    btn.textContent = 'Submit session →';
+    html = buildRehabForm(cas);
+  } else if (currentRole === 'district') {
+    title = cas ? 'Follow-up — ' + cas.name : 'Field follow-up note';
+    sub = cas ? cas.village + ', ' + cas.district : 'Select beneficiary';
+    btn.textContent = 'Save follow-up →';
+    html = buildDistrictForm(cas);
+  } else {
+    title = cas ? 'Outcomes — ' + cas.name : 'Milestone update';
+    sub = cas ? 'Post-implant outcomes tracker' : 'Find beneficiary';
+    btn.textContent = 'Submit outcomes →';
+    html = buildStateForm(cas);
+  }
+
+  document.getElementById('form-title').textContent = title;
+  document.getElementById('form-sub').textContent = sub;
+  document.getElementById('form-body').innerHTML = html;
 }
 
 function buildHospitalForm(cas) {
-  const banner = cas?`<div class="info-banner"><div class="ib-icon">✓</div><div><div class="ib-name">${cas.name}</div><div class="ib-text">${cas.gender}, ${cas.age} · ${cas.district}<br>Surgery: ${cas.surgAdmit||'—'} · SAST: ${cas.surgRefNo||'—'}</div></div></div>`:'';
-  return `<div class="fsect-title">Find beneficiary</div>
-  <div class="field-row">
-    <div class="field"><div class="field-label">Card No. <span class="req">*</span></div><input class="field-input ${cas?'hv':''}" id="f-card" value="${cas?cas.id:''}"></div>
-    <div class="field"><div class="field-label">Surgery year</div><select class="field-input hv" id="f-year"><option>2025-26</option><option selected>2024-25</option><option>2023-24</option><option>2022-23</option></select></div>
-  </div>${banner}
-  <div class="fsect-title" style="margin-top:4px">Device details</div>
-  <div class="field"><div class="field-label">Manufacturer <span class="req">*</span></div><select class="field-input" id="f-mfr"><option value="">Select...</option><option>Cochlear Limited (Australia)</option><option>MED-EL (Austria)</option><option>Advanced Bionics (USA)</option><option>Oticon Medical (Denmark)</option></select></div>
-  <div class="field-row">
-    <div class="field"><div class="field-label">Model</div><input class="field-input" id="f-model" placeholder="e.g. Nucleus 8"></div>
-    <div class="field"><div class="field-label">Side <span class="req">*</span></div><select class="field-input" id="f-side"><option value="">Select</option><option>Right ear</option><option>Left ear</option><option>Bilateral</option></select></div>
-  </div>
-  <div class="field"><div class="field-label">Serial number <span class="req">*</span></div><input class="field-input" id="f-serial" placeholder="Scan or type serial number"><div class="field-hint">Found on device packaging label</div></div>
-  <div class="fsect-title">Operative details</div>
-  <div class="field-row">
-    <div class="field"><div class="field-label">Surgery date <span class="req">*</span></div><input type="date" class="field-input ${cas&&cas.surgAdmit?'hv':''}" id="f-surgdate" value="${cas&&cas.surgAdmit?cas.surgAdmit.substring(0,10):''}"></div>
-    <div class="field"><div class="field-label">Switch-on date</div><input type="date" class="field-input" id="f-switchon"></div>
-  </div>
-  <div class="field"><div class="field-label">Treating surgeon <span class="pf-badge">Pre-filled</span></div><input class="field-input hv" id="f-surgeon" value="${cas?cas.doctor||'':''}"></div>
-  <div class="field"><div class="field-label">Recommended rehab centre</div><select class="field-input" id="f-rehabcentre"><option value="">Select...</option><option>AIISH Mysuru</option><option>NIMHANS Bengaluru</option><option>Samspanda Mandya</option><option>KSAD Dharwad</option><option>Other</option></select></div>
-  <div class="field"><div class="field-label">Notes</div><textarea class="field-input" id="f-notes" rows="2" placeholder="Optional remarks"></textarea></div>`;
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">✓</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.gender}, ${cas.age} · ${cas.village}, ${cas.district}<br>Surgery: ${cas.surgAdmit||cas.surgery||'—'} · SAST Ref: ${cas.surgRefNo||'—'}</div></div></div>` : '';
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Find beneficiary</div>
+      <div class="field">
+        <div class="field-label">Hospital <span class="req">*</span></div>
+        <select class="field-input has-value" id="f-hospital">
+          ${ROLE_META.hospital.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Surgery year <span class="req">*</span></div>
+          <select class="field-input has-value" id="f-year">
+            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option><option>2022-23</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Card No. <span class="req">*</span></div>
+          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card number" value="${cas?cas.id:''}" oninput="this.classList.toggle('has-value',this.value.length>0)">
+        </div>
+      </div>
+      ${bannerHTML}
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Device details</div>
+      <div class="field">
+        <div class="field-label">Manufacturer <span class="req">*</span></div>
+        <select class="field-input" id="f-mfr">
+          <option value="">Select...</option>
+          <option>Cochlear Limited (Australia)</option>
+          <option>MED-EL (Austria)</option>
+          <option>Advanced Bionics (USA)</option>
+          <option>Oticon Medical (Denmark)</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Model</div>
+          <input class="field-input" id="f-model" placeholder="e.g. Nucleus 8">
+        </div>
+        <div class="field">
+          <div class="field-label">Side <span class="req">*</span></div>
+          <select class="field-input" id="f-side">
+            <option value="">Select</option>
+            <option>Right ear</option><option>Left ear</option><option>Bilateral</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Serial number <span class="req">*</span></div>
+        <input class="field-input" id="f-serial" placeholder="Scan or type device serial number">
+        <div class="field-hint">Found on device packaging label</div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Operative details</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Surgery date <span class="req">*</span></div>
+          <input type="date" class="field-input ${cas?'has-value':''}" id="f-surgdate" value="${cas&&cas.surgAdmit?cas.surgAdmit.substring(0,10):''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Switch-on date</div>
+          <input type="date" class="field-input" id="f-switchon">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Treating surgeon</div>
+        <input class="field-input" id="f-surgeon" placeholder="Dr. name" value="${cas?cas.doctor||'':''}" placeholder="Dr. name">
+        <div class="field-hint">Pre-filled from SAST where available</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Recommended rehab centre</div>
+        <select class="field-input" id="f-rehabcentre">
+          <option value="">Select institute...</option>
+          ${ROLE_META.rehab.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Notes</div>
+      <div class="field">
+        <div class="field-label">Any complications or remarks</div>
+        <textarea class="field-input" id="f-notes" rows="3" placeholder="Optional..."></textarea>
+      </div>
+    </div>`;
 }
 
 function buildRehabForm(cas) {
-  const sn = cas?cas.sessions+1:1;
-  const dotsHTML = cas?Array.from({length:Math.min(18,54)},(_,i)=>{
-    const n=i+1;
-    return `<div class="sdot ${n<sn?'sd-done':n===sn?'sd-today':'sd-pending'}">${n}</div>`;
-  }).join(''):'';
-  const banner = cas?`<div class="info-banner"><div class="ib-icon">🎧</div><div><div class="ib-name">${cas.name}</div><div class="ib-text">${cas.phase} · ${cas.sessions} sessions done · Surgery: ${cas.surgAdmit||'—'}</div></div></div>`:'';
-  const warn = cas&&cas.risk?`<div class="warn-banner"><span>⚠</span>Last contact: ${cas.lastContact}. Please note reason for gap.</div>`:'';
-  return `<div class="fsect-title">Find beneficiary</div>
-  <div class="field-row">
-    <div class="field"><div class="field-label">Card No. <span class="req">*</span></div><input class="field-input ${cas?'hv':''}" id="f-card" value="${cas?cas.id:''}"></div>
-    <div class="field"><div class="field-label">Year</div><select class="field-input hv" id="f-year"><option>2025-26</option><option selected>2024-25</option><option>2023-24</option></select></div>
-  </div>${banner}${warn}
-  ${cas?`<div class="fsect-title">Session progress</div><div class="sdots">${dotsHTML}</div><div style="font-size:10px;color:var(--text-light);margin-bottom:12px">${cas.sessions} done · ${54-cas.sessions} remaining</div>`:''}
-  <div class="fsect-title">Today's session — ${sn}</div>
-  <div class="field-row">
-    <div class="field"><div class="field-label">Date <span class="req">*</span></div><input type="date" class="field-input hv" id="f-sessdate" value="${new Date().toISOString().split('T')[0]}"></div>
-    <div class="field"><div class="field-label">Duration</div><select class="field-input" id="f-duration"><option>45 min</option><option>60 min</option><option>30 min</option></select></div>
-  </div>
-  <div class="field"><div class="field-label">Audiologist / therapist <span class="req">*</span></div><input class="field-input" id="f-therapist" placeholder="Name"></div>
-  <div class="field"><div class="field-label">Attendance <span class="req">*</span></div>
-    <div class="radio-group" id="grp-attend">
-      <div class="radio-item checked" onclick="selRadio(this,'grp-attend')"><div class="radio-dot"></div>Present — child + guardian attended</div>
-      <div class="radio-item" onclick="selRadio(this,'grp-attend')"><div class="radio-dot"></div>Absent — family notified</div>
-      <div class="radio-item" onclick="selRadio(this,'grp-attend')"><div class="radio-dot"></div>Absent — not reachable</div>
+  const sessionNum = cas ? cas.sessions + 1 : 1;
+  const totalSess = cas ? cas.totalSessions : 54;
+  const pct = cas ? Math.round(cas.sessions / totalSess * 100) : 0;
+  const dotsHTML = cas ? Array.from({length: Math.min(18, totalSess)}, (_,i) => {
+    const n = i+1;
+    if (n < sessionNum) return `<div class="sdot sdot-done">${n}</div>`;
+    if (n === sessionNum) return `<div class="sdot sdot-today">${n}</div>`;
+    return `<div class="sdot sdot-pending">${n}</div>`;
+  }).join('') : '';
+
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🎧</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.phase} · ${cas.sessions} sessions done · Surgery: ${cas.surgery}</div></div></div>` : '';
+  const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last session was ${cas.lastContact}. Please note reason for gap in remarks.</div>` : '';
+
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Find beneficiary</div>
+      <div class="field">
+        <div class="field-label">Institute <span class="req">*</span></div>
+        <select class="field-input has-value" id="f-institute">
+          ${ROLE_META.rehab.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Year <span class="req">*</span></div>
+          <select class="field-input has-value" id="f-year">
+            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Card No. <span class="req">*</span></div>
+          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card no." value="${cas?cas.id:''}">
+        </div>
+      </div>
+      ${bannerHTML}
+      ${warnHTML}
     </div>
-  </div>
-  <div class="field"><div class="field-label">Session remarks</div><textarea class="field-input" id="f-remarks" rows="2" placeholder="Child's response, progress notes..."></textarea></div>`;
+    ${cas ? `<div class="form-section">
+      <div class="form-section-title">Session progress</div>
+      <div class="session-dots">${dotsHTML}</div>
+      <div style="font-size:10px;color:var(--text-light);margin-bottom:4px">${cas.sessions} done · ${totalSess - cas.sessions} remaining</div>
+    </div>` : ''}
+    <div class="form-section">
+      <div class="form-section-title">Today's session — ${sessionNum}</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Date <span class="req">*</span></div>
+          <input type="date" class="field-input has-value" id="f-sessdate" value="${new Date().toISOString().split('T')[0]}">
+        </div>
+        <div class="field">
+          <div class="field-label">Duration</div>
+          <select class="field-input" id="f-duration">
+            <option>45 min</option><option>60 min</option><option>30 min</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Audiologist / therapist <span class="req">*</span></div>
+        <input class="field-input" id="f-therapist" placeholder="Name of AVT therapist">
+      </div>
+      <div class="field">
+        <div class="field-label">Attendance <span class="req">*</span></div>
+        <div class="radio-group" id="attendance-group">
+          <div class="radio-item checked" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Present — child + guardian attended</div>
+          <div class="radio-item" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Absent — family notified</div>
+          <div class="radio-item" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Absent — not reachable</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Session remarks</div>
+        <textarea class="field-input" id="f-remarks" rows="2" placeholder="Child's response, progress notes..."></textarea>
+      </div>
+    </div>`;
 }
 
 function buildDistrictForm(cas) {
-  const banner = cas?`<div class="info-banner"><div class="ib-icon">📍</div><div><div class="ib-name">${cas.name}</div><div class="ib-text">${cas.village}, ${cas.district} · ${cas.phase} · Surgery: ${cas.surgAdmit||'—'}</div></div></div>`:'';
-  const warn = cas&&cas.risk?`<div class="warn-banner"><span>⚠</span>Last contact: ${cas.lastContact}. Flagged as at-risk.</div>`:'';
-  return `<div class="fsect-title">Select beneficiary</div>
-  <div class="field-row">
-    <div class="field"><div class="field-label">Card No.</div><input class="field-input ${cas?'hv':''}" id="f-card" value="${cas?cas.id:''}" placeholder="Optional"></div>
-    <div class="field"><div class="field-label">Year</div><select class="field-input hv" id="f-year"><option>2025-26</option><option selected>2024-25</option><option>2023-24</option></select></div>
-  </div>${banner}${warn}
-  <div class="fsect-title">Contact attempt</div>
-  <div class="field-row">
-    <div class="field"><div class="field-label">Date <span class="req">*</span></div><input type="date" class="field-input hv" id="f-contactdate" value="${new Date().toISOString().split('T')[0]}"></div>
-    <div class="field"><div class="field-label">Next follow-up</div><input type="date" class="field-input" id="f-nextdate"></div>
-  </div>
-  <div class="field"><div class="field-label">Contact method <span class="req">*</span></div>
-    <div class="radio-group" id="grp-contact">
-      <div class="radio-item checked" onclick="selRadio(this,'grp-contact')"><div class="radio-dot"></div>Phone call — reached guardian</div>
-      <div class="radio-item" onclick="selRadio(this,'grp-contact')"><div class="radio-dot"></div>Phone call — no answer</div>
-      <div class="radio-item" onclick="selRadio(this,'grp-contact')"><div class="radio-dot"></div>Home visit conducted</div>
-      <div class="radio-item" onclick="selRadio(this,'grp-contact')"><div class="radio-dot"></div>ASHA worker coordinated</div>
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">📍</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.village}, ${cas.district} · ${cas.phase} · Surgery: ${cas.surgery}</div></div></div>` : '';
+  const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last contact: ${cas.lastContact}. This case is flagged as at-risk.</div>` : '';
+
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Select beneficiary</div>
+      <div class="field">
+        <div class="field-label">District <span class="req">*</span></div>
+        <select class="field-input has-value" id="f-district">
+          ${ROLE_META.district.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Year <span class="req">*</span></div>
+          <select class="field-input has-value" id="f-year">
+            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Card No.</div>
+          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="Optional" value="${cas?cas.id:''}">
+        </div>
+      </div>
+      ${bannerHTML}
+      ${warnHTML}
     </div>
-  </div>
-  <div class="field"><div class="field-label">Reason for gap</div><select class="field-input" id="f-reason"><option value="">Select if applicable...</option><option>Financial — travel cost</option><option>Family unaware of rehab</option><option>Child unwell</option><option>Device issue</option><option>Family relocated</option><option>No issue — on track</option></select></div>
-  <div class="field"><div class="field-label">Action taken</div><textarea class="field-input" id="f-action" rows="2" placeholder="e.g. Referred to ASHA..."></textarea></div>
-  <div class="field"><div class="field-label">Officer name</div><input class="field-input" id="f-officer" placeholder="Your name"></div>`;
+    <div class="form-section">
+      <div class="form-section-title">Contact attempt</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Date <span class="req">*</span></div>
+          <input type="date" class="field-input has-value" id="f-contactdate" value="${new Date().toISOString().split('T')[0]}">
+        </div>
+        <div class="field">
+          <div class="field-label">Next follow-up</div>
+          <input type="date" class="field-input" id="f-nextdate">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Contact method <span class="req">*</span></div>
+        <div class="radio-group" id="contact-group">
+          <div class="radio-item checked" onclick="selectRadio(this,'contact-group')"><div class="radio-dot"></div>Phone call — reached guardian</div>
+          <div class="radio-item" onclick="selectRadio(this,'contact-group')"><div class="radio-dot"></div>Phone call — no answer</div>
+          <div class="radio-item" onclick="selectRadio(this,'contact-group')"><div class="radio-dot"></div>Home visit conducted</div>
+          <div class="radio-item" onclick="selectRadio(this,'contact-group')"><div class="radio-dot"></div>ASHA worker coordinated</div>
+        </div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Reason for gap / issue</div>
+      <div class="field">
+        <div class="field-label">Primary reason</div>
+        <select class="field-input" id="f-reason">
+          <option value="">Select if applicable...</option>
+          <option>Financial — travel cost to rehab centre</option>
+          <option>Family unaware of rehab importance</option>
+          <option>Child unwell / hospitalised</option>
+          <option>Device issue / mapping needed</option>
+          <option>Family migrated / relocated</option>
+          <option>Rehab centre access issue</option>
+          <option>No issue — on track</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Action taken</div>
+        <textarea class="field-input" id="f-action" rows="2" placeholder="e.g. Referred to ASHA, connected with rehab centre..."></textarea>
+      </div>
+      <div class="field">
+        <div class="field-label">Officer name</div>
+        <input class="field-input" id="f-officer" placeholder="Your name">
+      </div>
+    </div>`;
 }
 
 function buildStateForm(cas) {
-  const banner = cas?`<div class="info-banner"><div class="ib-icon">🏛️</div><div><div class="ib-name">${cas.name}</div><div class="ib-text">${cas.district} · ${cas.journey} · Surgery: ${cas.surgAdmit||'—'}</div></div></div>`:'';
-  return `<div class="fsect-title">Find beneficiary</div>
-  <div class="field"><div class="field-label">Card No. <span class="req">*</span></div><input class="field-input ${cas?'hv':''}" id="f-card" value="${cas?cas.id:''}"></div>${banner}
-  <div class="fsect-title">Developmental milestones</div>
-  <div class="field"><div class="field-label">Assessment date</div><input type="date" class="field-input" id="f-assessdate" value="${new Date().toISOString().split('T')[0]}"></div>
-  ${['Sound awareness','Responds to name','Localises sound','First word spoken','2-word phrases','School integration ready'].map((m,i)=>`
-  <div class="field"><div class="field-label">${m}</div><div class="radio-group" id="ms-${i}">
-    <div class="radio-item" onclick="selRadio(this,'ms-${i}')"><div class="radio-dot"></div>Achieved</div>
-    <div class="radio-item" onclick="selRadio(this,'ms-${i}')"><div class="radio-dot"></div>Not yet</div>
-  </div></div>`).join('')}
-  <div class="fsect-title">Audiogram</div>
-  <div class="field-row">
-    <div class="field"><div class="field-label">Aided threshold</div><select class="field-input" id="f-threshold"><option value="">Select...</option><option>20–30 dB (normal)</option><option>31–40 dB (mild)</option><option>41–55 dB (moderate)</option><option>>55 dB (needs review)</option></select></div>
-    <div class="field"><div class="field-label">Hearing age (months)</div><input class="field-input" id="f-hearingage" type="number" placeholder="e.g. 8"></div>
-  </div>
-  <div class="field"><div class="field-label">Assessed by</div><input class="field-input" id="f-audiologist" placeholder="Audiologist name"></div>`;
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🏛️</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.district} · ${cas.phase} · ${cas.sessions}/${cas.totalSessions} sessions · Surgery: ${cas.surgery}</div></div></div>` : '';
+
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Find beneficiary</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">District</div>
+          <select class="field-input" id="f-district">
+            <option value="">All districts</option>
+            ${ROLE_META.district.orgOptions.slice(0,-1).map(o=>`<option>${o}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">FY</div>
+          <select class="field-input has-value" id="f-year">
+            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Card No. <span class="req">*</span></div>
+        <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card number" value="${cas?cas.id:''}">
+      </div>
+      ${bannerHTML}
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Developmental milestones</div>
+      <div class="field">
+        <div class="field-label">Assessment date</div>
+        <input type="date" class="field-input" id="f-assessdate" value="${new Date().toISOString().split('T')[0]}">
+      </div>
+      ${['Sound awareness','Responds to name','Localises sound','First word spoken','2-word phrases','School integration ready'].map((m,i) => `
+        <div class="field">
+          <div class="field-label">${m}</div>
+          <div class="radio-group" id="ms-${i}">
+            <div class="radio-item" onclick="selectRadio(this,'ms-${i}')"><div class="radio-dot"></div>Achieved</div>
+            <div class="radio-item" onclick="selectRadio(this,'ms-${i}')"><div class="radio-dot"></div>Not yet</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Audiogram</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Aided threshold</div>
+          <select class="field-input" id="f-threshold">
+            <option value="">Select...</option>
+            <option>20–30 dB (normal)</option>
+            <option>31–40 dB (mild)</option>
+            <option>41–55 dB (moderate)</option>
+            <option>>55 dB (needs review)</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Hearing age (months)</div>
+          <input class="field-input" id="f-hearingage" type="number" placeholder="e.g. 8">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Assessed by (audiologist)</div>
+        <input class="field-input" id="f-audiologist" placeholder="Name">
+      </div>
+    </div>`;
 }
 
-function selRadio(el, gid) {
-  document.querySelectorAll('#'+gid+' .radio-item').forEach(r=>r.classList.remove('checked'));
+// ══════════════════════════════════════════
+// RADIO SELECT
+// ══════════════════════════════════════════
+function selectRadio(el, groupId) {
+  document.querySelectorAll('#' + groupId + ' .radio-item').forEach(r => r.classList.remove('checked'));
   el.classList.add('checked');
 }
 
@@ -912,55 +1247,97 @@ function selRadio(el, gid) {
 // SUBMIT
 // ══════════════════════════════════════════
 function submitForm() {
-  const isEntry = currentScreen==='home';
-  const btn = document.getElementById(isEntry?'entry-submit-btn':'form-submit-btn');
-  const bodyId = isEntry?'entry-form-body':'form-body';
-  btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
-  const formData = {};
-  document.querySelectorAll('#'+bodyId+' .field-input, #'+bodyId+' textarea').forEach(el=>{if(el.id)formData[el.id]=el.value;});
-  document.querySelectorAll('#'+bodyId+' .radio-group').forEach(g=>{const c=g.querySelector('.radio-item.checked');if(c)formData[g.id]=c.textContent.trim();});
-  formData.role=currentRole; formData.token=currentUser?.token||'';
-  formData.timestamp=new Date().toISOString(); formData.entryId='CI-'+Date.now(); formData.action='submit';
-  if (navigator.onLine) {
-    fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify(formData)})
-      .then(()=>showSuccess(formData.entryId)).catch(()=>saveOffline(formData));
-  } else { saveOffline(formData); }
-  btn.innerHTML='Submit →'; btn.disabled=false;
-}
+  const btn = document.getElementById('submit-btn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
 
-let pendingQ = JSON.parse(localStorage.getItem('ci_pending')||'[]');
-function saveOffline(d) { pendingQ.push(d); localStorage.setItem('ci_pending',JSON.stringify(pendingQ)); showSuccess(d.entryId,true); }
-function showSuccess(id,offline) {
-  document.getElementById('succ-id').textContent=id;
-  const msgs={hospital:'Surgery details saved.',rehab:'Session attendance logged.',district:'Follow-up note saved.',state:'Outcomes updated.'};
-  document.getElementById('succ-msg').textContent=(offline?'Saved offline — will sync when connected. ':'')+msgs[currentRole];
-  screenHistory=['home']; showScreen('success');
-}
+  const formData = collectFormData();
+  formData.role = currentRole;
+  formData.timestamp = new Date().toISOString();
+  formData.entryId = 'CI-' + Date.now();
 
-// ══════════════════════════════════════════
-// OFFLINE
-// ══════════════════════════════════════════
-window.addEventListener('offline',()=>{const c=document.getElementById('offline-chip');c.textContent='📶 No internet — entries will be saved locally ';const x=document.createElement('button');x.className='x-btn';x.textContent='×';x.onclick=()=>c.classList.remove('show');c.appendChild(x);c.classList.add('show');});
-window.addEventListener('online',()=>{document.getElementById('offline-chip').classList.remove('show');if(pendingQ.length){pendingQ.forEach(d=>fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify(d)}));pendingQ=[];localStorage.setItem('ci_pending','[]');}});
-
-// ══════════════════════════════════════════
-// AUTO LOGIN
-// ══════════════════════════════════════════
-window.addEventListener('load',()=>{
-  // Load cases from external file if available
-  if (typeof PRELOADED_CASES_DATA !== 'undefined') {
-    SAMPLE_CASES = PRELOADED_CASES_DATA;
+  if (navigator.onLine && SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(formData),
+    }).then(() => showSuccess(formData.entryId, false))
+      .catch(() => saveOffline(formData));
+  } else {
+    saveOffline(formData);
   }
-  const saved=sessionStorage.getItem('ci_user');
-  if(saved){
-    try{
-      currentUser=JSON.parse(saved);
-      currentRole=currentUser.role;
-      buildHome();
-      showScreen('home',false);
-    }catch(e){ sessionStorage.removeItem('ci_user'); }
+}
+
+function collectFormData() {
+  const data = {};
+  document.querySelectorAll('#form-body .field-input, #form-body textarea').forEach(el => {
+    if (el.id) data[el.id] = el.value;
+  });
+  document.querySelectorAll('#form-body .radio-group').forEach(grp => {
+    const checked = grp.querySelector('.radio-item.checked');
+    if (checked) data[grp.id] = checked.textContent.trim();
+  });
+  return data;
+}
+
+function saveOffline(data) {
+  pendingQueue.push(data);
+  localStorage.setItem('ci_pending', JSON.stringify(pendingQueue));
+  showSuccess(data.entryId, true);
+}
+
+function showSuccess(id, offline) {
+  document.getElementById('success-id').textContent = id;
+  const msgs = { hospital:'Surgery details saved to programme register.', rehab:'Session attendance logged successfully.', district:'Follow-up note saved. Family will be monitored.', state:'Outcome milestones updated.' };
+  document.getElementById('success-msg').textContent = msgs[currentRole];
+  const note = document.getElementById('offline-note');
+  note.style.display = offline ? 'block' : 'none';
+  screenHistory = ['home'];
+  showScreen('success');
+  const btn = document.getElementById('submit-btn');
+  if (btn) { btn.innerHTML = 'Submit →'; btn.disabled = false; }
+}
+
+// ══════════════════════════════════════════
+// OFFLINE SYNC
+// ══════════════════════════════════════════
+window.addEventListener('online', () => {
+  if (pendingQueue.length && SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+    const toast = document.getElementById('offline-toast');
+    toast.textContent = `📶 Syncing ${pendingQueue.length} offline entries...`;
+    toast.classList.add('show');
+    Promise.all(pendingQueue.map(d => fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify(d) })))
+      .then(() => { pendingQueue = []; localStorage.setItem('ci_pending','[]'); toast.textContent = '✓ All entries synced'; setTimeout(() => toast.classList.remove('show'), 3000); })
+      .catch(() => toast.classList.remove('show'));
   }
 });
 
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+window.addEventListener('offline', () => {
+  const toast = document.getElementById('offline-toast');
+  toast.textContent = '📶 No internet — entries will be saved locally';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 4000);
+});
 </script>
+
+<!-- Service Worker registration for offline PWA -->
+<script>
+// Auto-login if session stored
+window.addEventListener('load', () => {
+  const saved = sessionStorage.getItem('ci_user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      currentRole = currentUser.role;
+      buildHome();
+      showScreen('home', false);
+    } catch(e) { sessionStorage.removeItem('ci_user'); }
+  }
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+}
+</script>
+</body>
+</html>

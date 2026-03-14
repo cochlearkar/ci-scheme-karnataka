@@ -414,7 +414,6 @@ body {
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-thumb { background: var(--gray-mid); border-radius: 3px; }
 </style>
-<script src="cases.js"></script>
 </head>
 <body>
 
@@ -651,7 +650,7 @@ const ROLE_META = {
 };
 
 const PRELOADED_CASES = [];
-let SAMPLE_CASES = (typeof PRELOADED_CASES_DATA !== "undefined") ? PRELOADED_CASES_DATA : [];
+let SAMPLE_CASES = [];
 
 let filteredCases = [...SAMPLE_CASES];
 let selectedYears = ['2024-2025']; // default to current year
@@ -835,6 +834,10 @@ function filterCasesByUser(cases) {
 }
 
 function buildHome() {
+  // Ensure cases are loaded
+  if (SAMPLE_CASES.length === 0 && typeof PRELOADED_CASES_DATA !== 'undefined') {
+    SAMPLE_CASES = PRELOADED_CASES_DATA;
+  }
   const meta = ROLE_META[currentRole];
   const unitName = (currentUser && currentUser.unit) ? currentUser.unit : meta.orgOptions[0];
   document.getElementById('home-title').textContent = meta.icon + '  ' + unitName;
@@ -1474,5 +1477,6 @@ if ('serviceWorker' in navigator) {
 }
 }
 </script>
+<script src="cases.js"></script>
 </body>
 </html>

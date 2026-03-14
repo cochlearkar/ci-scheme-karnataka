@@ -1674,6 +1674,14 @@ function submitForm() {
   formData.role = currentRole;
   formData.timestamp = new Date().toISOString();
   formData.entryId = 'CI-' + Date.now();
+  // Include session token and case card number for Apps Script verification
+  if (currentUser) {
+    formData.token = currentUser.token || '';
+    formData.username = currentUser.username || '';
+    formData.unit = currentUser.unit || '';
+    // Ensure card number is captured even if not an editable field
+    if (!formData['f-card'] && selectedCase) formData['f-card'] = selectedCase.id || '';
+  }
 
   if (navigator.onLine && SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
     fetch(SCRIPT_URL, {
@@ -1695,6 +1703,14 @@ function collectFormData() {
     const checked = grp.querySelector('.radio-item.checked');
     if (checked) data[grp.id] = checked.textContent.trim();
   });
+  // Attach case info from selectedCase
+  if (selectedCase) {
+    data['case-name']     = selectedCase.name || '';
+    data['case-district'] = selectedCase.district || '';
+    data['case-hospital'] = selectedCase.hospital || '';
+    data['case-fy']       = selectedCase.fy || '';
+    data['case-journey']  = selectedCase.journey || selectedCase.phase || '';
+  }
   return data;
 }
 

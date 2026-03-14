@@ -701,6 +701,63 @@ async function submitPasswordChange() {
   }
 }
 
+function authenticateAndLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value.trim();
+  const errEl = document.getElementById('login-err');
+  const btn = document.getElementById('login-submit-btn');
+  errEl.style.display = 'none';
+  if (!username || !password) {
+    errEl.textContent = 'Please enter your username and password.';
+    errEl.style.display = 'block'; return;
+  }
+  btn.innerHTML = '<span class="spinner"></span> Signing in...';
+  btn.disabled = true;
+
+  // Use JSONP to bypass CORS — script tag injection works from any origin
+  const cbName = 'ciLoginCb_' + Date.now();
+  const timeout = setTimeout(() => {
+    delete window[cbName];
+    const s = document.getElementById(cbName);
+    if (s) s.remove();
+    btn.innerHTML = 'Sign in →'; btn.disabled = false;
+    errEl.textContent = 'Connection timed out. Please check your internet and try again.';
+    errEl.style.display = 'block';
+  }, 12000);
+
+  window[cbName] = function(data) {
+    clearTimeout(timeout);
+    delete window[cbName];
+    const s = document.getElementById(cbName);
+    if (s) s.remove();
+    btn.innerHTML = 'Sign in →'; btn.disabled = false;
+    if (data.status === 'ok') {
+      currentUser = data; currentRole = data.role;
+      sessionStorage.setItem('ci_user', JSON.stringify(data));
+      if (typeof PRELOADED_CASES_DATA !== 'undefined') SAMPLE_CASES = PRELOADED_CASES_DATA;
+      buildHome(); showScreen('home');
+    } else {
+      errEl.textContent = data.message || 'Incorrect username or password.';
+      errEl.style.display = 'block';
+    }
+  };
+
+  const url = SCRIPT_URL + '?action=login&username=' + encodeURIComponent(username) +
+    '&password=' + encodeURIComponent(password) + '&callback=' + cbName;
+  const script = document.createElement('script');
+  script.id = cbName;
+  script.src = url;
+  script.onerror = function() {
+    clearTimeout(timeout);
+    delete window[cbName];
+    this.remove();
+    btn.innerHTML = 'Sign in →'; btn.disabled = false;
+    errEl.textContent = 'Cannot reach server. Please check your internet connection.';
+    errEl.style.display = 'block';
+  };
+  document.head.appendChild(script);
+}
+
 function doLogout() {
   currentUser = null; sessionStorage.removeItem('ci_user');
   currentRole = null; screenHistory = [];

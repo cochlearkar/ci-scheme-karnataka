@@ -6,9 +6,9 @@
 <meta name="theme-color" content="#0a3d2e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="CI Scheme">
+<meta name="apple-mobile-web-app-title" content="Shravan Sanjeevini">
 <link rel="manifest" href="manifest.json">
-<title>CI Scheme Karnataka</title>
+<title>Shravan Sanjeevini</title>
 
 <style>
 :root {
@@ -406,6 +406,14 @@ body {
 
 /* ─── SCROLLBAR ─── */
 ::-webkit-scrollbar { width: 3px; }
+
+/* FY section grouping */
+.fy-section { margin-bottom: 8px; }
+.fy-header { display:flex; align-items:center; padding:10px 16px; background:var(--gray-bg); border-radius:10px; cursor:pointer; font-weight:600; font-size:13px; color:var(--text-main); gap:8px; }
+.fy-count { margin-left:auto; font-size:11px; font-weight:500; color:var(--text-light); background:var(--gray-mid); padding:2px 8px; border-radius:10px; }
+.fy-toggle { font-size:11px; color:var(--text-light); }
+.fy-body { padding:4px 0 0 0; }
+
 ::-webkit-scrollbar-thumb { background: var(--gray-mid); border-radius: 3px; }
 </style>
 <script src="cases.js" defer></script>
@@ -417,7 +425,8 @@ body {
   <div style="background:var(--green-dark);min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;overflow-y:auto;">
     <div style="text-align:center;margin-bottom:32px;">
       <div style="font-size:52px;margin-bottom:14px;">🦻</div>
-      <h1 style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-.3px;">CI Scheme Karnataka</h1>
+      <div id="login-offline-banner" style="display:none;background:rgba(255,255,255,0.15);border-radius:8px;padding:8px 14px;font-size:12px;color:#fff;margin-bottom:10px;">📶 No internet — entries will sync when online</div>
+      <h1 style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-.3px;">Shravan Sanjeevini</h1>
       <p style="color:rgba(255,255,255,.55);font-size:13px;margin-top:6px;">Cochlear Implant Programme · NPPCD</p>
     </div>
     <div style="background:var(--surface);border-radius:20px;padding:24px 20px;width:100%;max-width:360px;">
@@ -458,7 +467,7 @@ body {
     <div id="login-hero" style="padding:48px 28px 32px;text-align:center;flex-shrink:0;">
       <div id="login-hero-icon" style="font-size:52px;margin-bottom:16px;"></div>
       <div id="login-hero-title" style="color:#fff;font-size:20px;font-weight:700;letter-spacing:-.3px;"></div>
-      <div id="login-hero-sub" style="color:rgba(255,255,255,.55);font-size:12px;margin-top:5px;">CI Scheme Karnataka · NPPCD</div>
+      <div id="login-hero-sub" style="color:rgba(255,255,255,.55);font-size:12px;margin-top:5px;">Shravan Sanjeevini · NPPCD</div>
     </div>
 
     <!-- White card at bottom -->
@@ -836,7 +845,7 @@ function buildHome() {
   const meta = ROLE_META[currentRole];
   const unitName = (currentUser && currentUser.unit) ? currentUser.unit : meta.orgOptions[0];
   document.getElementById('home-title').textContent = meta.icon + '  ' + unitName;
-  document.getElementById('home-sub').textContent = meta.label + ' · CI Scheme Karnataka';
+  document.getElementById('home-sub').textContent = meta.label + ' · Shravan Sanjeevini';
   const chip = document.getElementById('home-chip');
   chip.textContent = meta.label;
   chip.className = 'role-chip ' + meta.chip;
@@ -868,7 +877,10 @@ function buildHome() {
   } else if (currentRole === 'rehab') {
     html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">✏️</div><div><div class="action-title">Log today's session</div><div class="action-desc">Mark attendance & session number</div></div><div class="action-arrow">→</div></div>`;
   } else if (currentRole === 'district') {
-    html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk babies</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
+    if (currentRole !== 'state') {
+    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify & complete pending information</div></div><div class="action-arrow">→</div></div>`;
+  }
+  if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
   } else {
     html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">📊</div><div><div class="action-title">Update milestone / outcomes</div><div class="action-desc">Record audiogram & milestones</div></div><div class="action-arrow">→</div></div>`;
   }
@@ -896,13 +908,15 @@ function buildHome() {
 // ══════════════════════════════════════════
 function buildCaseList(filter = 'all') {
   const meta = ROLE_META[currentRole];
-  document.getElementById('cases-title').textContent = meta.orgOptions[0] + ' — Cases';
+  const _unitLabel = (currentUser && currentUser.unit) ? currentUser.unit : meta.orgOptions[0];
+  document.getElementById('cases-title').textContent = _unitLabel + ' — Cases';
   document.getElementById('cases-sub').textContent = 'Tap a case to view or update';
   const chip = document.getElementById('cases-chip');
   chip.textContent = meta.label;
   chip.className = 'role-chip ' + meta.chip;
 
   if (filter === 'risk') activeStatusFilter = 'At risk';
+  else if (filter === 'confirm') activeStatusFilter = 'Confirm';
   else activeStatusFilter = 'All';
 
 
@@ -965,12 +979,23 @@ function toggleAllYears(el) {
 
 function applyAllFilters() {
   let cases = filterCasesByUser(SAMPLE_CASES);
-  // Status filter only
-  if (activeStatusFilter === 'On track') cases = cases.filter(c => !c.risk);
-  else if (activeStatusFilter === 'At risk') cases = cases.filter(c => c.risk);
-  else if (activeStatusFilter !== 'All') cases = cases.filter(c => c.phase && c.phase.toLowerCase().includes(activeStatusFilter.toLowerCase()));
+  if (activeStatusFilter === 'Confirm') {
+    // Show cases that need confirmation (missing data or at-risk)
+    cases = cases.filter(c => c.risk || !c.surgAdmit || c.status === 'pending');
+  } else if (activeStatusFilter === 'On track') {
+    cases = cases.filter(c => !c.risk && c.status !== 'pending');
+  } else if (activeStatusFilter === 'At risk') {
+    cases = cases.filter(c => c.risk);
+  } else if (activeStatusFilter === 'Completed') {
+    cases = cases.filter(c => c.status === 'paid');
+  } else if (activeStatusFilter === 'Rehab 1') {
+    cases = cases.filter(c => c.status === 'rehab1');
+  } else if (activeStatusFilter === 'Rehab 2') {
+    cases = cases.filter(c => c.status === 'rehab2');
+  }
   filteredCases = cases;
-  document.getElementById('case-search').value = '';
+  const searchEl = document.getElementById('case-search');
+  if (searchEl) searchEl.value = '';
   renderCaseList();
 }
 
@@ -994,26 +1019,65 @@ function filterCases(q) {
   renderCaseList();
 }
 
+function caseCardHTML(c) {
+  const pct = c.totalSessions ? Math.round(c.sessions / c.totalSessions * 100) : 0;
+  const pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':'pill-pending';
+  const pillLabel = c.status==='paid'?'✓ Complete':c.status==='risk'?'⚠ At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pending':'Active';
+  const dateLabel = c.surgAdmit ? `Surgery: ${c.surgAdmit}` : c.r1Admit ? `Rehab1: ${c.r1Admit}` : c.r2Admit ? `Rehab2: ${c.r2Admit}` : '—';
+  return `<div class="case-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
+    <div class="case-header">
+      <div class="case-name">${c.name}</div>
+      <span class="status-pill ${pillClass}">${pillLabel}</span>
+    </div>
+    <div class="case-meta">
+      <span>${c.gender}, ${c.age} · ${c.district}</span>
+      <span>${dateLabel}</span>
+      <span style="color:var(--text-light);font-size:11px">${c.journey||c.phase||''}</span>
+    </div>
+    ${c.sessions>0?`<div class="case-progress"><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="progress-label">${c.sessions}/${c.totalSessions} sessions</div></div>`:''}
+  </div>`;
+}
+
 function renderCaseList() {
   document.getElementById('case-count').textContent = `Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''}`;
   const list = document.getElementById('case-list');
-  list.innerHTML = filteredCases.map(c => {
-    const pct = c.totalSessions ? Math.round(c.sessions / c.totalSessions * 100) : 0;
-    const pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':c.status==='rehab'?'pill-rehab':'pill-pending';
-    const pillLabel = c.status==='paid'?'On track':c.status==='risk'?'At risk':c.status==='rehab1'?'Needs Rehab 1':c.status==='rehab2'?'Needs Rehab 2':c.status==='pending'?'Pending':'Unknown';
-    return `<div class="case-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
-      <div class="case-header">
-        <div class="case-name">${c.name}</div>
-        <span class="status-pill ${pillClass}">${pillLabel}</span>
+  if (!filteredCases.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:32px;font-size:13px">No cases found</div>';
+    return;
+  }
+  // Group by FY
+  const byFY = {};
+  filteredCases.forEach(c => {
+    const fy = c.fy || 'Unknown FY';
+    if (!byFY[fy]) byFY[fy] = [];
+    byFY[fy].push(c);
+  });
+  const fyKeys = Object.keys(byFY).sort().reverse(); // newest first
+  let html = '';
+  fyKeys.forEach(fy => {
+    const cases = byFY[fy];
+    const sectionId = 'fy-sec-' + fy.replace(/[^a-z0-9]/gi,'');
+    html += `<div class="fy-section">
+      <div class="fy-header" onclick="toggleFYSection('${sectionId}')">
+        <span>FY ${fy}</span>
+        <span class="fy-count">${cases.length} cases</span>
+        <span class="fy-toggle" id="${sectionId}-icon">▼</span>
       </div>
-      <div class="case-meta">
-        <span>${c.gender}, ${c.age}</span>
-        <span>${c.village}, ${c.district}</span>
-        <span>Surgery: ${c.surgAdmit||c.r1Admit||"—"}</span>
+      <div class="fy-body" id="${sectionId}">
+        ${cases.map(caseCardHTML).join('')}
       </div>
-      ${c.sessions>0?`<div class="case-progress"><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="progress-label">${c.sessions} of ${c.totalSessions} sessions · ${pct}%</div></div>`:''}
     </div>`;
-  }).join('') || '<div style="text-align:center;color:var(--text-light);padding:32px;font-size:13px">No cases found</div>';
+  });
+  list.innerHTML = html;
+}
+
+function toggleFYSection(id) {
+  const body = document.getElementById(id);
+  const icon = document.getElementById(id+'-icon');
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (icon) icon.textContent = open ? '▶' : '▼';
 }
 
 // ══════════════════════════════════════════
@@ -1158,7 +1222,7 @@ function buildRehabForm(cas) {
     return `<div class="sdot sdot-pending">${n}</div>`;
   }).join('') : '';
 
-  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🎧</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.phase} · ${cas.sessions} sessions done · Surgery: ${cas.surgery}</div></div></div>` : '';
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🎧</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.phase} · ${cas.sessions} sessions done · Surgery: ${cas.surgAdmit||cas.r1Admit||'—'}</div></div></div>` : '';
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last session was ${cas.lastContact}. Please note reason for gap in remarks.</div>` : '';
 
   return `
@@ -1224,7 +1288,7 @@ function buildRehabForm(cas) {
 }
 
 function buildDistrictForm(cas) {
-  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">📍</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.village}, ${cas.district} · ${cas.phase} · Surgery: ${cas.surgery}</div></div></div>` : '';
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">📍</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.village}, ${cas.district} · ${cas.phase} · Surgery: ${cas.surgAdmit||cas.r1Admit||'—'}</div></div></div>` : '';
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last contact: ${cas.lastContact}. This case is flagged as at-risk.</div>` : '';
 
   return `
@@ -1296,11 +1360,41 @@ function buildDistrictForm(cas) {
         <div class="field-label">Officer name</div>
         <input class="field-input" id="f-officer" placeholder="Your name">
       </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">🎧 Device &amp; Equipment Status</div>
+      <div class="field">
+        <div class="field-label">Device Condition <span class="req">*</span></div>
+        <div class="radio-group" id="rg-device-status">
+          <div class="radio-item" onclick="selectRadio(this,'rg-device-status');showDeviceNote(false)"><div class="radio-dot"></div>✅ Working well</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-device-status');showDeviceNote(true)"><div class="radio-dot"></div>🔧 Needs repair / service</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-device-status');showDeviceNote(true)"><div class="radio-dot"></div>❌ Lost or damaged</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-device-status');showDeviceNote(false)"><div class="radio-dot"></div>⬆️ Upgraded / replaced</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-device-status');showDeviceNote(true)"><div class="radio-dot"></div>⛔ Not using device</div>
+        </div>
+      </div>
+      <div class="field" id="device-note-group" style="display:none">
+        <div class="field-label">Device Issue Details</div>
+        <textarea class="field-input" id="f-device-note" rows="2" placeholder="Describe the issue..."></textarea>
+      </div>
+      <div class="field">
+        <div class="field-label">Mapping / Programming</div>
+        <div class="radio-group" id="rg-mapping-status">
+          <div class="radio-item" onclick="selectRadio(this,'rg-mapping-status')"><div class="radio-dot"></div>✅ Up to date</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-mapping-status')"><div class="radio-dot"></div>⏰ Due for mapping</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-mapping-status')"><div class="radio-dot"></div>⚠ Difficulty reported</div>
+        </div>
+      </div>
     </div>`;
 }
 
+function showDeviceNote(show) {
+  const el = document.getElementById('device-note-group');
+  if (el) el.style.display = show ? 'block' : 'none';
+}
+
 function buildStateForm(cas) {
-  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🏛️</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.district} · ${cas.phase} · ${cas.sessions}/${cas.totalSessions} sessions · Surgery: ${cas.surgery}</div></div></div>` : '';
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🏛️</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.district} · ${cas.phase} · ${cas.sessions}/${cas.totalSessions} sessions · Surgery: ${cas.surgAdmit||cas.r1Admit||'—'}</div></div></div>` : '';
 
   return `
     <div class="form-section">
@@ -1378,6 +1472,16 @@ function selectRadio(el, groupId) {
 // SUBMIT
 // ══════════════════════════════════════════
 function submitForm() {
+  // ── Mandatory field validation ──
+  if (currentRole === 'district') {
+    const devStatus = document.querySelector('#rg-device-status .radio-item.checked');
+    if (!devStatus) {
+      alert('⚠ Device status is required. Please select the equipment condition before submitting.');
+      const el = document.getElementById('rg-device-status');
+      if (el) el.scrollIntoView({behavior:'smooth'});
+      return;
+    }
+  }
   const btn = document.getElementById('submit-btn');
   btn.innerHTML = '<span class="spinner"></span>';
   btn.disabled = true;
@@ -1431,29 +1535,21 @@ function showSuccess(id, offline) {
 // ══════════════════════════════════════════
 // OFFLINE SYNC
 // ══════════════════════════════════════════
-window.addEventListener('online', () => {
-  if (pendingQueue.length && SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
-    const toast = document.getElementById('offline-toast');
-    toast.textContent = `📶 Syncing ${pendingQueue.length} offline entries...`;
-    toast.classList.add('show');
-    Promise.all(pendingQueue.map(d => fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify(d) })))
-      .then(() => { pendingQueue = []; localStorage.setItem('ci_pending','[]'); toast.textContent = '✓ All entries synced'; setTimeout(() => toast.classList.remove('show'), 3000); })
-      .catch(() => toast.classList.remove('show'));
-  }
-});
 
-window.addEventListener('offline', () => {
-  const toast = document.getElementById('offline-toast');
-  toast.textContent = '📶 No internet — entries will be saved locally';
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 4000);
-});
 </script>
 
 <!-- Service Worker registration for offline PWA -->
 <script>
 // Auto-login if session stored
+// Offline banner only on login screen
+function updateOfflineBanner(){
+  const b=document.getElementById('login-offline-banner');
+  if(b) b.style.display=navigator.onLine?'none':'block';
+}
+window.addEventListener('online', updateOfflineBanner);
+window.addEventListener('offline', updateOfflineBanner);
 window.addEventListener('load', () => {
+  updateOfflineBanner();
   // cases.js (defer) is guaranteed loaded by window load event
   if (typeof PRELOADED_CASES_DATA !== 'undefined') {
     SAMPLE_CASES = PRELOADED_CASES_DATA;

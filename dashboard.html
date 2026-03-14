@@ -441,25 +441,36 @@ try {
 
 // Filter cases by logged-in user's role
 function getCasesForUser(allCases, session) {
-  if (!session) return allCases; // no session = show all (standalone access)
+  if (!session) return allCases;
   const role = session.role;
   const unit = (session.unit || '').toLowerCase();
   const dist = (session.district || session.unit || '').toUpperCase();
 
   if (role === 'state') return allCases;
+
   if (role === 'hospital') {
-    // Match hospital name (partial, first 15 chars)
-    const key = unit.substring(0, 15);
-    return allCases.filter(c => c.hospital && c.hospital.toLowerCase().includes(key));
+    // Match on hospital name — try progressively shorter keys to find matches
+    for (let len = unit.length; len >= 6; len -= 2) {
+      const key = unit.substring(0, len);
+      const matches = allCases.filter(c => c.hospital && c.hospital.toLowerCase().includes(key));
+      if (matches.length > 0) return matches;
+    }
+    return []; // no matching cases for this hospital
   }
+
   if (role === 'rehab') {
-    // Rehab units — show cases that have been referred/operated, in their zone
-    // Since rehab cases don't have a fixed rehab field, show all cases with r1 pending
-    return allCases.filter(c => c.r1Admit || c.r2Admit || c.status === 'rehab1' || c.status === 'rehab2');
+    // IMPORTANT: The source data (SAST) does NOT record which rehab institute
+    // handled each case. There is no rehab institute field in the dataset.
+    // Rehab units therefore see NO cases in the dashboard — they can only
+    // enter new session data via the main app form.
+    // Return empty array with an explanatory flag.
+    return [];
   }
+
   if (role === 'district') {
     return allCases.filter(c => (c.district || '').toUpperCase() === dist);
   }
+
   return allCases;
 }
 
@@ -1121,6 +1132,32 @@ function filterRiskTable() { renderRiskTable(); }
 // ══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   setDashboardHeader();
+
+  // Rehab units: no case-level data available in SAST source
+  if (SESSION && SESSION.role === 'rehab') {
+    document.getElementById('fy-bar').style.display = 'none';
+    document.querySelector('.nav').style.display = 'none';
+    document.querySelector('.main').innerHTML = `
+      <div style="max-width:520px;margin:60px auto;text-align:center;padding:0 24px">
+        <div style="font-size:52px;margin-bottom:16px">🎧</div>
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:12px">${SESSION.unit}</h2>
+        <p style="color:#555;font-size:14px;line-height:1.7;margin-bottom:24px">
+          The SAST source data does not record <strong>which rehab institute</strong> 
+          handled each case — so there are no cases to display for your unit in this dashboard.
+        </p>
+        <div style="background:#fef3c7;border:1.5px solid #d97706;border-radius:12px;padding:16px 20px;text-align:left;font-size:13px;color:#92400e;margin-bottom:20px">
+          <strong>⚠ What this means:</strong><br>
+          The dashboard cannot show AIISH Mysuru, AIISH Bengaluru, NIMHANS, or other 
+          rehab institutes' individual caseloads because the SAST portal does not tag 
+          each rehab claim with the institute name.<br><br>
+          <strong>What you can do:</strong> Use the main app to log session attendance 
+          and track progress case by case.
+        </div>
+        <button onclick="window.close()" style="background:#1a8a5a;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">← Back to App</button>
+      </div>`;
+    return;
+  }
+
   buildFYBar();
   renderState();
   // Update subtitle for role

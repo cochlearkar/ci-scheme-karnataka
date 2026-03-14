@@ -204,6 +204,12 @@ body {
 .search-icon { color: var(--text-light); font-size: 15px; }
 
 .filter-row { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+.year-bar { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 2px; align-items: center; }
+.year-chip { white-space: nowrap; font-size: 11px; font-weight: 600; padding: 5px 12px; border-radius: 16px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text-mid); cursor: pointer; flex-shrink: 0; transition: all .15s; }
+.year-chip.active { border-color: var(--green-mid); background: var(--green-light); color: var(--green); }
+.year-chip.all-years { border-style: dashed; }
+.year-chip.all-years.active { border-style: solid; background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+.year-label { font-size: 10px; color: var(--text-light); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
 .filter-chip {
   white-space: nowrap; font-size: 11px; font-weight: 500;
   padding: 6px 12px; border-radius: 16px;
@@ -639,6 +645,8 @@ const PRELOADED_CASES = [];
 let SAMPLE_CASES = (typeof PRELOADED_CASES_DATA !== "undefined") ? PRELOADED_CASES_DATA : [];
 
 let filteredCases = [...SAMPLE_CASES];
+let selectedYears = ['2024-2025']; // default to current year
+let activeStatusFilter = 'All';
 let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
 
 // ══════════════════════════════════════════
@@ -834,7 +842,8 @@ function buildHome() {
     document.getElementById('user-display-role').textContent = meta.label + (currentUser.unit ? ' · ' + currentUser.unit.substring(0,30) : '');
   }
 
-  const myCases = filterCasesByUser(SAMPLE_CASES);
+  const allMyCases = filterCasesByUser(SAMPLE_CASES);
+  const myCases = allMyCases.filter(c => selectedYears.includes(c.fy));
   const risks = myCases.filter(c => c.risk);
   const ontrack = myCases.filter(c => !c.risk);
   document.getElementById('stat1').textContent = myCases.length;
@@ -889,34 +898,97 @@ function buildCaseList(filter = 'all') {
   chip.textContent = meta.label;
   chip.className = 'role-chip ' + meta.chip;
 
+  if (filter === 'risk') activeStatusFilter = 'At risk';
+  else activeStatusFilter = 'All';
+
+  buildYearBar();
+
   const filterRow = document.getElementById('filter-row');
-  filterRow.innerHTML = ['All','On track','At risk','Rehab 1','Rehab 2','Completed'].map((f,i) =>
-    `<div class="filter-chip ${(filter==='risk'&&f==='At risk')||(f==='All'&&filter==='all')?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
+  filterRow.innerHTML = ['All','On track','At risk','Rehab 1','Rehab 2','Completed'].map(f =>
+    `<div class="filter-chip ${f===activeStatusFilter?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
   ).join('');
 
-  const userCases = filterCasesByUser(SAMPLE_CASES);
-  filteredCases = filter === 'risk' ? userCases.filter(c=>c.risk) : [...userCases];
+  applyAllFilters();
+}
+
+function buildYearBar() {
+  // Get all unique years from data
+  const allYears = [...new Set(
+    filterCasesByUser(SAMPLE_CASES).map(c => c.fy).filter(Boolean)
+  )].sort();
+
+  const bar = document.getElementById('year-bar');
+  if (!bar) return;
+
+  // Default to most recent year if selectedYears is empty or has invalid value
+  if (!selectedYears.length || !allYears.some(y => selectedYears.includes(y))) {
+    selectedYears = [allYears[allYears.length - 1] || '2024-2025'];
+  }
+
+  bar.innerHTML = '<span class="year-label">FY:</span>' +
+    `<div class="year-chip all-years ${selectedYears.length===allYears.length?'active':''}"
+      onclick="toggleAllYears(this)" title="Select all years">All years</div>` +
+    allYears.map(y =>
+      `<div class="year-chip ${selectedYears.includes(y)?'active':''}"
+        onclick="toggleYear('${y}',this)">${y}</div>`
+    ).join('');
+}
+
+function toggleYear(yr, el) {
+  if (selectedYears.includes(yr)) {
+    if (selectedYears.length === 1) return; // keep at least one
+    selectedYears = selectedYears.filter(y => y !== yr);
+  } else {
+    selectedYears.push(yr);
+  }
+  buildYearBar();
+  applyAllFilters();
+}
+
+function toggleAllYears(el) {
+  const allYears = [...new Set(
+    filterCasesByUser(SAMPLE_CASES).map(c => c.fy).filter(Boolean)
+  )].sort();
+  if (selectedYears.length === allYears.length) {
+    // collapse to most recent year
+    selectedYears = [allYears[allYears.length - 1]];
+  } else {
+    selectedYears = [...allYears];
+  }
+  buildYearBar();
+  applyAllFilters();
+}
+
+function applyAllFilters() {
+  let cases = filterCasesByUser(SAMPLE_CASES);
+  // Year filter
+  cases = cases.filter(c => selectedYears.includes(c.fy));
+  // Status filter
+  if (activeStatusFilter === 'On track') cases = cases.filter(c => !c.risk);
+  else if (activeStatusFilter === 'At risk') cases = cases.filter(c => c.risk);
+  else if (activeStatusFilter !== 'All') cases = cases.filter(c => c.phase && c.phase.toLowerCase().includes(activeStatusFilter.toLowerCase()));
+  filteredCases = cases;
+  document.getElementById('case-search').value = '';
   renderCaseList();
 }
 
 function applyFilter(f, el) {
   document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
-  const uc = filterCasesByUser(SAMPLE_CASES);
-  if (f === 'All') filteredCases = [...uc];
-  else if (f === 'On track') filteredCases = uc.filter(c => !c.risk);
-  else if (f === 'At risk') filteredCases = uc.filter(c => c.risk);
-  else filteredCases = uc.filter(c => c.phase && c.phase.toLowerCase().includes(f.toLowerCase()));
-  document.getElementById('case-search').value = '';
-  renderCaseList();
+  activeStatusFilter = f;
+  applyAllFilters();
 }
 
 function filterCases(q) {
   const s = q.toLowerCase();
-  filteredCases = SAMPLE_CASES.filter(c =>
-    c.name.toLowerCase().includes(s) || c.village.toLowerCase().includes(s) ||
-    c.district.toLowerCase().includes(s) || c.id.includes(s)
-  );
+  let base = filterCasesByUser(SAMPLE_CASES).filter(c => selectedYears.includes(c.fy));
+  if (s) {
+    base = base.filter(c =>
+      c.name.toLowerCase().includes(s) || (c.village||'').toLowerCase().includes(s) ||
+      (c.district||'').toLowerCase().includes(s) || c.id.includes(s)
+    );
+  }
+  filteredCases = base;
   renderCaseList();
 }
 

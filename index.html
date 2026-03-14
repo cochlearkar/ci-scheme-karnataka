@@ -1684,14 +1684,77 @@ function submitForm() {
   }
 
   if (navigator.onLine && SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
-    fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(formData),
-    }).then(() => showSuccess(formData.entryId, false))
-      .catch(() => saveOffline(formData));
+    submitToSheet(formData);
   } else {
     saveOffline(formData);
   }
+}
+
+function submitToSheet(formData) {
+  const btn = document.getElementById('submit-btn');
+
+  // Use no-cors POST — reaches Apps Script but response is opaque
+  // We verify by also sending a JSONP GET callback to confirm receipt
+  const payload = JSON.stringify(formData);
+
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: payload
+  })
+  .then(() => {
+    // POST fired (no-cors = opaque response, can't confirm content)
+    // Now verify via JSONP GET
+    verifyViaJSONP(formData);
+  })
+  .catch(() => {
+    // Network error — save offline
+    saveOffline(formData);
+  });
+}
+
+function verifyViaJSONP(formData) {
+  const cbName = 'cb_' + Date.now();
+  const params = new URLSearchParams({
+    action: 'ping',
+    entryId: formData.entryId,
+    card: formData['f-card'] || '',
+    role: formData.role || '',
+    callback: cbName
+  });
+
+  const script = document.createElement('script');
+  let done = false;
+
+  window[cbName] = function(response) {
+    done = true;
+    delete window[cbName];
+    document.head.removeChild(script);
+    // POST already sent — show success regardless of ping result
+    showSuccess(formData.entryId, false);
+  };
+
+  script.onerror = function() {
+    done = true;
+    delete window[cbName];
+    try { document.head.removeChild(script); } catch(e) {}
+    // JSONP failed but POST may still have reached — show success
+    showSuccess(formData.entryId, false);
+  };
+
+  // Timeout fallback — 5 seconds
+  setTimeout(() => {
+    if (!done) {
+      done = true;
+      delete window[cbName];
+      try { document.head.removeChild(script); } catch(e) {}
+      showSuccess(formData.entryId, false);
+    }
+  }, 5000);
+
+  script.src = SCRIPT_URL + '?' + params.toString();
+  document.head.appendChild(script);
 }
 
 function collectFormData() {

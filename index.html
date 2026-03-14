@@ -648,7 +648,7 @@ const ROLE_META = {
     orgLabel: 'Institute', orgOptions: ['AIISH Mysuru','NIMHANS Bengaluru','Samspanda Mandya','KSAD Dharwad','Other'],
     yearLabel: 'Enrolment year' },
   district: { label: 'District Officer', chip: 'chip-district', color: '#8a5a0a', icon: '📍',
-    orgLabel: 'District', orgOptions: ['Belagavi','Raichur','Mysuru','Tumakuru','Mandya','Bagalkote','Davangere','Shivamogga','Bengaluru','Koppal','Bidar','Dharwad','Kalaburagi','Hassan','Ramanagara','Other'],
+    orgLabel: 'District', orgOptions: ["BAGALKOTE", "BALLARI", "BANGALORE - RURAL", "BANGALORE EAST", "BANGALORE NORTH", "BANGALORE SOUTH", "BANGALORE WEST", "BELAGAVI", "BENGALURU", "BENGALURU RURAL", "BIDAR", "CHAMARAJANAGARA", "CHIKKABALLAPURA", "CHIKKAMAGALURU", "CHITRADURGA", "DAKSHINA KANNADA", "DAVANAGERE", "DHARWAR", "GADAG", "HASSAN", "HAVERI", "KALABURAGI", "KODAGU", "KOLAR", "KOPPAL", "MANDYA", "MYSORE", "MYSURU", "RAICHUR", "RAMANAGARA", "SHIVAMOGGA", "TUMAKURU", "UDUPI", "UTTARA KANNADA", "VIJAYANAGAR", "VIJAYAPURA", "YADGIR"],
     yearLabel: 'FY' },
   state: { label: 'State Team', chip: 'chip-state', color: '#4a2a7a', icon: '🏛️',
     orgLabel: 'View', orgOptions: ['All Karnataka'],
@@ -881,7 +881,7 @@ function buildHome() {
   if (currentRole === 'hospital') {
     html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">➕</div><div><div class="action-title">Register new surgery</div><div class="action-desc">Log device & operative details</div></div><div class="action-arrow">→</div></div>`;
   } else if (currentRole === 'rehab') {
-    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">✏️</div><div><div class="action-title">Log today's session</div><div class="action-desc">Mark attendance & session number</div></div><div class="action-arrow">→</div></div>`;
+    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Update Rehab Sessions</div><div class="action-desc">Select a case to log today's session</div></div><div class="action-arrow">→</div></div>`;
   } else if (currentRole === 'district') {
     if (currentRole !== 'state') {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify & complete pending information</div></div><div class="action-arrow">→</div></div>`;
@@ -1111,8 +1111,8 @@ function buildForm(cas) {
     btn.textContent = cas ? 'Update record →' : 'Submit registration →';
     html = buildHospitalForm(cas);
   } else if (currentRole === 'rehab') {
-    title = cas ? cas.name + ' — session log' : 'Log AVT session';
-    sub = cas ? `${cas.phase} · Session ${cas.sessions+1} of ${cas.totalSessions}` : 'Find beneficiary first';
+    title = cas ? cas.name + ' — rehab session' : 'Rehab Session';
+    sub = cas ? `${cas.phase} · ${cas.district}` : 'Select a case from the cases list';
     btn.textContent = 'Submit session →';
     html = buildRehabForm(cas);
   } else if (currentRole === 'district') {
@@ -1130,6 +1130,21 @@ function buildForm(cas) {
   document.getElementById('form-title').textContent = title;
   document.getElementById('form-sub').textContent = sub;
   document.getElementById('form-body').innerHTML = html;
+
+  // Pre-fill district dropdown in rehab form when case is selected
+  if (currentRole === 'rehab' && cas && cas.district) {
+    const distSel = document.getElementById('f-res-district');
+    if (distSel) {
+      const distUpper = cas.district.toUpperCase();
+      for (let opt of distSel.options) {
+        if (opt.value.toUpperCase() === distUpper) {
+          opt.selected = true;
+          distSel.classList.add('has-value');
+          break;
+        }
+      }
+    }
+  }
 }
 
 function buildHospitalForm(cas) {
@@ -1224,98 +1239,219 @@ function buildHospitalForm(cas) {
 
 
 function buildRehabForm(cas) {
-  const sessionNum = cas ? cas.sessions + 1 : 1;
-  const totalSess = cas ? cas.totalSessions : 54;
-  const pct = cas ? Math.round(cas.sessions / totalSess * 100) : 0;
-  const dotsHTML = cas ? Array.from({length: Math.min(18, totalSess)}, (_,i) => {
-    const n = i+1;
-    if (n < sessionNum) return `<div class="sdot sdot-done">${n}</div>`;
-    if (n === sessionNum) return `<div class="sdot sdot-today">${n}</div>`;
-    return `<div class="sdot sdot-pending">${n}</div>`;
-  }).join('') : '';
+  const rehabUnit = currentUser ? currentUser.unit : 'Rehab Institute';
 
-  const bannerHTML = cas ? `
+  // Patient info card — same style as hospital form
+  const patientBanner = cas ? (() => {
+    const mob = cleanMob(cas.mobile);
+    return `
     <div class="patient-info-card">
       <div class="patient-info-header">
         <span class="patient-info-icon">👶</span>
         <div>
           <div class="patient-info-name">${cas.name}</div>
-          <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.district}</div>
+          <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.caste||''}</div>
         </div>
-        <span class="status-pill ${cas.risk?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
+        <span class="status-pill ${cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
       </div>
       <div class="patient-info-grid">
+        <div><span class="info-label">Card No.</span><span class="info-val">${cas.id||'—'}</span></div>
+        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
         <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
         <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
-        <div><span class="info-label">Mobile</span><span class="info-val">${cleanMob(cas.mobile)?`<a href="tel:${cleanMob(cas.mobile)}" style="color:var(--green);font-weight:600">${cleanMob(cas.mobile)}</a>`:'\u2014'}</span></div>
-        <div><span class="info-label">Surgery</span><span class="info-val">${cas.surgAdmit||'—'}</span></div>
-        <div><span class="info-label">Rehab Ref</span><span class="info-val">${cas.r1RefNo||'—'}</span></div>
-        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
+        <div><span class="info-label">District</span><span class="info-val">${cas.district||'—'}</span></div>
+        <div><span class="info-label">Mobile</span><span class="info-val">${mob?`<a href="tel:${mob}" style="color:var(--green);font-weight:600">${mob}</a>`:'—'}</span></div>
+        <div><span class="info-label">Surgery date</span><span class="info-val">${cas.surgAdmit||'—'}</span></div>
+        <div><span class="info-label">Hospital</span><span class="info-val" style="font-size:11px">${cas.hospital||'—'}</span></div>
+        <div><span class="info-label">Rehab 1 Ref</span><span class="info-val" style="font-size:10px">${cas.r1RefNo||'—'}</span></div>
+        <div><span class="info-label">Rehab 2 Ref</span><span class="info-val" style="font-size:10px">${cas.r2RefNo||'—'}</span></div>
       </div>
-    </div>` : '';
-  const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last session was ${cas.lastContact}. Please note reason for gap in remarks.</div>` : '';
+    </div>`;
+  })() : '<div class="info-banner" style="background:var(--gray-bg)"><div class="info-banner-text" style="color:var(--text-light)">Select a case from the cases list</div></div>';
+
+  const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> This case is flagged at-risk. Last contact: ${cas.lastContact||'not recorded'}.</div>` : '';
+
+  // Session progress dots
+  const totalSess = cas ? cas.totalSessions : 54;
+  const sessionsDone = cas ? cas.sessions : 0;
+  const dotsHTML = cas ? Array.from({length: Math.min(18, totalSess)}, (_,i) => {
+    const n = i+1;
+    if (n <= sessionsDone) return `<div class="sdot sdot-done">${n}</div>`;
+    if (n === sessionsDone+1) return `<div class="sdot sdot-today">${n}</div>`;
+    return `<div class="sdot sdot-pending">${n}</div>`;
+  }).join('') : '';
 
   return `
     <div class="form-section">
-      <div class="form-section-title">Find beneficiary</div>
-      <div class="field">
-        <div class="field-label">Institute <span class="req">*</span></div>
-        <select class="field-input has-value" id="f-institute">
-          ${ROLE_META.rehab.orgOptions.map(o=>`<option>${o}</option>`).join('')}
-        </select>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <div class="field-label">Year <span class="req">*</span></div>
-          <select class="field-input has-value" id="f-year">
-            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option>
-          </select>
-        </div>
-        <div class="field">
-          <div class="field-label">Card No. <span class="req">*</span></div>
-          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card no." value="${cas?cas.id:''}">
-        </div>
-      </div>
-      ${bannerHTML}
+      <div class="form-section-title">🎧 ${rehabUnit}</div>
+      ${patientBanner}
       ${warnHTML}
     </div>
+
     ${cas ? `<div class="form-section">
-      <div class="form-section-title">Session progress</div>
+      <div class="form-section-title">📊 Session Progress</div>
       <div class="session-dots">${dotsHTML}</div>
-      <div style="font-size:10px;color:var(--text-light);margin-bottom:4px">${cas.sessions} done · ${totalSess - cas.sessions} remaining</div>
+      <div style="font-size:11px;color:var(--text-light);margin:4px 0 0">${sessionsDone} completed · ${totalSess - sessionsDone} remaining</div>
     </div>` : ''}
+
     <div class="form-section">
-      <div class="form-section-title">Today's session — ${sessionNum}</div>
+      <div class="form-section-title">🗓 Rehab Session Details</div>
+      <div class="field">
+        <div class="field-label">Rehab stage <span class="req">*</span></div>
+        <div class="radio-group" id="rg-rehab-stage">
+          <div class="radio-item ${cas&&cas.r1Admit&&!cas.r2Admit?'checked':''}" onclick="selectRadio(this,'rg-rehab-stage')"><div class="radio-dot"></div>Rehab Part 1 (2002GP)</div>
+          <div class="radio-item ${cas&&cas.r2Admit?'checked':''}" onclick="selectRadio(this,'rg-rehab-stage')"><div class="radio-dot"></div>Rehab Part 2 (2003GP)</div>
+        </div>
+      </div>
       <div class="field-row">
         <div class="field">
-          <div class="field-label">Date <span class="req">*</span></div>
+          <div class="field-label">Session date <span class="req">*</span></div>
           <input type="date" class="field-input has-value" id="f-sessdate" value="${new Date().toISOString().split('T')[0]}">
         </div>
         <div class="field">
-          <div class="field-label">Duration</div>
+          <div class="field-label">Session number</div>
+          <input type="number" class="field-input" id="f-sessnum" min="1" max="54" placeholder="e.g. 3" value="${cas?cas.sessions+1:''}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Duration <span class="req">*</span></div>
           <select class="field-input" id="f-duration">
-            <option>45 min</option><option>60 min</option><option>30 min</option>
+            <option value="">Select</option>
+            <option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Session type</div>
+          <select class="field-input" id="f-sesstype">
+            <option>AVT (Auditory Verbal Therapy)</option>
+            <option>Mapping / Programming</option>
+            <option>Counselling</option>
+            <option>Parent training</option>
+            <option>Assessment</option>
           </select>
         </div>
       </div>
       <div class="field">
-        <div class="field-label">Audiologist / therapist <span class="req">*</span></div>
-        <input class="field-input" id="f-therapist" placeholder="Name of AVT therapist">
+        <div class="field-label">Audiologist / Therapist <span class="req">*</span></div>
+        <input class="field-input" id="f-therapist" placeholder="Name of AVT therapist / audiologist">
       </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">✅ Attendance & Response</div>
       <div class="field">
         <div class="field-label">Attendance <span class="req">*</span></div>
-        <div class="radio-group" id="attendance-group">
-          <div class="radio-item checked" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Present — child + guardian attended</div>
-          <div class="radio-item" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Absent — family notified</div>
-          <div class="radio-item" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Absent — not reachable</div>
+        <div class="radio-group" id="rg-attendance">
+          <div class="radio-item checked" onclick="selectRadio(this,'rg-attendance')"><div class="radio-dot"></div>Present — child + guardian attended</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-attendance')"><div class="radio-dot"></div>Absent — family informed</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-attendance')"><div class="radio-dot"></div>Absent — not reachable</div>
         </div>
       </div>
       <div class="field">
-        <div class="field-label">Session remarks</div>
-        <textarea class="field-input" id="f-remarks" rows="2" placeholder="Child's response, progress notes..."></textarea>
+        <div class="field-label">Child's response / progress this session</div>
+        <div class="radio-group" id="rg-progress">
+          <div class="radio-item" onclick="selectRadio(this,'rg-progress')"><div class="radio-dot"></div>🌟 Excellent — exceeding expectations</div>
+          <div class="radio-item checked" onclick="selectRadio(this,'rg-progress')"><div class="radio-dot"></div>✅ Good — on track</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-progress')"><div class="radio-dot"></div>⚠ Fair — needs more attention</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-progress')"><div class="radio-dot"></div>❌ Poor — significant difficulty</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Speech &amp; Language milestone</div>
+        <select class="field-input" id="f-milestone">
+          <option value="">Select current milestone...</option>
+          <option>Detection — responds to sounds</option>
+          <option>Discrimination — distinguishes sounds</option>
+          <option>Identification — recognises familiar words</option>
+          <option>Comprehension — understands spoken language</option>
+          <option>Verbal expression — producing speech</option>
+          <option>Age-appropriate communication</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Session notes / observations</div>
+        <textarea class="field-input" id="f-remarks" rows="2" placeholder="Progress notes, parent feedback, observations..."></textarea>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📍 Residential District (for District Officer)</div>
+      <div class="field">
+        <div class="field-label">Child's home district <span class="req">*</span></div>
+        <select class="field-input ${cas&&cas.district?'has-value':''}" id="f-res-district">
+          <option value="">Select district...</option>
+          <option value="BAGALKOTE">Bagalkote</option>
+          <option value="BALLARI">Ballari</option>
+          <option value="BANGALORE - RURAL">Bangalore - Rural</option>
+          <option value="BANGALORE EAST">Bangalore East</option>
+          <option value="BANGALORE NORTH">Bangalore North</option>
+          <option value="BANGALORE SOUTH">Bangalore South</option>
+          <option value="BANGALORE WEST">Bangalore West</option>
+          <option value="BELAGAVI">Belagavi</option>
+          <option value="BENGALURU">Bengaluru</option>
+          <option value="BENGALURU RURAL">Bengaluru Rural</option>
+          <option value="BIDAR">Bidar</option>
+          <option value="CHAMARAJANAGARA">Chamarajanagara</option>
+          <option value="CHIKKABALLAPURA">Chikkaballapura</option>
+          <option value="CHIKKAMAGALURU">Chikkamagaluru</option>
+          <option value="CHITRADURGA">Chitradurga</option>
+          <option value="DAKSHINA KANNADA">Dakshina Kannada</option>
+          <option value="DAVANAGERE">Davanagere</option>
+          <option value="DHARWAR">Dharwar</option>
+          <option value="GADAG">Gadag</option>
+          <option value="HASSAN">Hassan</option>
+          <option value="HAVERI">Haveri</option>
+          <option value="KALABURAGI">Kalaburagi</option>
+          <option value="KODAGU">Kodagu</option>
+          <option value="KOLAR">Kolar</option>
+          <option value="KOPPAL">Koppal</option>
+          <option value="MANDYA">Mandya</option>
+          <option value="MYSORE">Mysore</option>
+          <option value="MYSURU">Mysuru</option>
+          <option value="RAICHUR">Raichur</option>
+          <option value="RAMANAGARA">Ramanagara</option>
+          <option value="SHIVAMOGGA">Shivamogga</option>
+          <option value="TUMAKURU">Tumakuru</option>
+          <option value="UDUPI">Udupi</option>
+          <option value="UTTARA KANNADA">Uttara Kannada</option>
+          <option value="VIJAYANAGAR">Vijayanagar</option>
+          <option value="VIJAYAPURA">Vijayapura</option>
+          <option value="YADGIR">Yadgir</option>
+        </select>
+        <div class="field-hint">This determines which District Officer receives follow-up alerts for this child</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Next session date</div>
+        <input type="date" class="field-input" id="f-next-sess">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📋 Claim & Documentation</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Claim ref (SAST)</div>
+          <input class="field-input ${cas&&(cas.r1RefNo||cas.r2RefNo)?'has-value':''}" id="f-claim-ref" value="${cas?cas.r1RefNo||cas.r2RefNo||'':''}" placeholder="SAST claim reference">
+        </div>
+        <div class="field">
+          <div class="field-label">Claim status</div>
+          <select class="field-input" id="f-claim-status">
+            <option value="">Select...</option>
+            <option>Claims Paid</option>
+            <option>Approved</option>
+            <option>Need More Info</option>
+            <option>Submitted</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Any issues to flag</div>
+        <textarea class="field-input" id="f-issues" rows="2" placeholder="Device issues, family concerns, barriers to attendance..."></textarea>
       </div>
     </div>`;
 }
+
 
 function buildDistrictForm(cas) {
   const bannerHTML = cas ? `

@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a3d2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CI Scheme">
+<link rel="manifest" href="manifest.json">
+<title>CI Scheme Karnataka</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600&family=Noto+Sans+Kannada:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green-dark: #0a3d2e;
+  --green: #1a6b4a;
+  --green-mid: #1D9E75;
+  --green-light: #E1F5EE;
+  --green-border: #9FE1CB;
+  --blue: #1a4a7a;
+  --blue-mid: #378ADD;
+  --blue-light: #E6F1FB;
+  --amber: #8a5a0a;
+  --amber-mid: #EF9F27;
+  --amber-light: #FAEEDA;
+  --purple: #4a2a7a;
+  --purple-mid: #7F77DD;
+  --purple-light: #EEEDFE;
+  --red: #A32D2D;
+  --red-light: #FCEBEB;
+  --gray: #f5f3ef;
+  --gray-mid: #e0ddd6;
+  --gray-dark: #6b6358;
+  --text: #1a1612;
+  --text-mid: #4a453f;
+  --text-light: #8a8278;
+  --surface: #fffcf8;
+  --border: #e8e4dc;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: 'Noto Sans', sans-serif;
+  background: var(--gray);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ─── SCREENS ─── */
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--gray); transition: transform 0.3s cubic-bezier(.4,0,.2,1), opacity 0.3s; }
+.screen.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+.screen.slide-left { transform: translateX(-30%); opacity: 0; pointer-events: none; }
+
+/* ─── LOGIN SCREEN ─── */
+#screen-login {
+  background: var(--green-dark);
+  align-items: center;
+  justify-content: center;
+  padding: 40px 28px;
+}
+.login-logo { margin-bottom: 32px; text-align: center; }
+.login-logo-ring {
+  width: 72px; height: 72px; border-radius: 20px;
+  background: rgba(255,255,255,0.12);
+  border: 1.5px solid rgba(255,255,255,0.2);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px; font-size: 32px;
+}
+.login-logo h1 { color: #fff; font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+.login-logo p { color: rgba(255,255,255,0.55); font-size: 12px; margin-top: 4px; }
+.login-card {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 24px 20px;
+  width: 100%;
+  max-width: 360px;
+}
+.login-card h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.login-card p { font-size: 12px; color: var(--text-light); margin-bottom: 20px; }
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.role-btn {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--surface);
+}
+.role-btn:active { transform: scale(0.97); }
+.role-btn .role-icon { font-size: 24px; margin-bottom: 6px; }
+.role-btn .role-label { font-size: 12px; font-weight: 500; color: var(--text); }
+.role-btn .role-desc { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+.role-btn.r-hospital:hover, .role-btn.r-hospital.sel { border-color: var(--green-mid); background: var(--green-light); }
+.role-btn.r-rehab:hover, .role-btn.r-rehab.sel { border-color: var(--blue-mid); background: var(--blue-light); }
+.role-btn.r-district:hover, .role-btn.r-district.sel { border-color: var(--amber-mid); background: var(--amber-light); }
+.role-btn.r-state:hover, .role-btn.r-state.sel { border-color: var(--purple-mid); background: var(--purple-light); }
+.login-btn {
+  width: 100%; margin-top: 16px; padding: 13px;
+  background: var(--green-dark); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: 'Noto Sans', sans-serif;
+  transition: opacity 0.15s;
+}
+.login-btn:disabled { opacity: 0.4; }
+.login-btn:active { opacity: 0.85; }
+
+/* ─── APP HEADER ─── */
+.app-header {
+  padding: 12px 16px 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.back-btn {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--surface); border: 0.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; color: var(--text-mid);
+}
+.header-title { font-size: 15px; font-weight: 600; }
+.header-sub { font-size: 11px; color: var(--text-light); }
+.role-chip {
+  font-size: 10px; font-weight: 500; padding: 4px 10px;
+  border-radius: 12px; white-space: nowrap;
+}
+.chip-hospital { background: var(--green-light); color: var(--green); }
+.chip-rehab { background: var(--blue-light); color: var(--blue); }
+.chip-district { background: var(--amber-light); color: var(--amber); }
+.chip-state { background: var(--purple-light); color: var(--purple); }
+
+/* ─── HOME SCREEN ─── */
+.home-hero {
+  background: var(--green-dark);
+  padding: 16px 16px 24px;
+  color: #fff;
+}
+.home-hero h2 { font-size: 18px; font-weight: 600; }
+.home-hero p { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 3px; }
+.home-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 16px; }
+.home-stat { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; text-align: center; }
+.home-stat-num { font-size: 20px; font-weight: 600; }
+.home-stat-label { font-size: 9px; color: rgba(255,255,255,0.6); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.home-body { flex: 1; overflow-y: auto; padding: 16px; }
+.section-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-light); margin-bottom: 10px; margin-top: 18px; }
+.section-label:first-child { margin-top: 0; }
+
+.action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.action-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.action-card:active { transform: scale(0.97); }
+.action-icon { font-size: 22px; }
+.action-title { font-size: 13px; font-weight: 500; }
+.action-desc { font-size: 11px; color: var(--text-light); }
+.action-card.primary { background: var(--green-dark); border-color: var(--green-dark); grid-column: span 2; flex-direction: row; align-items: center; gap: 14px; }
+.action-card.primary .action-title { color: #fff; font-size: 14px; }
+.action-card.primary .action-desc { color: rgba(255,255,255,0.6); }
+.action-card.primary .action-arrow { margin-left: auto; color: rgba(255,255,255,0.5); font-size: 18px; }
+
+.alert-card {
+  background: var(--red-light);
+  border: 0.5px solid #f5c6c2;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.alert-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-top: 4px; flex-shrink: 0; }
+.alert-name { font-size: 13px; font-weight: 500; }
+.alert-detail { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.alert-tag { font-size: 10px; font-weight: 500; padding: 2px 7px; border-radius: 6px; background: var(--red-light); color: var(--red); border: 0.5px solid #f5c6c2; white-space: nowrap; margin-left: auto; }
+
+/* ─── SEARCH / CASE LIST ─── */
+.search-bar {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.search-bar input {
+  border: none; outline: none; flex: 1;
+  font-size: 13px; background: transparent;
+  font-family: 'Noto Sans', sans-serif;
+  color: var(--text);
+}
+.search-bar input::placeholder { color: var(--text-light); }
+.search-icon { color: var(--text-light); font-size: 15px; }
+
+.filter-row { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
+.filter-chip {
+  white-space: nowrap; font-size: 11px; font-weight: 500;
+  padding: 6px 12px; border-radius: 16px;
+  border: 0.5px solid var(--border);
+  background: var(--surface); color: var(--text-mid);
+  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+}
+.filter-chip.active { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+
+.case-list { display: flex; flex-direction: column; gap: 8px; }
+.case-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.case-card:active { transform: scale(0.98); }
+.case-card.selected { border-color: var(--green-mid); border-width: 1.5px; background: var(--green-light); }
+.case-header { display: flex; align-items: center; gap: 8px; }
+.case-name { font-size: 13px; font-weight: 500; flex: 1; }
+.status-pill { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+.pill-paid { background: var(--green-light); color: var(--green); }
+.pill-pending { background: var(--amber-light); color: var(--amber); }
+.pill-risk { background: var(--red-light); color: var(--red); }
+.pill-rehab { background: var(--blue-light); color: var(--blue); }
+.case-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+.case-meta span { font-size: 11px; color: var(--text-light); }
+.case-progress { margin-top: 7px; }
+.progress-track { height: 4px; background: var(--gray-mid); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 2px; background: var(--green-mid); transition: width 0.4s; }
+.progress-label { font-size: 9px; color: var(--text-light); margin-top: 3px; }
+
+/* ─── FORM ─── */
+.form-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+.form-section { margin-bottom: 20px; }
+.form-section-title {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.07em; color: var(--text-light);
+  margin-bottom: 12px; padding-bottom: 6px;
+  border-bottom: 0.5px solid var(--border);
+}
+.field { margin-bottom: 14px; }
+.field-label {
+  font-size: 12px; color: var(--text-mid); margin-bottom: 5px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.req { color: var(--red); font-size: 11px; }
+.field-input {
+  width: 100%; padding: 10px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px; background: var(--surface);
+  color: var(--text); font-family: 'Noto Sans', sans-serif;
+  transition: border-color 0.15s;
+  -webkit-appearance: none; appearance: none;
+}
+.field-input:focus { outline: none; border-color: var(--green-mid); }
+.field-input.has-value { background: #fafaf8; }
+.field-input.error { border-color: var(--red); background: var(--red-light); }
+.field-hint { font-size: 10px; color: var(--text-light); margin-top: 3px; }
+.field-error { font-size: 10px; color: var(--red); margin-top: 3px; display: none; }
+.field-input.error + .field-error { display: block; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.prefilled-badge {
+  font-size: 9px; background: var(--green-light); color: var(--green);
+  padding: 1px 6px; border-radius: 4px; font-weight: 500;
+}
+
+.radio-group { display: flex; flex-direction: column; gap: 7px; }
+.radio-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  font-size: 12px; color: var(--text); transition: all 0.15s;
+}
+.radio-item.checked { border-color: var(--green-mid); background: var(--green-light); color: var(--green); }
+.radio-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--border); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.radio-item.checked .radio-dot { border-color: var(--green-mid); background: var(--green-mid); }
+.radio-item.checked .radio-dot::after { content:''; width:6px; height:6px; border-radius:50%; background:#fff; }
+
+.info-banner {
+  background: var(--green-light);
+  border: 0.5px solid var(--green-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.info-banner-icon { font-size: 14px; flex-shrink: 0; }
+.info-banner-text { font-size: 11px; color: var(--green); line-height: 1.5; }
+.info-banner-name { font-size: 13px; font-weight: 500; color: var(--green-dark); margin-bottom: 3px; }
+
+.warn-banner {
+  background: var(--amber-light);
+  border: 0.5px solid #FAC775;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 11px; color: var(--amber); line-height: 1.5;
+  display: flex; gap: 8px;
+}
+
+.session-dots { display: grid; grid-template-columns: repeat(9,1fr); gap: 3px; margin-bottom: 6px; }
+.sdot { height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 500; }
+.sdot-done { background: var(--green-light); color: var(--green); }
+.sdot-today { background: var(--blue-mid); color: #fff; }
+.sdot-pending { background: var(--gray-mid); color: var(--text-light); }
+
+/* ─── BOTTOM BAR ─── */
+.bottom-bar {
+  padding: 12px 16px;
+  border-top: 0.5px solid var(--border);
+  background: var(--surface);
+  display: flex; gap: 10px;
+  flex-shrink: 0;
+}
+.btn-submit {
+  flex: 1; padding: 13px;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: 'Noto Sans', sans-serif;
+  transition: opacity 0.15s;
+}
+.btn-submit:active { opacity: 0.85; }
+.btn-submit.hospital { background: var(--green-dark); color: #fff; }
+.btn-submit.rehab { background: var(--blue); color: #fff; }
+.btn-submit.district { background: var(--amber); color: #fff; }
+.btn-submit.state { background: var(--purple); color: #fff; }
+.btn-back-sm {
+  padding: 13px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent; font-size: 13px;
+  color: var(--text-mid); cursor: pointer;
+  font-family: 'Noto Sans', sans-serif;
+}
+
+/* ─── NAV ─── */
+.bottom-nav {
+  display: flex; border-top: 0.5px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; padding: 10px 4px;
+  cursor: pointer; transition: all 0.15s;
+}
+.nav-icon { font-size: 18px; }
+.nav-label { font-size: 9px; color: var(--text-light); }
+.nav-item.active .nav-label { color: var(--green-dark); font-weight: 600; }
+.nav-item.active .nav-icon { transform: translateY(-1px); }
+
+/* ─── SUCCESS ─── */
+#screen-success {
+  align-items: center; justify-content: center; padding: 40px 28px; text-align: center;
+}
+.success-ring {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: var(--green-light); border: 2px solid var(--green-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; margin: 0 auto 20px;
+}
+.success-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+.success-sub { font-size: 13px; color: var(--text-light); margin-bottom: 28px; line-height: 1.6; }
+.success-id { background: var(--gray); border-radius: 8px; padding: 10px 16px; display: inline-block; font-size: 12px; color: var(--text-mid); margin-bottom: 24px; }
+.success-id span { font-weight: 500; color: var(--text); }
+.btn-home {
+  width: 100%; padding: 13px; background: var(--green-dark); color: #fff;
+  border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500;
+  cursor: pointer; font-family: 'Noto Sans', sans-serif;
+}
+
+/* ─── OFFLINE TOAST ─── */
+.offline-toast {
+  position: fixed; bottom: 80px; left: 16px; right: 16px;
+  background: var(--text); color: #fff;
+  border-radius: 10px; padding: 12px 16px;
+  font-size: 12px; display: flex; align-items: center; gap: 8px;
+  transform: translateY(120%); transition: transform 0.3s;
+  z-index: 999;
+}
+.offline-toast.show { transform: translateY(0); }
+
+/* ─── LOADING ─── */
+.spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: var(--gray-mid); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ SCREEN: LOGIN ══════════════════ -->
+<div class="screen" id="screen-login">
+  <div class="login-logo">
+    <div class="login-logo-ring">🦻</div>
+    <h1>CI Scheme Karnataka</h1>
+    <p>Cochlear Implant Programme · NPPCD</p>
+  </div>
+  <div class="login-card">
+    <h2>Select your role</h2>
+    <p>Choose how you're connected to the programme</p>
+    <div class="role-grid">
+      <div class="role-btn r-hospital" onclick="selectRole('hospital', this)">
+        <div class="role-icon">🏥</div>
+        <div class="role-label">Hospital</div>
+        <div class="role-desc">Surgery & device data</div>
+      </div>
+      <div class="role-btn r-rehab" onclick="selectRole('rehab', this)">
+        <div class="role-icon">🎧</div>
+        <div class="role-label">Rehab Institute</div>
+        <div class="role-desc">AVT session logs</div>
+      </div>
+      <div class="role-btn r-district" onclick="selectRole('district', this)">
+        <div class="role-icon">📍</div>
+        <div class="role-label">District Officer</div>
+        <div class="role-desc">Follow-up & field notes</div>
+      </div>
+      <div class="role-btn r-state" onclick="selectRole('state', this)">
+        <div class="role-icon">🏛️</div>
+        <div class="role-label">State Team</div>
+        <div class="role-desc">Outcomes & overview</div>
+      </div>
+    </div>
+    <button class="login-btn" id="login-btn" disabled onclick="doLogin()">Continue →</button>
+  </div>
+</div>
+
+<!-- ══════════════════ SCREEN: HOME ══════════════════ -->
+<div class="screen hidden" id="screen-home">
+  <div class="app-header" id="home-header" style="background:var(--green-dark)">
+    <div class="header-left">
+      <div>
+        <div class="header-title" style="color:#fff" id="home-title">—</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.55)" id="home-sub">—</div>
+      </div>
+    </div>
+    <div class="role-chip" id="home-chip">—</div>
+  </div>
+  <div class="home-hero" style="padding-top:0">
+    <div class="home-stats">
+      <div class="home-stat">
+        <div class="home-stat-num" id="stat1">—</div>
+        <div class="home-stat-label" id="stat1-label">Cases</div>
+      </div>
+      <div class="home-stat">
+        <div class="home-stat-num" id="stat2">—</div>
+        <div class="home-stat-label" id="stat2-label">On track</div>
+      </div>
+      <div class="home-stat">
+        <div class="home-stat-num" id="stat3" style="color:#FAC775">—</div>
+        <div class="home-stat-label" id="stat3-label">Alerts</div>
+      </div>
+    </div>
+  </div>
+  <div class="home-body" id="home-body"></div>
+  <div class="bottom-nav" id="home-nav">
+    <div class="nav-item active" onclick="navTo('home')"><div class="nav-icon">🏠</div><div class="nav-label">Home</div></div>
+    <div class="nav-item" onclick="navTo('cases')"><div class="nav-icon">📋</div><div class="nav-label">Cases</div></div>
+    <div class="nav-item" onclick="navTo('form')"><div class="nav-icon">✏️</div><div class="nav-label">New entry</div></div>
+    <div class="nav-item" onclick="navTo('pending')"><div class="nav-icon">🔔</div><div class="nav-label">Alerts</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════ SCREEN: CASE LIST ══════════════════ -->
+<div class="screen hidden" id="screen-cases">
+  <div class="app-header">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()">←</div>
+      <div>
+        <div class="header-title" id="cases-title">Cases</div>
+        <div class="header-sub" id="cases-sub">Select to view or update</div>
+      </div>
+    </div>
+    <div class="role-chip" id="cases-chip"></div>
+  </div>
+  <div class="form-scroll">
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" placeholder="Search by name, village or taluk..." oninput="filterCases(this.value)" id="case-search">
+    </div>
+    <div class="filter-row" id="filter-row"></div>
+    <div style="font-size:11px;color:var(--text-light);margin-bottom:10px" id="case-count"></div>
+    <div class="case-list" id="case-list"></div>
+  </div>
+</div>
+
+<!-- ══════════════════ SCREEN: FORM ══════════════════ -->
+<div class="screen hidden" id="screen-form">
+  <div class="app-header">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()">←</div>
+      <div>
+        <div class="header-title" id="form-title">New Entry</div>
+        <div class="header-sub" id="form-sub"></div>
+      </div>
+    </div>
+    <div class="role-chip" id="form-chip"></div>
+  </div>
+  <div class="form-scroll" id="form-body"></div>
+  <div class="bottom-bar">
+    <button class="btn-back-sm" onclick="goBack()">Cancel</button>
+    <button class="btn-submit" id="submit-btn" onclick="submitForm()">Submit →</button>
+  </div>
+</div>
+
+<!-- ══════════════════ SCREEN: SUCCESS ══════════════════ -->
+<div class="screen hidden" id="screen-success">
+  <div class="success-ring">✓</div>
+  <div class="success-title">Submitted!</div>
+  <div class="success-sub" id="success-msg">Your entry has been recorded and will sync to the programme register.</div>
+  <div class="success-id">Entry ID: <span id="success-id">—</span></div>
+  <div class="success-id" style="background:var(--green-light);color:var(--green)" id="offline-note" style="display:none">
+    📶 Saved offline — will sync when connected
+  </div>
+  <button class="btn-home" onclick="showScreen('home')">Back to home</button>
+</div>
+
+<!-- ══════════════════ OFFLINE TOAST ══════════════════ -->
+<div class="offline-toast" id="offline-toast">
+  📶 No internet — entry saved locally, will sync automatically
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// CONFIG — replace with your Apps Script URL
+// ══════════════════════════════════════════
+const SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
+// cochlearkar@gmail.com — paste your deployed Apps Script URL above
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let currentRole = null;
+let currentScreen = 'login';
+let selectedCase = null;
+let screenHistory = [];
+
+const ROLE_META = {
+  hospital: { label: 'Hospital', chip: 'chip-hospital', color: '#0a3d2e', icon: '🏥',
+    orgLabel: 'Hospital', orgOptions: ['KIMS Hubli','Akash Hospital Devanahalli','Mandya MIMS','NIMHANS Bengaluru','Samspanda Mandya','SDM Dharwad','BGS Kengeri','Other'],
+    yearLabel: 'Surgery year' },
+  rehab: { label: 'Rehab Institute', chip: 'chip-rehab', color: '#1a4a7a', icon: '🎧',
+    orgLabel: 'Institute', orgOptions: ['AIISH Mysuru','NIMHANS Bengaluru','Samspanda Mandya','KSAD Dharwad','Other'],
+    yearLabel: 'Enrolment year' },
+  district: { label: 'District Officer', chip: 'chip-district', color: '#8a5a0a', icon: '📍',
+    orgLabel: 'District', orgOptions: ['Belagavi','Raichur','Mysuru','Tumakuru','Mandya','Bagalkote','Davangere','Shivamogga','Bengaluru','Koppal','Bidar','Dharwad','Kalaburagi','Hassan','Ramanagara','Other'],
+    yearLabel: 'FY' },
+  state: { label: 'State Team', chip: 'chip-state', color: '#4a2a7a', icon: '🏛️',
+    orgLabel: 'View', orgOptions: ['All Karnataka'],
+    yearLabel: 'FY' },
+};
+
+const SAMPLE_CASES = [
+  { id:'280600148856', name:'Lipika G D', gender:'Female', age:'6 yrs', village:'Gowdanahalli', district:'CHIKKABALLAPURA', hospital:'Akash Hospital', rehab:'AIISH Mysuru', surgery:'15 Oct 2025', sessions:7, totalSessions:54, status:'rehab', phase:'Rehab 1', lastContact:'47 days ago', risk:true },
+  { id:'200400194705', name:'Pratiksha', gender:'Female', age:'3 yrs', village:'Koppal', district:'KOPPAL', hospital:'KIMS Hubli', rehab:'AIISH Mysuru', surgery:'16 May 2024', sessions:23, totalSessions:54, status:'paid', phase:'Rehab 1', lastContact:'12 days ago', risk:false },
+  { id:'913178417730', name:'Shashidhar S', gender:'Male', age:'5 yrs', village:'Kalagatagi', district:'DHARWAD', hospital:'KIMS Hubli', rehab:'KSAD Dharwad', surgery:'30 May 2024', sessions:0, totalSessions:54, status:'risk', phase:'Surgery done', lastContact:'Never', risk:true },
+  { id:'130300156605', name:'Rohith B K', gender:'Male', age:'4 yrs', village:'Sindhanur', district:'RAICHUR', hospital:'KIMS Hubli', rehab:'Samspanda Mandya', surgery:'3 Jun 2024', sessions:41, totalSessions:108, status:'paid', phase:'Rehab 2', lastContact:'8 days ago', risk:false },
+  { id:'250600128270', name:'Navya D', gender:'Female', age:'5 yrs', village:'Pavagada', district:'TUMAKURU', hospital:'K C General Bengaluru', rehab:'NIMHANS Bengaluru', surgery:'30 Jan 2023', sessions:54, totalSessions:54, status:'paid', phase:'Completed', lastContact:'3 days ago', risk:false },
+  { id:'724038331859', name:'Siddharth S K', gender:'Male', age:'2 yrs', village:'Savadatti', district:'BELAGAVI', hospital:'BIMS Belagavi', rehab:'KSAD Dharwad', surgery:'17 Nov 2025', sessions:2, totalSessions:54, status:'rehab', phase:'Rehab 1', lastContact:'5 days ago', risk:false },
+];
+
+let filteredCases = [...SAMPLE_CASES];
+let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
+
+// ══════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════
+function showScreen(name, pushHistory = true) {
+  if (pushHistory && currentScreen !== name) screenHistory.push(currentScreen);
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('hidden', 'slide-left');
+  });
+  document.querySelectorAll('.screen').forEach(s => {
+    if (!s.id.endsWith(name)) s.classList.add(currentScreen === name ? 'slide-left' : 'hidden');
+  });
+  document.getElementById('screen-' + name).classList.remove('hidden', 'slide-left');
+  currentScreen = name;
+}
+
+function goBack() {
+  const prev = screenHistory.pop() || 'home';
+  showScreen(prev, false);
+}
+
+function navTo(dest) {
+  if (dest === 'home') showScreen('home');
+  else if (dest === 'cases') { buildCaseList(); showScreen('cases'); }
+  else if (dest === 'form') { buildForm(null); showScreen('form'); }
+  else if (dest === 'pending') { buildCaseList('risk'); showScreen('cases'); }
+}
+
+// ══════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════
+function selectRole(role, el) {
+  currentRole = role;
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('login-btn').disabled = false;
+}
+
+function doLogin() {
+  if (!currentRole) return;
+  buildHome();
+  showScreen('home');
+}
+
+// ══════════════════════════════════════════
+// HOME
+// ══════════════════════════════════════════
+function buildHome() {
+  const meta = ROLE_META[currentRole];
+  document.getElementById('home-title').textContent = meta.icon + '  ' + meta.orgOptions[0];
+  document.getElementById('home-sub').textContent = meta.label + ' · CI Scheme Karnataka';
+  const chip = document.getElementById('home-chip');
+  chip.textContent = meta.label;
+  chip.className = 'role-chip ' + meta.chip;
+
+  const risks = SAMPLE_CASES.filter(c => c.risk);
+  const ontrack = SAMPLE_CASES.filter(c => !c.risk);
+  document.getElementById('stat1').textContent = SAMPLE_CASES.length;
+  document.getElementById('stat2').textContent = ontrack.length;
+  document.getElementById('stat3').textContent = risks.length;
+  document.getElementById('stat1-label').textContent = currentRole === 'district' ? 'In district' : 'Total cases';
+
+  const body = document.getElementById('home-body');
+  let html = '';
+
+  // Primary action
+  html += `<div class="section-label">Quick action</div>`;
+  html += `<div class="action-grid">`;
+  if (currentRole === 'hospital') {
+    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">➕</div><div><div class="action-title">Register new surgery</div><div class="action-desc">Log device & operative details</div></div><div class="action-arrow">→</div></div>`;
+  } else if (currentRole === 'rehab') {
+    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">✏️</div><div><div class="action-title">Log today's session</div><div class="action-desc">Mark attendance & session number</div></div><div class="action-arrow">→</div></div>`;
+  } else if (currentRole === 'district') {
+    html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk babies</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
+  } else {
+    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">📊</div><div><div class="action-title">Update milestone / outcomes</div><div class="action-desc">Record audiogram & milestones</div></div><div class="action-arrow">→</div></div>`;
+  }
+  html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">${currentRole === 'district' ? 'By district' : 'By ' + meta.orgLabel.toLowerCase()}</div></div>`;
+  html += `<div class="action-card" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">🔔</div><div class="action-title">Alerts</div><div class="action-desc">${risks.length} need attention</div></div>`;
+  html += `</div>`;
+
+  // Alerts
+  if (risks.length) {
+    html += `<div class="section-label" style="margin-top:20px">Needs attention</div>`;
+    risks.forEach(c => {
+      html += `<div class="alert-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
+        <div class="alert-dot"></div>
+        <div style="flex:1"><div class="alert-name">${c.name}</div><div class="alert-detail">${c.village} · ${c.phase} · Last contact: ${c.lastContact}</div></div>
+        <span class="alert-tag">At risk</span>
+      </div>`;
+    });
+  }
+
+  body.innerHTML = html;
+}
+
+// ══════════════════════════════════════════
+// CASE LIST
+// ══════════════════════════════════════════
+function buildCaseList(filter = 'all') {
+  const meta = ROLE_META[currentRole];
+  document.getElementById('cases-title').textContent = meta.orgOptions[0] + ' — Cases';
+  document.getElementById('cases-sub').textContent = 'Tap a case to view or update';
+  const chip = document.getElementById('cases-chip');
+  chip.textContent = meta.label;
+  chip.className = 'role-chip ' + meta.chip;
+
+  const filterRow = document.getElementById('filter-row');
+  filterRow.innerHTML = ['All','On track','At risk','Rehab 1','Rehab 2','Completed'].map((f,i) =>
+    `<div class="filter-chip ${(filter==='risk'&&f==='At risk')||(f==='All'&&filter==='all')?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
+  ).join('');
+
+  filteredCases = filter === 'risk' ? SAMPLE_CASES.filter(c=>c.risk) : [...SAMPLE_CASES];
+  renderCaseList();
+}
+
+function applyFilter(f, el) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  if (f === 'All') filteredCases = [...SAMPLE_CASES];
+  else if (f === 'On track') filteredCases = SAMPLE_CASES.filter(c => !c.risk);
+  else if (f === 'At risk') filteredCases = SAMPLE_CASES.filter(c => c.risk);
+  else filteredCases = SAMPLE_CASES.filter(c => c.phase && c.phase.toLowerCase().includes(f.toLowerCase()));
+  document.getElementById('case-search').value = '';
+  renderCaseList();
+}
+
+function filterCases(q) {
+  const s = q.toLowerCase();
+  filteredCases = SAMPLE_CASES.filter(c =>
+    c.name.toLowerCase().includes(s) || c.village.toLowerCase().includes(s) ||
+    c.district.toLowerCase().includes(s) || c.id.includes(s)
+  );
+  renderCaseList();
+}
+
+function renderCaseList() {
+  document.getElementById('case-count').textContent = `Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''}`;
+  const list = document.getElementById('case-list');
+  list.innerHTML = filteredCases.map(c => {
+    const pct = c.totalSessions ? Math.round(c.sessions / c.totalSessions * 100) : 0;
+    const pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':c.status==='rehab'?'pill-rehab':'pill-pending';
+    const pillLabel = c.status==='paid'?'On track':c.status==='risk'?'At risk':c.status==='rehab'?c.phase:'Pending';
+    return `<div class="case-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
+      <div class="case-header">
+        <div class="case-name">${c.name}</div>
+        <span class="status-pill ${pillClass}">${pillLabel}</span>
+      </div>
+      <div class="case-meta">
+        <span>${c.gender}, ${c.age}</span>
+        <span>${c.village}, ${c.district}</span>
+        <span>Surgery: ${c.surgery}</span>
+      </div>
+      ${c.sessions>0?`<div class="case-progress"><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="progress-label">${c.sessions} of ${c.totalSessions} sessions · ${pct}%</div></div>`:''}
+    </div>`;
+  }).join('') || '<div style="text-align:center;color:var(--text-light);padding:32px;font-size:13px">No cases found</div>';
+}
+
+// ══════════════════════════════════════════
+// FORMS — role-specific
+// ══════════════════════════════════════════
+function buildForm(cas) {
+  const meta = ROLE_META[currentRole];
+  const chip = document.getElementById('form-chip');
+  chip.textContent = meta.label;
+  chip.className = 'role-chip ' + meta.chip;
+
+  const btn = document.getElementById('submit-btn');
+  btn.className = 'btn-submit ' + currentRole;
+
+  let title, sub, html = '';
+
+  if (currentRole === 'hospital') {
+    title = cas ? 'Update case — ' + cas.name : 'New surgery registration';
+    sub = 'Device & operative details';
+    btn.textContent = cas ? 'Update record →' : 'Submit registration →';
+    html = buildHospitalForm(cas);
+  } else if (currentRole === 'rehab') {
+    title = cas ? cas.name + ' — session log' : 'Log AVT session';
+    sub = cas ? `${cas.phase} · Session ${cas.sessions+1} of ${cas.totalSessions}` : 'Find beneficiary first';
+    btn.textContent = 'Submit session →';
+    html = buildRehabForm(cas);
+  } else if (currentRole === 'district') {
+    title = cas ? 'Follow-up — ' + cas.name : 'Field follow-up note';
+    sub = cas ? cas.village + ', ' + cas.district : 'Select beneficiary';
+    btn.textContent = 'Save follow-up →';
+    html = buildDistrictForm(cas);
+  } else {
+    title = cas ? 'Outcomes — ' + cas.name : 'Milestone update';
+    sub = cas ? 'Post-implant outcomes tracker' : 'Find beneficiary';
+    btn.textContent = 'Submit outcomes →';
+    html = buildStateForm(cas);
+  }
+
+  document.getElementById('form-title').textContent = title;
+  document.getElementById('form-sub').textContent = sub;
+  document.getElementById('form-body').innerHTML = html;
+}
+
+function buildHospitalForm(cas) {
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">✓</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.gender}, ${cas.age} · Surgery: ${cas.surgery} · Card: ${cas.id}</div></div></div>` : '';
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Find beneficiary</div>
+      <div class="field">
+        <div class="field-label">Hospital <span class="req">*</span></div>
+        <select class="field-input has-value" id="f-hospital">
+          ${ROLE_META.hospital.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Surgery year <span class="req">*</span></div>
+          <select class="field-input has-value" id="f-year">
+            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option><option>2022-23</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Card No. <span class="req">*</span></div>
+          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card number" value="${cas?cas.id:''}">
+        </div>
+      </div>
+      ${bannerHTML}
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Device details</div>
+      <div class="field">
+        <div class="field-label">Manufacturer <span class="req">*</span></div>
+        <select class="field-input" id="f-mfr">
+          <option value="">Select...</option>
+          <option>Cochlear Limited (Australia)</option>
+          <option>MED-EL (Austria)</option>
+          <option>Advanced Bionics (USA)</option>
+          <option>Oticon Medical (Denmark)</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Model</div>
+          <input class="field-input" id="f-model" placeholder="e.g. Nucleus 8">
+        </div>
+        <div class="field">
+          <div class="field-label">Side <span class="req">*</span></div>
+          <select class="field-input" id="f-side">
+            <option value="">Select</option>
+            <option>Right ear</option><option>Left ear</option><option>Bilateral</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Serial number <span class="req">*</span></div>
+        <input class="field-input" id="f-serial" placeholder="Scan or type device serial number">
+        <div class="field-hint">Found on device packaging label</div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Operative details</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Surgery date <span class="req">*</span></div>
+          <input type="date" class="field-input ${cas?'has-value':''}" id="f-surgdate" value="${cas?'2024-05-16':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Switch-on date</div>
+          <input type="date" class="field-input" id="f-switchon">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Treating surgeon</div>
+        <input class="field-input" id="f-surgeon" placeholder="Dr. name" value="${cas?'Dr. Ravindra Gadag':''}">
+        <div class="field-hint">Pre-filled from SAST where available</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Recommended rehab centre</div>
+        <select class="field-input" id="f-rehabcentre">
+          <option value="">Select institute...</option>
+          ${ROLE_META.rehab.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Notes</div>
+      <div class="field">
+        <div class="field-label">Any complications or remarks</div>
+        <textarea class="field-input" id="f-notes" rows="3" placeholder="Optional..."></textarea>
+      </div>
+    </div>`;
+}
+
+function buildRehabForm(cas) {
+  const sessionNum = cas ? cas.sessions + 1 : 1;
+  const totalSess = cas ? cas.totalSessions : 54;
+  const pct = cas ? Math.round(cas.sessions / totalSess * 100) : 0;
+  const dotsHTML = cas ? Array.from({length: Math.min(18, totalSess)}, (_,i) => {
+    const n = i+1;
+    if (n < sessionNum) return `<div class="sdot sdot-done">${n}</div>`;
+    if (n === sessionNum) return `<div class="sdot sdot-today">${n}</div>`;
+    return `<div class="sdot sdot-pending">${n}</div>`;
+  }).join('') : '';
+
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🎧</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.phase} · ${cas.sessions} sessions done · Surgery: ${cas.surgery}</div></div></div>` : '';
+  const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last session was ${cas.lastContact}. Please note reason for gap in remarks.</div>` : '';
+
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Find beneficiary</div>
+      <div class="field">
+        <div class="field-label">Institute <span class="req">*</span></div>
+        <select class="field-input has-value" id="f-institute">
+          ${ROLE_META.rehab.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Year <span class="req">*</span></div>
+          <select class="field-input has-value" id="f-year">
+            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Card No. <span class="req">*</span></div>
+          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card no." value="${cas?cas.id:''}">
+        </div>
+      </div>
+      ${bannerHTML}
+      ${warnHTML}
+    </div>
+    ${cas ? `<div class="form-section">
+      <div class="form-section-title">Session progress</div>
+      <div class="session-dots">${dotsHTML}</div>
+      <div style="font-size:10px;color:var(--text-light);margin-bottom:4px">${cas.sessions} done · ${totalSess - cas.sessions} remaining</div>
+    </div>` : ''}
+    <div class="form-section">
+      <div class="form-section-title">Today's session — ${sessionNum}</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Date <span class="req">*</span></div>
+          <input type="date" class="field-input has-value" id="f-sessdate" value="${new Date().toISOString().split('T')[0]}">
+        </div>
+        <div class="field">
+          <div class="field-label">Duration</div>
+          <select class="field-input" id="f-duration">
+            <option>45 min</option><option>60 min</option><option>30 min</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Audiologist / therapist <span class="req">*</span></div>
+        <input class="field-input" id="f-therapist" placeholder="Name of AVT therapist">
+      </div>
+      <div class="field">
+        <div class="field-label">Attendance <span class="req">*</span></div>
+        <div class="radio-group" id="attendance-group">
+          <div class="radio-item checked" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Present — child + guardian attended</div>
+          <div class="radio-item" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Absent — family notified</div>
+          <div class="radio-item" onclick="selectRadio(this,'attendance-group')"><div class="radio-dot"></div>Absent — not reachable</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Session remarks</div>
+        <textarea class="field-input" id="f-remarks" rows="2" placeholder="Child's response, progress notes..."></textarea>
+      </div>
+    </div>`;
+}
+
+function buildDistrictForm(cas) {
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">📍</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.village}, ${cas.district} · ${cas.phase} · Surgery: ${cas.surgery}</div></div></div>` : '';
+  const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last contact: ${cas.lastContact}. This case is flagged as at-risk.</div>` : '';
+
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Select beneficiary</div>
+      <div class="field">
+        <div class="field-label">District <span class="req">*</span></div>
+        <select class="field-input has-value" id="f-district">
+          ${ROLE_META.district.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Year <span class="req">*</span></div>
+          <select class="field-input has-value" id="f-year">
+            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Card No.</div>
+          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="Optional" value="${cas?cas.id:''}">
+        </div>
+      </div>
+      ${bannerHTML}
+      ${warnHTML}
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Contact attempt</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Date <span class="req">*</span></div>
+          <input type="date" class="field-input has-value" id="f-contactdate" value="${new Date().toISOString().split('T')[0]}">
+        </div>
+        <div class="field">
+          <div class="field-label">Next follow-up</div>
+          <input type="date" class="field-input" id="f-nextdate">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Contact method <span class="req">*</span></div>
+        <div class="radio-group" id="contact-group">
+          <div class="radio-item checked" onclick="selectRadio(this,'contact-group')"><div class="radio-dot"></div>Phone call — reached guardian</div>
+          <div class="radio-item" onclick="selectRadio(this,'contact-group')"><div class="radio-dot"></div>Phone call — no answer</div>
+          <div class="radio-item" onclick="selectRadio(this,'contact-group')"><div class="radio-dot"></div>Home visit conducted</div>
+          <div class="radio-item" onclick="selectRadio(this,'contact-group')"><div class="radio-dot"></div>ASHA worker coordinated</div>
+        </div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Reason for gap / issue</div>
+      <div class="field">
+        <div class="field-label">Primary reason</div>
+        <select class="field-input" id="f-reason">
+          <option value="">Select if applicable...</option>
+          <option>Financial — travel cost to rehab centre</option>
+          <option>Family unaware of rehab importance</option>
+          <option>Child unwell / hospitalised</option>
+          <option>Device issue / mapping needed</option>
+          <option>Family migrated / relocated</option>
+          <option>Rehab centre access issue</option>
+          <option>No issue — on track</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Action taken</div>
+        <textarea class="field-input" id="f-action" rows="2" placeholder="e.g. Referred to ASHA, connected with rehab centre..."></textarea>
+      </div>
+      <div class="field">
+        <div class="field-label">Officer name</div>
+        <input class="field-input" id="f-officer" placeholder="Your name">
+      </div>
+    </div>`;
+}
+
+function buildStateForm(cas) {
+  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🏛️</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.district} · ${cas.phase} · ${cas.sessions}/${cas.totalSessions} sessions · Surgery: ${cas.surgery}</div></div></div>` : '';
+
+  return `
+    <div class="form-section">
+      <div class="form-section-title">Find beneficiary</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">District</div>
+          <select class="field-input" id="f-district">
+            <option value="">All districts</option>
+            ${ROLE_META.district.orgOptions.slice(0,-1).map(o=>`<option>${o}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">FY</div>
+          <select class="field-input has-value" id="f-year">
+            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Card No. <span class="req">*</span></div>
+        <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card number" value="${cas?cas.id:''}">
+      </div>
+      ${bannerHTML}
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Developmental milestones</div>
+      <div class="field">
+        <div class="field-label">Assessment date</div>
+        <input type="date" class="field-input" id="f-assessdate" value="${new Date().toISOString().split('T')[0]}">
+      </div>
+      ${['Sound awareness','Responds to name','Localises sound','First word spoken','2-word phrases','School integration ready'].map((m,i) => `
+        <div class="field">
+          <div class="field-label">${m}</div>
+          <div class="radio-group" id="ms-${i}">
+            <div class="radio-item" onclick="selectRadio(this,'ms-${i}')"><div class="radio-dot"></div>Achieved</div>
+            <div class="radio-item" onclick="selectRadio(this,'ms-${i}')"><div class="radio-dot"></div>Not yet</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="form-section">
+      <div class="form-section-title">Audiogram</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Aided threshold</div>
+          <select class="field-input" id="f-threshold">
+            <option value="">Select...</option>
+            <option>20–30 dB (normal)</option>
+            <option>31–40 dB (mild)</option>
+            <option>41–55 dB (moderate)</option>
+            <option>>55 dB (needs review)</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Hearing age (months)</div>
+          <input class="field-input" id="f-hearingage" type="number" placeholder="e.g. 8">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Assessed by (audiologist)</div>
+        <input class="field-input" id="f-audiologist" placeholder="Name">
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════
+// RADIO SELECT
+// ══════════════════════════════════════════
+function selectRadio(el, groupId) {
+  document.querySelectorAll('#' + groupId + ' .radio-item').forEach(r => r.classList.remove('checked'));
+  el.classList.add('checked');
+}
+
+// ══════════════════════════════════════════
+// SUBMIT
+// ══════════════════════════════════════════
+function submitForm() {
+  const btn = document.getElementById('submit-btn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+
+  const formData = collectFormData();
+  formData.role = currentRole;
+  formData.timestamp = new Date().toISOString();
+  formData.entryId = 'CI-' + Date.now();
+
+  if (navigator.onLine && SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(formData),
+    }).then(() => showSuccess(formData.entryId, false))
+      .catch(() => saveOffline(formData));
+  } else {
+    saveOffline(formData);
+  }
+}
+
+function collectFormData() {
+  const data = {};
+  document.querySelectorAll('#form-body .field-input, #form-body textarea').forEach(el => {
+    if (el.id) data[el.id] = el.value;
+  });
+  document.querySelectorAll('#form-body .radio-group').forEach(grp => {
+    const checked = grp.querySelector('.radio-item.checked');
+    if (checked) data[grp.id] = checked.textContent.trim();
+  });
+  return data;
+}
+
+function saveOffline(data) {
+  pendingQueue.push(data);
+  localStorage.setItem('ci_pending', JSON.stringify(pendingQueue));
+  showSuccess(data.entryId, true);
+}
+
+function showSuccess(id, offline) {
+  document.getElementById('success-id').textContent = id;
+  const msgs = { hospital:'Surgery details saved to programme register.', rehab:'Session attendance logged successfully.', district:'Follow-up note saved. Family will be monitored.', state:'Outcome milestones updated.' };
+  document.getElementById('success-msg').textContent = msgs[currentRole];
+  const note = document.getElementById('offline-note');
+  note.style.display = offline ? 'block' : 'none';
+  screenHistory = ['home'];
+  showScreen('success');
+  const btn = document.getElementById('submit-btn');
+  if (btn) { btn.innerHTML = 'Submit →'; btn.disabled = false; }
+}
+
+// ══════════════════════════════════════════
+// OFFLINE SYNC
+// ══════════════════════════════════════════
+window.addEventListener('online', () => {
+  if (pendingQueue.length && SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+    const toast = document.getElementById('offline-toast');
+    toast.textContent = `📶 Syncing ${pendingQueue.length} offline entries...`;
+    toast.classList.add('show');
+    Promise.all(pendingQueue.map(d => fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify(d) })))
+      .then(() => { pendingQueue = []; localStorage.setItem('ci_pending','[]'); toast.textContent = '✓ All entries synced'; setTimeout(() => toast.classList.remove('show'), 3000); })
+      .catch(() => toast.classList.remove('show'));
+  }
+});
+
+window.addEventListener('offline', () => {
+  const toast = document.getElementById('offline-toast');
+  toast.textContent = '📶 No internet — entries will be saved locally';
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 4000);
+});
+</script>
+
+<!-- Service Worker registration for offline PWA -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

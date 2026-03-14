@@ -439,21 +439,10 @@ function goBack() {
 // ══════════════════════════════════════════
 function pickRole(role) {
   currentRole = role;
-  const meta = ROLE_META[role];
-  // Style login screen
-  document.getElementById('screen-login').style.background = meta.loginBg;
-  document.getElementById('login-badge-icon').textContent = meta.icon;
-  document.getElementById('login-badge-icon').style.background = 'rgba(255,255,255,0.2)';
-  document.getElementById('login-badge-title').textContent = meta.label;
-  document.getElementById('login-badge-title').style.color = '#fff';
-  document.getElementById('login-badge-sub').textContent = 'CI Scheme Karnataka · NPPCD';
-  document.getElementById('login-badge-sub').style.color = 'rgba(255,255,255,0.65)';
-  document.querySelector('.login-card').style.background = 'rgba(255,255,255,0.95)';
-  const btn = document.getElementById('login-btn');
-  btn.className = 'lbtn ' + meta.lbtnClass;
-  document.querySelector('.login-footer').style.color = 'rgba(255,255,255,0.55)';
-  document.querySelector('.login-back').style.color = '#fff';
-  showScreen('login');
+  currentUser = { role: role, unit: ROLE_META[role].label, username: role, district: 'ALL' };
+  sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
+  buildHome();
+  showScreen('home');
 }
 
 // ══════════════════════════════════════════
@@ -499,7 +488,6 @@ async function submitPasswordChange() {
 
 function doLogout() {
   currentUser=null; sessionStorage.removeItem('ci_user'); currentRole=null; screenHistory=[];
-  document.getElementById('login-username').value=''; document.getElementById('login-password').value='';
   showScreen('role', false);
 }
 
@@ -951,7 +939,14 @@ window.addEventListener('online',()=>{document.getElementById('offline-chip').cl
 // ══════════════════════════════════════════
 window.addEventListener('load',()=>{
   const saved=sessionStorage.getItem('ci_user');
-  if(saved){try{currentUser=JSON.parse(saved);currentRole=currentUser.role;buildHome();showScreen('home',false);}catch(e){sessionStorage.removeItem('ci_user');}}
+  if(saved){
+    try{
+      currentUser=JSON.parse(saved);
+      currentRole=currentUser.role;
+      buildHome();
+      showScreen('home',false);
+    }catch(e){ sessionStorage.removeItem('ci_user'); }
+  }
 });
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}

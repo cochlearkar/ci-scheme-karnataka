@@ -385,15 +385,6 @@ body {
 }
 
 /* ─── OFFLINE TOAST ─── */
-.offline-toast {
-  position: fixed; bottom: 80px; left: 16px; right: 16px;
-  background: var(--text); color: #fff;
-  border-radius: 10px; padding: 12px 16px;
-  font-size: 12px; display: flex; align-items: center; gap: 8px;
-  transform: translateY(120%); transition: transform 0.3s;
-  z-index: 999;
-}
-.offline-toast.show { transform: translateY(0); }
 
 /* ─── LOADING ─── */
 .spinner {
@@ -413,6 +404,18 @@ body {
 .fy-count { margin-left:auto; font-size:11px; font-weight:500; color:var(--text-light); background:var(--gray-mid); padding:2px 8px; border-radius:10px; }
 .fy-toggle { font-size:11px; color:var(--text-light); }
 .fy-body { padding:4px 0 0 0; }
+
+
+/* Patient info card */
+.patient-info-card { background:var(--green-light); border:1px solid var(--green); border-radius:12px; padding:14px; margin:10px 0; }
+.patient-info-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.patient-info-icon { font-size:26px; }
+.patient-info-name { font-size:15px; font-weight:700; color:var(--text-main); }
+.patient-info-sub { font-size:12px; color:var(--text-light); margin-top:2px; }
+.patient-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
+.patient-info-grid > div { display:flex; flex-direction:column; }
+.info-label { font-size:10px; color:var(--text-light); text-transform:uppercase; font-weight:600; letter-spacing:.4px; }
+.info-val { font-size:13px; color:var(--text-main); font-weight:500; margin-top:1px; }
 
 ::-webkit-scrollbar-thumb { background: var(--gray-mid); border-radius: 3px; }
 </style>
@@ -610,7 +613,6 @@ body {
 </div>
 
 <!-- ══════════════════ OFFLINE TOAST ══════════════════ -->
-<div class="offline-toast" id="offline-toast">
   📶 No internet — entry saved locally, will sync automatically
 </div>
 
@@ -640,7 +642,7 @@ let screenHistory = [];
 
 const ROLE_META = {
   hospital: { label: 'Hospital', chip: 'chip-hospital', color: '#0a3d2e', icon: '🏥',
-    orgLabel: 'Hospital', orgOptions: ['KIMS Hubli','Akash Hospital Devanahalli','Mandya MIMS','NIMHANS Bengaluru','Samspanda Mandya','SDM Dharwad','BGS Kengeri','Other'],
+    orgLabel: 'Hospital', orgOptions: [],
     yearLabel: 'Surgery year' },
   rehab: { label: 'Rehab Institute', chip: 'chip-rehab', color: '#1a4a7a', icon: '🎧',
     orgLabel: 'Institute', orgOptions: ['AIISH Mysuru','NIMHANS Bengaluru','Samspanda Mandya','KSAD Dharwad','Other'],
@@ -1122,16 +1124,32 @@ function buildForm(cas) {
 }
 
 function buildHospitalForm(cas) {
-  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">✓</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.gender}, ${cas.age} · ${cas.village}, ${cas.district}<br>Surgery: ${cas.surgAdmit||cas.surgery||'—'} · SAST Ref: ${cas.surgRefNo||'—'}</div></div></div>` : '';
+  // Patient info banner - shown when a case is selected
+  const patientBanner = cas ? `
+    <div class="patient-info-card">
+      <div class="patient-info-header">
+        <span class="patient-info-icon">👶</span>
+        <div>
+          <div class="patient-info-name">${cas.name}</div>
+          <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.caste||''}</div>
+        </div>
+        <span class="status-pill ${cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
+      </div>
+      <div class="patient-info-grid">
+        <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
+        <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
+        <div><span class="info-label">District</span><span class="info-val">${cas.district||'—'}</span></div>
+        <div><span class="info-label">Mobile</span><span class="info-val"><a href="tel:${cas.mobile}" style="color:var(--green)">${cas.mobile||'—'}</a></span></div>
+        <div><span class="info-label">SAST Ref</span><span class="info-val">${cas.surgRefNo||cas.r1RefNo||'—'}</span></div>
+        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
+      </div>
+    </div>` : '';
+
+  const hospitalLabel = currentUser ? currentUser.unit : 'Hospital';
+
   return `
     <div class="form-section">
-      <div class="form-section-title">Find beneficiary</div>
-      <div class="field">
-        <div class="field-label">Hospital <span class="req">*</span></div>
-        <select class="field-input has-value" id="f-hospital">
-          ${ROLE_META.hospital.orgOptions.map(o=>`<option>${o}</option>`).join('')}
-        </select>
-      </div>
+      <div class="form-section-title">🏥 ${hospitalLabel}</div>
       <div class="field-row">
         <div class="field">
           <div class="field-label">Surgery year <span class="req">*</span></div>
@@ -1140,14 +1158,14 @@ function buildHospitalForm(cas) {
           </select>
         </div>
         <div class="field">
-          <div class="field-label">Card No. <span class="req">*</span></div>
-          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card number" value="${cas?cas.id:''}" oninput="this.classList.toggle('has-value',this.value.length>0)">
+          <div class="field-label">Card No.</div>
+          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card no." value="${cas?cas.id:''}" oninput="this.classList.toggle('has-value',this.value.length>0)">
         </div>
       </div>
-      ${bannerHTML}
+      ${patientBanner}
     </div>
     <div class="form-section">
-      <div class="form-section-title">Device details</div>
+      <div class="form-section-title">🎧 Device Details</div>
       <div class="field">
         <div class="field-label">Manufacturer <span class="req">*</span></div>
         <select class="field-input" id="f-mfr">
@@ -1172,13 +1190,12 @@ function buildHospitalForm(cas) {
         </div>
       </div>
       <div class="field">
-        <div class="field-label">Serial number <span class="req">*</span></div>
-        <input class="field-input" id="f-serial" placeholder="Scan or type device serial number">
-        <div class="field-hint">Found on device packaging label</div>
+        <div class="field-label">Serial number</div>
+        <input class="field-input" id="f-serial" placeholder="Device serial number">
       </div>
     </div>
     <div class="form-section">
-      <div class="form-section-title">Operative details</div>
+      <div class="form-section-title">🗓 Operative Details</div>
       <div class="field-row">
         <div class="field">
           <div class="field-label">Surgery date <span class="req">*</span></div>
@@ -1191,7 +1208,7 @@ function buildHospitalForm(cas) {
       </div>
       <div class="field">
         <div class="field-label">Treating surgeon</div>
-        <input class="field-input" id="f-surgeon" placeholder="Dr. name" value="${cas?cas.doctor||'':''}" placeholder="Dr. name">
+        <input class="field-input" id="f-surgeon" placeholder="Dr. name" value="${cas?cas.doctor||'':''}">
         <div class="field-hint">Pre-filled from SAST where available</div>
       </div>
       <div class="field">
@@ -1203,13 +1220,14 @@ function buildHospitalForm(cas) {
       </div>
     </div>
     <div class="form-section">
-      <div class="form-section-title">Notes</div>
+      <div class="form-section-title">📝 Notes</div>
       <div class="field">
-        <div class="field-label">Any complications or remarks</div>
+        <div class="field-label">Complications or remarks</div>
         <textarea class="field-input" id="f-notes" rows="3" placeholder="Optional..."></textarea>
       </div>
     </div>`;
 }
+
 
 function buildRehabForm(cas) {
   const sessionNum = cas ? cas.sessions + 1 : 1;
@@ -1222,7 +1240,25 @@ function buildRehabForm(cas) {
     return `<div class="sdot sdot-pending">${n}</div>`;
   }).join('') : '';
 
-  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🎧</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.phase} · ${cas.sessions} sessions done · Surgery: ${cas.surgAdmit||cas.r1Admit||'—'}</div></div></div>` : '';
+  const bannerHTML = cas ? `
+    <div class="patient-info-card">
+      <div class="patient-info-header">
+        <span class="patient-info-icon">👶</span>
+        <div>
+          <div class="patient-info-name">${cas.name}</div>
+          <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.district}</div>
+        </div>
+        <span class="status-pill ${cas.risk?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
+      </div>
+      <div class="patient-info-grid">
+        <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
+        <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
+        <div><span class="info-label">Mobile</span><span class="info-val"><a href="tel:${cas.mobile}" style="color:var(--green)">${cas.mobile||'—'}</a></span></div>
+        <div><span class="info-label">Surgery</span><span class="info-val">${cas.surgAdmit||'—'}</span></div>
+        <div><span class="info-label">Rehab Ref</span><span class="info-val">${cas.r1RefNo||'—'}</span></div>
+        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
+      </div>
+    </div>` : '';
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last session was ${cas.lastContact}. Please note reason for gap in remarks.</div>` : '';
 
   return `
@@ -1288,7 +1324,25 @@ function buildRehabForm(cas) {
 }
 
 function buildDistrictForm(cas) {
-  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">📍</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.village}, ${cas.district} · ${cas.phase} · Surgery: ${cas.surgAdmit||cas.r1Admit||'—'}</div></div></div>` : '';
+  const bannerHTML = cas ? `
+    <div class="patient-info-card">
+      <div class="patient-info-header">
+        <span class="patient-info-icon">👶</span>
+        <div>
+          <div class="patient-info-name">${cas.name}</div>
+          <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.caste||''}</div>
+        </div>
+        <span class="status-pill ${cas.risk?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
+      </div>
+      <div class="patient-info-grid">
+        <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
+        <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
+        <div><span class="info-label">District</span><span class="info-val">${cas.district||'—'}</span></div>
+        <div><span class="info-label">Mobile</span><span class="info-val"><a href="tel:${cas.mobile}" style="color:var(--green)">${cas.mobile||'—'}</a></span></div>
+        <div><span class="info-label">Hospital</span><span class="info-val">${cas.hospital||'—'}</span></div>
+        <div><span class="info-label">Surgery</span><span class="info-val">${cas.surgAdmit||'—'}</span></div>
+      </div>
+    </div>` : '';
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last contact: ${cas.lastContact}. This case is flagged as at-risk.</div>` : '';
 
   return `

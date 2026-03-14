@@ -666,6 +666,10 @@ let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
 // ══════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════
+function cleanMob(m) {
+  return String(m||'').replace(/\.0$/, '').replace(/[^0-9+]/g, '').trim();
+}
+
 function showScreen(name, pushHistory = true) {
   if (pushHistory && currentScreen !== name) screenHistory.push(currentScreen);
   document.querySelectorAll('.screen').forEach(s => {
@@ -1129,7 +1133,7 @@ function buildForm(cas) {
 }
 
 function buildHospitalForm(cas) {
-  // Patient info banner - shown when a case is selected
+  const mob = cas ? cleanMob(cas.mobile) : '';
   const patientBanner = cas ? `
     <div class="patient-info-card">
       <div class="patient-info-header">
@@ -1141,32 +1145,22 @@ function buildHospitalForm(cas) {
         <span class="status-pill ${cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
       </div>
       <div class="patient-info-grid">
+        <div><span class="info-label">Card No.</span><span class="info-val">${cas.id||'—'}</span></div>
+        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
         <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
         <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
         <div><span class="info-label">District</span><span class="info-val">${cas.district||'—'}</span></div>
-        <div><span class="info-label">Mobile</span><span class="info-val"><a href="tel:${cas.mobile}" style="color:var(--green)">${cas.mobile||'—'}</a></span></div>
-        <div><span class="info-label">SAST Ref</span><span class="info-val">${cas.surgRefNo||cas.r1RefNo||'—'}</span></div>
-        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
+        <div><span class="info-label">Surgeon</span><span class="info-val">${cas.doctor||'—'}</span></div>
+        <div><span class="info-label">Mobile</span><span class="info-val">${mob ? '<a href="tel:'+mob+'" style="color:var(--green);font-weight:600">'+mob+'</a>' : '—'}</span></div>
+        <div><span class="info-label">SAST Ref</span><span class="info-val" style="font-size:10px">${cas.surgRefNo||cas.r1RefNo||'—'}</span></div>
       </div>
-    </div>` : '';
+    </div>` : '<div class="info-banner" style="background:var(--gray-bg)"><div class="info-banner-text" style="color:var(--text-light)">Select a case from the cases list to pre-fill details</div></div>';
 
   const hospitalLabel = currentUser ? currentUser.unit : 'Hospital';
 
   return `
     <div class="form-section">
       <div class="form-section-title">🏥 ${hospitalLabel}</div>
-      <div class="field-row">
-        <div class="field">
-          <div class="field-label">Surgery year <span class="req">*</span></div>
-          <select class="field-input has-value" id="f-year">
-            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option><option>2022-23</option>
-          </select>
-        </div>
-        <div class="field">
-          <div class="field-label">Card No.</div>
-          <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card no." value="${cas?cas.id:''}" oninput="this.classList.toggle('has-value',this.value.length>0)">
-        </div>
-      </div>
       ${patientBanner}
     </div>
     <div class="form-section">
@@ -1212,11 +1206,6 @@ function buildHospitalForm(cas) {
         </div>
       </div>
       <div class="field">
-        <div class="field-label">Treating surgeon</div>
-        <input class="field-input" id="f-surgeon" placeholder="Dr. name" value="${cas?cas.doctor||'':''}">
-        <div class="field-hint">Pre-filled from SAST where available</div>
-      </div>
-      <div class="field">
         <div class="field-label">Recommended rehab centre</div>
         <select class="field-input" id="f-rehabcentre">
           <option value="">Select institute...</option>
@@ -1258,7 +1247,7 @@ function buildRehabForm(cas) {
       <div class="patient-info-grid">
         <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
         <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
-        <div><span class="info-label">Mobile</span><span class="info-val"><a href="tel:${cas.mobile}" style="color:var(--green)">${cas.mobile||'—'}</a></span></div>
+        <div><span class="info-label">Mobile</span><span class="info-val">${cleanMob(cas.mobile)?`<a href="tel:${cleanMob(cas.mobile)}" style="color:var(--green);font-weight:600">${cleanMob(cas.mobile)}</a>`:'\u2014'}</span></div>
         <div><span class="info-label">Surgery</span><span class="info-val">${cas.surgAdmit||'—'}</span></div>
         <div><span class="info-label">Rehab Ref</span><span class="info-val">${cas.r1RefNo||'—'}</span></div>
         <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
@@ -1343,7 +1332,7 @@ function buildDistrictForm(cas) {
         <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
         <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
         <div><span class="info-label">District</span><span class="info-val">${cas.district||'—'}</span></div>
-        <div><span class="info-label">Mobile</span><span class="info-val"><a href="tel:${cas.mobile}" style="color:var(--green)">${cas.mobile||'—'}</a></span></div>
+        <div><span class="info-label">Mobile</span><span class="info-val">${cleanMob(cas.mobile)?`<a href="tel:${cleanMob(cas.mobile)}" style="color:var(--green);font-weight:600">${cleanMob(cas.mobile)}</a>`:'\u2014'}</span></div>
         <div><span class="info-label">Hospital</span><span class="info-val">${cas.hospital||'—'}</span></div>
         <div><span class="info-label">Surgery</span><span class="info-val">${cas.surgAdmit||'—'}</span></div>
       </div>

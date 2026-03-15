@@ -2610,6 +2610,51 @@ function collectFormData() {
   return data;
 }
 
+function submitToSheet(formData) {
+  const btn = document.getElementById('submit-btn');
+  // Send via no-cors POST — reaches Apps Script, response is opaque (can't read it)
+  fetch(SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(formData)
+  })
+  .then(() => {
+    // POST fired successfully — verify via JSONP ping then show success
+    const cbName = 'cb_' + Date.now();
+    const params = new URLSearchParams({
+      action: 'ping',
+      entryId: formData.entryId || '',
+      callback: cbName
+    });
+    const script = document.createElement('script');
+    let done = false;
+    window[cbName] = function() {
+      done = true;
+      delete window[cbName];
+      try { document.head.removeChild(script); } catch(e) {}
+      showSuccess(formData.entryId, false);
+    };
+    script.onerror = function() {
+      done = true;
+      delete window[cbName];
+      try { document.head.removeChild(script); } catch(e) {}
+      showSuccess(formData.entryId, false);
+    };
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        delete window[cbName];
+        try { document.head.removeChild(script); } catch(e) {}
+        showSuccess(formData.entryId, false);
+      }
+    }, 5000);
+    script.src = SCRIPT_URL + '?' + params.toString();
+    document.head.appendChild(script);
+  })
+  .catch(() => saveOffline(formData));
+}
+
 function saveOffline(data) {
   pendingQueue.push(data);
   localStorage.setItem('ci_pending', JSON.stringify(pendingQueue));

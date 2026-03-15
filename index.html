@@ -590,7 +590,10 @@ body {
         <div class="header-sub" id="form-sub"></div>
       </div>
     </div>
-    <div class="role-chip" id="form-chip"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="role-chip" id="form-chip"></div>
+      <button onclick="showReportCard()" id="report-btn" style="display:none;background:transparent;border:1.5px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer">📄</button>
+    </div>
   </div>
   <div class="form-scroll" id="form-body"></div>
   <div class="bottom-bar">
@@ -830,11 +833,18 @@ function filterCasesByUser(cases) {
   if (!currentUser || currentUser.role === 'state') return cases;
   if (currentUser.role === 'hospital') {
     const u = (currentUser.unit||'').toLowerCase();
-    return cases.filter(c => c.hospital && c.hospital.toLowerCase().includes(u.substring(0,10)));
+    // Progressive match — try shorter keys until we find cases
+    for (let len = Math.min(u.length, 20); len >= 6; len -= 2) {
+      const key = u.substring(0, len);
+      const matches = cases.filter(c => c.hospital && c.hospital.toLowerCase().includes(key));
+      if (matches.length > 0) return matches;
+    }
+    return [];
   }
   if (currentUser.role === 'rehab') {
-    const u = (currentUser.unit||'').toLowerCase();
-    return cases.filter(c => (c.rehab||'').toLowerCase().includes(u.substring(0,8)));
+    // Rehab sees ALL cases that have had surgery — they need to update ANY child
+    // coming for sessions (SAST data has no rehab institute field)
+    return cases.filter(c => c.surgAdmit || c.status === 'rehab1' || c.status === 'rehab2' || c.status === 'paid');
   }
   if (currentUser.role === 'district') {
     const d = (currentUser.district||currentUser.unit||'').toUpperCase();
@@ -888,7 +898,7 @@ function buildHome() {
   }
   if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
   } else {
-    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">📊</div><div><div class="action-title">Update milestone / outcomes</div><div class="action-desc">Record audiogram & milestones</div></div><div class="action-arrow">→</div></div>`;
+    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">➕</div><div><div class="action-title">Enter new SAST case</div><div class="action-desc">Add case details from SAST portal</div></div><div class="action-arrow">→</div></div>`;
   }
   html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">${currentRole === 'district' ? 'By district' : 'By ' + meta.orgLabel.toLowerCase()}</div></div>`;
   html += `<div class="action-card" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">🔔</div><div class="action-title">Alerts</div><div class="action-desc">${risks.length} need attention</div></div>`;
@@ -1035,9 +1045,14 @@ function caseCardHTML(c) {
   const pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':'pill-pending';
   const pillLabel = c.status==='paid'?'✓ Complete':c.status==='risk'?'⚠ At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pending':'Active';
   const dateLabel = c.surgAdmit ? `Surgery: ${c.surgAdmit}` : c.r1Admit ? `Rehab1: ${c.r1Admit}` : c.r2Admit ? `Rehab2: ${c.r2Admit}` : '—';
+  // Source badge — SAST only vs institution-updated
+  const hasUpdate = c.surgDateUpdated || c.dob || c.mentorSurgeon;
+  const sourceBadge = hasUpdate
+    ? '<span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:6px;font-weight:700">✓ UPDATED</span>'
+    : '<span style="font-size:9px;background:#f3f4f6;color:#9ca3af;padding:1px 5px;border-radius:6px;font-weight:600">SAST only</span>';
   return `<div class="case-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
     <div class="case-header">
-      <div class="case-name">${c.name}</div>
+      <div class="case-name">${c.name} ${sourceBadge}</div>
       <span class="status-pill ${pillClass}">${pillLabel}</span>
     </div>
     <div class="case-meta">
@@ -1121,16 +1136,31 @@ function buildForm(cas) {
     btn.textContent = 'Save follow-up →';
     html = buildDistrictForm(cas);
   } else {
-    title = cas ? 'Outcomes — ' + cas.name : 'Milestone update';
-    sub = cas ? 'Post-implant outcomes tracker' : 'Find beneficiary';
-    btn.textContent = 'Submit outcomes →';
+    title = cas ? 'Update case — ' + cas.name : 'New SAST case entry';
+    sub = cas ? cas.district + ' · ' + (cas.journey||cas.status||'') : 'Enter full case details from SAST portal';
+    btn.textContent = cas ? 'Update case →' : 'Save new case →';
     html = buildStateForm(cas);
   }
 
   document.getElementById('form-title').textContent = title;
   document.getElementById('form-sub').textContent = sub;
   document.getElementById('form-body').innerHTML = html;
+  // Show report card button only when a case is selected
+  const reportBtn = document.getElementById('report-btn');
+  if (reportBtn) reportBtn.style.display = cas ? 'block' : 'none';
 
+  // Pre-fill district in hospital form
+  if (currentRole === 'hospital' && cas && cas.district) {
+    const hDistSel = document.getElementById('f-res-district');
+    if (hDistSel) {
+      const d = cas.district.toUpperCase();
+      for (let opt of hDistSel.options) {
+        if (opt.value.toUpperCase() === d) { opt.selected = true; hDistSel.classList.add('has-value'); break; }
+      }
+    }
+    // Trigger age calc if DOB pre-filled
+    calcAgeAtSurgery();
+  }
   // Pre-fill district dropdown in rehab form when case is selected
   if (currentRole === 'rehab' && cas && cas.district) {
     const distSel = document.getElementById('f-res-district');
@@ -1209,11 +1239,31 @@ function buildHospitalForm(cas) {
       </div>
     </div>
     <div class="form-section">
+      <div class="form-section-title">👶 Patient Details (to confirm)</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Date of Birth <span class="req">*</span></div>
+          <input type="date" class="field-input ${cas&&cas.dob?'has-value':''}" id="f-dob" value="${cas&&cas.dob?cas.dob:''}" onchange="calcAgeAtSurgery()">
+        </div>
+        <div class="field">
+          <div class="field-label">Age at surgery</div>
+          <input class="field-input" id="f-age-calc" placeholder="Auto-calculated" readonly style="background:var(--gray-bg);color:var(--text2)">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">BPL / APL Status</div>
+        <div class="radio-group" id="rg-bpl">
+          <div class="radio-item" onclick="selectRadio(this,'rg-bpl')"><div class="radio-dot"></div>BPL — Below Poverty Line</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-bpl')"><div class="radio-dot"></div>APL — Above Poverty Line</div>
+        </div>
+      </div>
+    </div>
+    <div class="form-section">
       <div class="form-section-title">🗓 Operative Details</div>
       <div class="field-row">
         <div class="field">
           <div class="field-label">Surgery date <span class="req">*</span></div>
-          <input type="date" class="field-input ${cas?'has-value':''}" id="f-surgdate" value="${cas&&cas.surgAdmit?cas.surgAdmit.substring(0,10):''}">
+          <input type="date" class="field-input ${cas?'has-value':''}" id="f-surgdate" value="${cas&&cas.surgAdmit?cas.surgAdmit.substring(0,10):''}" onchange="calcAgeAtSurgery()">
         </div>
         <div class="field">
           <div class="field-label">Switch-on date</div>
@@ -1221,10 +1271,74 @@ function buildHospitalForm(cas) {
         </div>
       </div>
       <div class="field">
+        <div class="field-label">Final diagnosis</div>
+        <select class="field-input" id="f-diagnosis">
+          <option value="">Select...</option>
+          <option>Bilateral Sensorineural Hearing Loss — Profound</option>
+          <option>Bilateral Sensorineural Hearing Loss — Severe</option>
+          <option>Auditory Neuropathy Spectrum Disorder</option>
+          <option>Post-meningitic Deafness</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Treating surgeon</div>
+          <input class="field-input" id="f-surgeon" placeholder="Operating surgeon" value="${cas?cas.doctor||'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Mentor surgeon</div>
+          <input class="field-input" id="f-mentor" placeholder="Mentor / supervising surgeon" value="${cas?cas.mentorSurgeon||'':''}">
+        </div>
+      </div>
+      <div class="field">
         <div class="field-label">Recommended rehab centre</div>
         <select class="field-input" id="f-rehabcentre">
           <option value="">Select institute...</option>
           ${ROLE_META.rehab.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <div class="field-label">Residential district of child</div>
+        <select class="field-input ${cas&&cas.district?'has-value':''}" id="f-res-district">
+          <option value="">Select district...</option>
+          <option value="BAGALKOTE">Bagalkote</option>
+          <option value="BALLARI">Ballari</option>
+          <option value="BANGALORE - RURAL">Bangalore - Rural</option>
+          <option value="BANGALORE EAST">Bangalore East</option>
+          <option value="BANGALORE NORTH">Bangalore North</option>
+          <option value="BANGALORE SOUTH">Bangalore South</option>
+          <option value="BANGALORE WEST">Bangalore West</option>
+          <option value="BELAGAVI">Belagavi</option>
+          <option value="BENGALURU">Bengaluru</option>
+          <option value="BENGALURU RURAL">Bengaluru Rural</option>
+          <option value="BIDAR">Bidar</option>
+          <option value="CHAMARAJANAGARA">Chamarajanagara</option>
+          <option value="CHIKKABALLAPURA">Chikkaballapura</option>
+          <option value="CHIKKAMAGALURU">Chikkamagaluru</option>
+          <option value="CHITRADURGA">Chitradurga</option>
+          <option value="DAKSHINA KANNADA">Dakshina Kannada</option>
+          <option value="DAVANAGERE">Davanagere</option>
+          <option value="DHARWAR">Dharwar</option>
+          <option value="GADAG">Gadag</option>
+          <option value="HASSAN">Hassan</option>
+          <option value="HAVERI">Haveri</option>
+          <option value="KALABURAGI">Kalaburagi</option>
+          <option value="KODAGU">Kodagu</option>
+          <option value="KOLAR">Kolar</option>
+          <option value="KOPPAL">Koppal</option>
+          <option value="MANDYA">Mandya</option>
+          <option value="MYSORE">Mysore</option>
+          <option value="MYSURU">Mysuru</option>
+          <option value="RAICHUR">Raichur</option>
+          <option value="RAMANAGARA">Ramanagara</option>
+          <option value="SHIVAMOGGA">Shivamogga</option>
+          <option value="TUMAKURU">Tumakuru</option>
+          <option value="UDUPI">Udupi</option>
+          <option value="UTTARA KANNADA">Uttara Kannada</option>
+          <option value="VIJAYANAGAR">Vijayanagar</option>
+          <option value="VIJAYAPURA">Vijayapura</option>
+          <option value="YADGIR">Yadgir</option>
         </select>
       </div>
     </div>
@@ -1572,81 +1686,358 @@ function buildDistrictForm(cas) {
     </div>`;
 }
 
+function calcAgeAtSurgery() {
+  const dob = document.getElementById('f-dob');
+  const surgDate = document.getElementById('f-surgdate');
+  const ageField = document.getElementById('f-age-calc');
+  if (!dob || !surgDate || !ageField) return;
+  if (!dob.value || !surgDate.value) { ageField.value = ''; return; }
+  const d1 = new Date(dob.value);
+  const d2 = new Date(surgDate.value);
+  if (isNaN(d1) || isNaN(d2) || d2 < d1) { ageField.value = 'Check dates'; return; }
+  let years = d2.getFullYear() - d1.getFullYear();
+  let months = d2.getMonth() - d1.getMonth();
+  if (months < 0) { years--; months += 12; }
+  if (d2.getDate() < d1.getDate()) months--;
+  if (months < 0) { years--; months += 12; }
+  ageField.value = years > 0 ? `${years} yr ${months} mo` : `${months} months`;
+  ageField.classList.add('has-value');
+}
+
 function showDeviceNote(show) {
   const el = document.getElementById('device-note-group');
   if (el) el.style.display = show ? 'block' : 'none';
 }
 
 function buildStateForm(cas) {
-  const bannerHTML = cas ? `<div class="info-banner"><div class="info-banner-icon">🏛️</div><div><div class="info-banner-name">${cas.name}</div><div class="info-banner-text">${cas.district} · ${cas.phase} · ${cas.sessions}/${cas.totalSessions} sessions · Surgery: ${cas.surgAdmit||cas.r1Admit||'—'}</div></div></div>` : '';
+  const isNew = !cas;
+  const patientBanner = cas ? (() => {
+    const mob = cleanMob(cas.mobile);
+    return `<div class="patient-info-card">
+      <div class="patient-info-header">
+        <span class="patient-info-icon">👶</span>
+        <div><div class="patient-info-name">${cas.name}</div>
+        <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.district}</div></div>
+        <span class="status-pill pill-pending">${cas.journey||cas.status||''}</span>
+      </div>
+      <div class="patient-info-grid">
+        <div><span class="info-label">Card No.</span><span class="info-val">${cas.id}</span></div>
+        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
+        <div><span class="info-label">Hospital</span><span class="info-val" style="font-size:11px">${cas.hospital||'—'}</span></div>
+        <div><span class="info-label">Mobile</span><span class="info-val">${mob?`<a href="tel:${mob}" style="color:var(--green);font-weight:600">${mob}</a>`:'—'}</span></div>
+      </div>
+    </div>`;
+  })() : '';
 
   return `
     <div class="form-section">
-      <div class="form-section-title">Find beneficiary</div>
+      <div class="form-section-title">🏛 ${isNew ? 'New Case Entry from SAST' : 'Update Case — ' + (cas?cas.name:'')}</div>
+      ${patientBanner}
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📋 SAST Reference</div>
       <div class="field-row">
         <div class="field">
-          <div class="field-label">District</div>
-          <select class="field-input" id="f-district">
-            <option value="">All districts</option>
-            ${ROLE_META.district.orgOptions.slice(0,-1).map(o=>`<option>${o}</option>`).join('')}
-          </select>
+          <div class="field-label">First submission date</div>
+          <input type="date" class="field-input" id="f-sast-submit-date">
         </div>
         <div class="field">
-          <div class="field-label">FY</div>
-          <select class="field-input has-value" id="f-year">
-            <option>2025-26</option><option selected>2024-25</option><option>2023-24</option>
-          </select>
+          <div class="field-label">SAST Ref No. <span class="req">*</span></div>
+          <input class="field-input" id="f-sast-ref" placeholder="e.g. COC_H_..." value="${cas?cas.surgRefNo||'':''}">
         </div>
       </div>
-      <div class="field">
-        <div class="field-label">Card No. <span class="req">*</span></div>
-        <input class="field-input ${cas?'has-value':''}" id="f-card" placeholder="SAST card number" value="${cas?cas.id:''}">
-      </div>
-      ${bannerHTML}
-    </div>
-    <div class="form-section">
-      <div class="form-section-title">Developmental milestones</div>
-      <div class="field">
-        <div class="field-label">Assessment date</div>
-        <input type="date" class="field-input" id="f-assessdate" value="${new Date().toISOString().split('T')[0]}">
-      </div>
-      ${['Sound awareness','Responds to name','Localises sound','First word spoken','2-word phrases','School integration ready'].map((m,i) => `
-        <div class="field">
-          <div class="field-label">${m}</div>
-          <div class="radio-group" id="ms-${i}">
-            <div class="radio-item" onclick="selectRadio(this,'ms-${i}')"><div class="radio-dot"></div>Achieved</div>
-            <div class="radio-item" onclick="selectRadio(this,'ms-${i}')"><div class="radio-dot"></div>Not yet</div>
-          </div>
-        </div>`).join('')}
-    </div>
-    <div class="form-section">
-      <div class="form-section-title">Audiogram</div>
       <div class="field-row">
         <div class="field">
-          <div class="field-label">Aided threshold</div>
-          <select class="field-input" id="f-threshold">
+          <div class="field-label">Pre-auth status</div>
+          <select class="field-input" id="f-preauth-status">
             <option value="">Select...</option>
-            <option>20–30 dB (normal)</option>
-            <option>31–40 dB (mild)</option>
-            <option>41–55 dB (moderate)</option>
-            <option>>55 dB (needs review)</option>
+            <option>APPROVED</option><option>PENDING</option><option>REJECTED</option><option>NEED MORE INFO</option>
           </select>
         </div>
         <div class="field">
-          <div class="field-label">Hearing age (months)</div>
-          <input class="field-input" id="f-hearingage" type="number" placeholder="e.g. 8">
+          <div class="field-label">Pre-auth approved date</div>
+          <input type="date" class="field-input" id="f-preauth-date">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">👶 Patient Information</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Patient name <span class="req">*</span></div>
+          <input class="field-input" id="f-pat-name" placeholder="Full name" value="${cas?cas.name||'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Gender <span class="req">*</span></div>
+          <select class="field-input" id="f-gender">
+            <option value="">Select</option>
+            <option ${cas&&cas.gender==='Male'?'selected':''}>Male</option>
+            <option ${cas&&cas.gender==='Female'?'selected':''}>Female</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Date of Birth</div>
+          <input type="date" class="field-input" id="f-dob" value="${cas?cas.dob||'':''}" onchange="calcAgeAtSurgery()">
+        </div>
+        <div class="field">
+          <div class="field-label">Age (from SAST)</div>
+          <input class="field-input" id="f-age" placeholder="e.g. 2 Years" value="${cas?cas.age||'':''}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Caste / Category</div>
+          <select class="field-input" id="f-caste">
+            <option value="">Select</option>
+            <option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>MBC</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">BPL / APL</div>
+          <select class="field-input" id="f-bpl">
+            <option value="">Select</option>
+            <option>BPL — Below Poverty Line</option>
+            <option>APL — Above Poverty Line</option>
+          </select>
         </div>
       </div>
       <div class="field">
-        <div class="field-label">Assessed by (audiologist)</div>
-        <input class="field-input" id="f-audiologist" placeholder="Name">
+        <div class="field-label">Final diagnosis</div>
+        <select class="field-input" id="f-diagnosis">
+          <option value="">Select...</option>
+          <option>Bilateral Sensorineural Hearing Loss — Profound</option>
+          <option>Bilateral Sensorineural Hearing Loss — Severe</option>
+          <option>Auditory Neuropathy Spectrum Disorder</option>
+          <option>Post-meningitic Deafness</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📍 Patient Address</div>
+      <div class="field">
+        <div class="field-label">Full address</div>
+        <textarea class="field-input" id="f-address" rows="2" placeholder="Door no, street, locality...">${cas?cas.village||'':''}</textarea>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Village / Town</div>
+          <input class="field-input" id="f-village" value="${cas?cas.village||'':''}" placeholder="Village">
+        </div>
+        <div class="field">
+          <div class="field-label">Taluk</div>
+          <input class="field-input" id="f-taluk" value="${cas?cas.taluk||'':''}" placeholder="Taluk">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">District <span class="req">*</span></div>
+          <select class="field-input" id="f-district">
+            <option value="">Select district</option>
+          <option value="BAGALKOTE">Bagalkote</option>
+          <option value="BALLARI">Ballari</option>
+          <option value="BANGALORE - RURAL">Bangalore - Rural</option>
+          <option value="BANGALORE EAST">Bangalore East</option>
+          <option value="BANGALORE NORTH">Bangalore North</option>
+          <option value="BANGALORE SOUTH">Bangalore South</option>
+          <option value="BANGALORE WEST">Bangalore West</option>
+          <option value="BELAGAVI">Belagavi</option>
+          <option value="BENGALURU">Bengaluru</option>
+          <option value="BENGALURU RURAL">Bengaluru Rural</option>
+          <option value="BIDAR">Bidar</option>
+          <option value="CHAMARAJANAGARA">Chamarajanagara</option>
+          <option value="CHIKKABALLAPURA">Chikkaballapura</option>
+          <option value="CHIKKAMAGALURU">Chikkamagaluru</option>
+          <option value="CHITRADURGA">Chitradurga</option>
+          <option value="DAKSHINA KANNADA">Dakshina Kannada</option>
+          <option value="DAVANAGERE">Davanagere</option>
+          <option value="DHARWAR">Dharwar</option>
+          <option value="GADAG">Gadag</option>
+          <option value="HASSAN">Hassan</option>
+          <option value="HAVERI">Haveri</option>
+          <option value="KALABURAGI">Kalaburagi</option>
+          <option value="KODAGU">Kodagu</option>
+          <option value="KOLAR">Kolar</option>
+          <option value="KOPPAL">Koppal</option>
+          <option value="MANDYA">Mandya</option>
+          <option value="MYSORE">Mysore</option>
+          <option value="MYSURU">Mysuru</option>
+          <option value="RAICHUR">Raichur</option>
+          <option value="RAMANAGARA">Ramanagara</option>
+          <option value="SHIVAMOGGA">Shivamogga</option>
+          <option value="TUMAKURU">Tumakuru</option>
+          <option value="UDUPI">Udupi</option>
+          <option value="UTTARA KANNADA">Uttara Kannada</option>
+          <option value="VIJAYANAGAR">Vijayanagar</option>
+          <option value="VIJAYAPURA">Vijayapura</option>
+          <option value="YADGIR">Yadgir</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Mobile number</div>
+          <input class="field-input" id="f-mobile" placeholder="10-digit mobile" value="${cas?cleanMob(cas.mobile)||'':''}">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🏥 Hospital &amp; Surgical Details</div>
+      <div class="field">
+        <div class="field-label">Hospital name <span class="req">*</span></div>
+        <input class="field-input" id="f-hospital-name" placeholder="Hospital name" value="${cas?cas.hospital||'':''}">
+      </div>
+      <div class="field">
+        <div class="field-label">Hospital district</div>
+        <input class="field-input" id="f-hosp-dist" placeholder="Hospital district" value="${cas?cas.hospDist||'':''}">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Treating doctor</div>
+          <input class="field-input" id="f-doctor" placeholder="Dr. name" value="${cas?cas.doctor||'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Mentor surgeon</div>
+          <input class="field-input" id="f-mentor" placeholder="Mentor surgeon" value="${cas?cas.mentorSurgeon||'':''}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Admission date</div>
+          <input type="date" class="field-input" id="f-admit" value="${cas?cas.surgAdmit?cas.surgAdmit.substring(0,10):'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Date of surgery</div>
+          <input type="date" class="field-input" id="f-surgdate" onchange="calcAgeAtSurgery()">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Discharge date</div>
+          <input type="date" class="field-input" id="f-discharge" value="${cas?cas.surgDisch?cas.surgDisch.substring(0,10):'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Package / Procedure</div>
+          <input class="field-input" id="f-pkg" placeholder="e.g. 2001GP" value="${cas?cas.surgPkg||'':''}">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">💰 Surgery Financial Details</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Preauth amount (₹)</div>
+          <input type="number" class="field-input" id="f-preauth-amt" placeholder="0">
+        </div>
+        <div class="field">
+          <div class="field-label">Claims bill amount (₹)</div>
+          <input type="number" class="field-input" id="f-bill-amt" placeholder="0">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Approved amount (₹)</div>
+          <input type="number" class="field-input" id="f-approved-amt" placeholder="0">
+        </div>
+        <div class="field">
+          <div class="field-label">Net paid (₹)</div>
+          <input type="number" class="field-input" id="f-net-paid" placeholder="0" value="${cas?cas.surgNet||'':''}">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🎧 Rehab Part 1 (2002GP)</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Preauth submit date</div>
+          <input type="date" class="field-input" id="f-r1-preauth-submit">
+        </div>
+        <div class="field">
+          <div class="field-label">Preauth approved date</div>
+          <input type="date" class="field-input" id="f-r1-preauth-date" value="${cas?cas.r1Admit?cas.r1Admit.substring(0,10):'':''}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Preauth approved amount (₹)</div>
+          <input type="number" class="field-input" id="f-r1-preauth-amt">
+        </div>
+        <div class="field">
+          <div class="field-label">Claim approved date</div>
+          <input type="date" class="field-input" id="f-r1-claim-date">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Claim approved amount (₹)</div>
+          <input type="number" class="field-input" id="f-r1-claim-amt" value="${cas?cas.r1Net||'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Ref No.</div>
+          <input class="field-input" id="f-r1-ref" value="${cas?cas.r1RefNo||'':''}">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🎧 Rehab Part 2 (2003GP)</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Preauth submit date</div>
+          <input type="date" class="field-input" id="f-r2-preauth-submit">
+        </div>
+        <div class="field">
+          <div class="field-label">Preauth approved date</div>
+          <input type="date" class="field-input" id="f-r2-preauth-date" value="${cas?cas.r2Admit?cas.r2Admit.substring(0,10):'':''}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Preauth approved amount (₹)</div>
+          <input type="number" class="field-input" id="f-r2-preauth-amt">
+        </div>
+        <div class="field">
+          <div class="field-label">Claim approved date</div>
+          <input type="date" class="field-input" id="f-r2-claim-date">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Claim approved amount (₹)</div>
+          <input type="number" class="field-input" id="f-r2-claim-amt" value="${cas?cas.r2Net||'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Ref No.</div>
+          <input class="field-input" id="f-r2-ref" value="${cas?cas.r2RefNo||'':''}">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📊 FY &amp; Journey</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Financial Year <span class="req">*</span></div>
+          <select class="field-input has-value" id="f-fy">
+            <option>2025-2026</option><option>2024-2025</option><option>2023-2024</option>
+            <option>2022-2023</option><option>2021-2022</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Programme notes</div>
+          <textarea class="field-input" id="f-notes" rows="2" placeholder="Any remarks..."></textarea>
+        </div>
       </div>
     </div>`;
 }
 
-// ══════════════════════════════════════════
-// RADIO SELECT
-// ══════════════════════════════════════════
+
 function selectRadio(el, groupId) {
   document.querySelectorAll('#' + groupId + ' .radio-item').forEach(r => r.classList.remove('checked'));
   el.classList.add('checked');
@@ -1793,6 +2184,123 @@ function showSuccess(id, offline) {
   showScreen('success');
   const btn = document.getElementById('submit-btn');
   if (btn) { btn.innerHTML = 'Submit →'; btn.disabled = false; }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// REPORT CARD
+// ══════════════════════════════════════════════════════════════
+function showReportCard() {
+  const cas = selectedCase;
+  if (!cas) { alert('No case selected.'); return; }
+  document.getElementById('report-card-content').innerHTML = buildReportCardHTML(cas);
+  document.getElementById('report-card-modal').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeReportCard() {
+  document.getElementById('report-card-modal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function printReportCard() {
+  const content = document.getElementById('report-card-inner').innerHTML;
+  const w = window.open('','_blank','width=700,height=900');
+  w.document.write(`<!DOCTYPE html><html><head><title>Report Card</title>
+    <style>body{font-family:-apple-system,sans-serif;padding:24px;font-size:13px;color:#1a1a1a}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    th{background:#0a3d2e;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+    td{padding:7px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+    tr:nth-child(even) td{background:#f9fafb}
+    .section-head{background:#e8f5ee;color:#0a3d2e;font-weight:700;font-size:12px;padding:6px 10px;margin:12px 0 4px}
+    h2{color:#0a3d2e;border-bottom:2px solid #0a3d2e;padding-bottom:6px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
+    @media print{button{display:none}}</style>
+  </head><body>${document.getElementById('report-card-inner').innerHTML}</body></html>`);
+  w.document.close();
+  w.print();
+}
+
+function buildReportCardHTML(c) {
+  const mob = cleanMob(c.mobile);
+  const now = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const statusLabel = c.status==='paid'?'✓ Complete':c.status==='risk'?'⚠ At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':'Pending';
+  const statusColor = c.status==='paid'?'#065f46':c.status==='risk'?'#991b1b':'#1d4ed8';
+
+  return `
+    <div style="text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #0a3d2e">
+      <div style="font-size:28px;margin-bottom:4px">🦻</div>
+      <div style="font-size:18px;font-weight:800;color:#0a3d2e">Shravan Sanjeevini</div>
+      <div style="font-size:11px;color:#555">Karnataka Cochlear Implant Programme (NPPCD)</div>
+      <div style="font-size:10px;color:#999;margin-top:4px">Report generated: ${now}</div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+      <div>
+        <div style="font-size:20px;font-weight:800">${c.name}</div>
+        <div style="font-size:12px;color:#555">${c.gender} · ${c.age} · ${c.caste||''}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:10px;color:#999">Card No.</div>
+        <div style="font-size:18px;font-weight:800;color:#0a3d2e">${c.id}</div>
+        <div style="background:${statusColor};color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;display:inline-block;margin-top:4px">${statusLabel}</div>
+      </div>
+    </div>
+
+    <div class="section-head">👤 Patient Information</div>
+    <table><tbody>
+      <tr><td style="width:40%;color:#666;font-size:11px">SAST TPA ID</td><td>${c.tpa||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">FY</td><td>${c.fy||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Date of Birth</td><td>${c.dob||'Not recorded'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Age at surgery</td><td>${c.age||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Village / Taluk</td><td>${c.village||'—'} · ${c.taluk||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">District</td><td>${c.district||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Mobile</td><td>${mob||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Caste / Category</td><td>${c.caste||'—'}</td></tr>
+    </tbody></table>
+
+    <div class="section-head">🏥 Surgery (2001GP)</div>
+    <table><tbody>
+      <tr><td style="width:40%;color:#666;font-size:11px">Hospital</td><td>${c.hospital||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Hospital district</td><td>${c.hospDist||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Treating doctor</td><td>${c.doctor||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Mentor surgeon</td><td>${c.mentorSurgeon||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">SAST Ref No.</td><td>${c.surgRefNo||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Admission date</td><td>${c.surgAdmit||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Discharge date</td><td>${c.surgDisch||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Package</td><td>${c.surgPkg||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Pre-auth status</td><td>${c.surgStatus||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Net paid</td><td>${c.surgNet?'₹'+Number(c.surgNet).toLocaleString('en-IN'):'—'}</td></tr>
+    </tbody></table>
+
+    <div class="section-head">🎧 Rehab Part 1 (2002GP)</div>
+    <table><tbody>
+      <tr><td style="width:40%;color:#666;font-size:11px">Ref No.</td><td>${c.r1RefNo||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Preauth approved</td><td>${c.r1Admit||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Claim status</td><td>${c.r1Status||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Net paid</td><td>${c.r1Net?'₹'+Number(c.r1Net).toLocaleString('en-IN'):'—'}</td></tr>
+    </tbody></table>
+
+    <div class="section-head">🎧 Rehab Part 2 (2003GP)</div>
+    <table><tbody>
+      <tr><td style="width:40%;color:#666;font-size:11px">Ref No.</td><td>${c.r2RefNo||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Preauth approved</td><td>${c.r2Admit||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Claim status</td><td>${c.r2Status||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Net paid</td><td>${c.r2Net?'₹'+Number(c.r2Net).toLocaleString('en-IN'):'—'}</td></tr>
+    </tbody></table>
+
+    <div class="section-head">📊 Programme Journey</div>
+    <table><tbody>
+      <tr><td style="width:40%;color:#666;font-size:11px">Journey stages</td><td>${c.journey||c.phase||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Current status</td><td><strong>${statusLabel}</strong></td></tr>
+      <tr><td style="color:#666;font-size:11px">Hospital type</td><td>${c.hospType||'—'}</td></tr>
+      <tr><td style="color:#666;font-size:11px">Total net paid</td><td><strong>${c.totalNet?'₹'+Number(c.totalNet).toLocaleString('en-IN'):'—'}</strong></td></tr>
+    </tbody></table>
+
+    <div style="text-align:center;font-size:10px;color:#999;margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb">
+      Shravan Sanjeevini · Karnataka Cochlear Implant Programme · NPPCD<br>
+      This report is system-generated from the CI programme tracker.
+    </div>`;
 }
 
 // ══════════════════════════════════════════

@@ -421,9 +421,13 @@ body {
 .patient-info-card { background:var(--green-light); border:1px solid var(--green); border-radius:12px; padding:14px; margin:10px 0; }
 .patient-info-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
 .patient-info-icon { font-size:26px; }
+
+.pic-cell { padding:4px 6px 4px 0; border-bottom:1px solid rgba(0,0,0,.06); }
+.pic-section-head { grid-column:span 2; font-size:9px; font-weight:700; color:var(--text-light); text-transform:uppercase; letter-spacing:.6px; padding:8px 0 3px; border-top:1px solid var(--border); }
+.pic-full { grid-column:span 2; padding:4px 0; border-bottom:1px solid rgba(0,0,0,.06); }
 .patient-info-name { font-size:15px; font-weight:700; color:var(--text-main); }
 .patient-info-sub { font-size:12px; color:var(--text-light); margin-top:2px; }
-.patient-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; }
+.patient-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; }
 .patient-info-grid > div { display:flex; flex-direction:column; }
 .info-label { font-size:10px; color:var(--text-light); text-transform:uppercase; font-weight:600; letter-spacing:.4px; }
 .info-val { font-size:13px; color:var(--text-main); font-weight:500; margin-top:1px; }
@@ -692,97 +696,91 @@ function buildPatientCard(cas) {
     '<div style="font-size:13px;color:#78350f;margin-bottom:12px">Go back to the cases list and tap a case to update it.</div>' +
     '<button onclick="goBack()" style="background:#d97706;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">← Go to Cases List</button>' +
     '</div>';
+
   const mob = cleanMob(cas.mobile);
   const statusClass = cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending';
   const statusLabel = cas.status==='paid'?'✓ Complete':cas.status==='risk'?'⚠ At risk':cas.status==='rehab1'?'Rehab 1 due':cas.status==='rehab2'?'Rehab 2 due':'Active';
 
-  // Helper to render a row — skip if value is empty
-  const row = (label, val, opts={}) => {
-    const v = val || '—';
-    const style = opts.small ? 'font-size:10px' : '';
-    const color = opts.highlight ? 'color:var(--green);font-weight:600' : '';
-    return `<div>
-      <span class="info-label">${label}</span>
-      <span class="info-val" style="${style};${color}">${v}</span>
-    </div>`;
+  // Cell helper — label + value in one grid cell
+  const c = (label, val, highlight=false) => {
+    if (!val) return '<div class="pic-cell"><span class="info-label">'+label+'</span><span class="info-val" style="color:var(--text-light)">—</span></div>';
+    return `<div class="pic-cell"><span class="info-label">${label}</span><span class="info-val${highlight?' highlight':''}">${val}</span></div>`;
   };
-
-  const mobHTML = mob
-    ? `<a href="tel:${mob}" style="color:var(--green);font-weight:600">${mob}</a>`
-    : '—';
+  // Full-width cell
+  const cf = (label, val) => {
+    if (!val) return '';
+    return `<div class="pic-full"><span class="info-label">${label}</span><span class="info-val">${val}</span></div>`;
+  };
+  const sec = (title) => `<div class="pic-section-head">${title}</div>`;
+  const mobHTML = mob ? `<a href="tel:${mob}" style="color:var(--green-dark);font-weight:700">${mob}</a>` : '—';
 
   return `<div class="patient-info-card">
     <div class="patient-info-header">
       <span class="patient-info-icon">👶</span>
-      <div style="flex:1">
+      <div style="flex:1;min-width:0">
         <div class="patient-info-name">${cas.name}</div>
-        <div class="patient-info-sub">${cas.gender||''} · ${cas.age||''} · ${cas.caste||''}</div>
+        <div class="patient-info-sub">${[cas.gender,cas.age,cas.caste].filter(Boolean).join(' · ')}</div>
       </div>
-      <span class="status-pill ${statusClass}">${statusLabel}</span>
+      <span class="status-pill ${statusClass}" style="flex-shrink:0">${statusLabel}</span>
     </div>
+
     <div class="patient-info-grid">
-      ${row('Card No.', cas.id)}
-      ${row('FY', cas.fy)}
-      ${row('TPA ID', cas.tpa, {small:true})}
-      <div><span class="info-label">Mobile</span><span class="info-val">${mobHTML}</span></div>
-      ${row('Village', cas.village)}
-      ${row('Taluk', cas.taluk)}
-      ${row('District', cas.district)}
-      ${row('DOB', cas.dob)}
+      ${sec('Patient Details')}
+      ${c('Card No.', cas.id)}
+      ${c('FY', cas.fy)}
+      ${c('TPA ID', cas.tpa)}
+      ${c('Date of Birth', cas.dob)}
+      ${c('Village', cas.village)}
+      ${c('Taluk', cas.taluk)}
+      ${c('District', cas.district)}
+      <div class="pic-cell"><span class="info-label">Mobile</span><span class="info-val">${mobHTML}</span></div>
+
+      ${sec('Hospital & Clinical')}
+      ${cf('Hospital', cas.hospital)}
+      ${c('Hosp. District', cas.hospDist)}
+      ${c('Treating Doctor', cas.doctor)}
+      ${c('Mentor Surgeon', cas.mentorSurgeon)}
+      ${cas.diagnosis?cf('Diagnosis', cas.diagnosis):''}
+      ${c('Hosp. Type', cas.hospType)}
+
+      ${sec('Surgery (2001GP)')}
+      ${cf('SAST Ref', cas.surgRefNo)}
+      ${c('Admission', cas.surgAdmit)}
+      ${c('Discharge', cas.surgDisch)}
+      ${c('Preauth Status', cas.surgStatus)}
+      ${c('Package', cas.surgPkg)}
+      ${cas.surgNet ? c('Net Paid', '₹'+Number(cas.surgNet).toLocaleString('en-IN'), true) : ''}
+
+      ${(cas.r1RefNo||cas.r1Admit) ? `
+      ${sec('Rehab Part 1 (2002GP)')}
+      ${c('Ref No.', cas.r1RefNo)}
+      ${c('Preauth Date', cas.r1Admit)}
+      ${c('Claim Status', cas.r1Status)}
+      ${cas.r1Net ? c('Net Paid', '₹'+Number(cas.r1Net).toLocaleString('en-IN'), true) : ''}
+      ` : ''}
+
+      ${(cas.r2RefNo||cas.r2Admit) ? `
+      ${sec('Rehab Part 2 (2003GP)')}
+      ${c('Ref No.', cas.r2RefNo)}
+      ${c('Preauth Date', cas.r2Admit)}
+      ${c('Claim Status', cas.r2Status)}
+      ${cas.r2Net ? c('Net Paid', '₹'+Number(cas.r2Net).toLocaleString('en-IN'), true) : ''}
+      ` : ''}
+
+      ${sec('Journey')}
+      ${cf('Stage', cas.journey||cas.phase)}
     </div>
-    <div style="border-top:1px solid var(--border);margin:8px 0"></div>
-    <div class="patient-info-grid">
-      ${row('Hospital', cas.hospital, {small:true})}
-      ${row('Hosp. District', cas.hospDist)}
-      ${row('Treating Doctor', cas.doctor)}
-      ${row('Mentor Surgeon', cas.mentorSurgeon)}
-      ${row('Diagnosis', cas.diagnosis)}
-      ${row('Hosp. Type', cas.hospType)}
-    </div>
-    <div style="border-top:1px solid var(--border);margin:8px 0"></div>
-    <div class="patient-info-grid">
-      ${row('Surgery Ref', cas.surgRefNo, {small:true})}
-      ${row('Admission', cas.surgAdmit)}
-      ${row('Surgery date', cas.surgDisch ? cas.surgAdmit : cas.surgAdmit)}
-      ${row('Discharge', cas.surgDisch)}
-      ${row('Surgery status', cas.surgStatus)}
-      ${row('Surgery paid', cas.surgNet ? '₹'+Number(cas.surgNet).toLocaleString('en-IN') : '', {highlight:true})}
-    </div>
-    ${(cas.r1RefNo||cas.r1Admit) ? `
-    <div style="border-top:1px solid var(--border);margin:8px 0"></div>
-    <div class="patient-info-grid">
-      ${row('Rehab 1 Ref', cas.r1RefNo, {small:true})}
-      ${row('R1 Preauth date', cas.r1Admit)}
-      ${row('R1 Status', cas.r1Status)}
-      ${row('R1 Paid', cas.r1Net ? '₹'+Number(cas.r1Net).toLocaleString('en-IN') : '', {highlight:true})}
-    </div>` : ''}
-    ${(cas.r2RefNo||cas.r2Admit) ? `
-    <div style="border-top:1px solid var(--border);margin:8px 0"></div>
-    <div class="patient-info-grid">
-      ${row('Rehab 2 Ref', cas.r2RefNo, {small:true})}
-      ${row('R2 Preauth date', cas.r2Admit)}
-      ${row('R2 Status', cas.r2Status)}
-      ${row('R2 Paid', cas.r2Net ? '₹'+Number(cas.r2Net).toLocaleString('en-IN') : '', {highlight:true})}
-    </div>` : ''}
-    <div style="border-top:1px solid var(--border);margin:8px 0 0"></div>
-    <div style="font-size:10px;color:var(--text-light);margin-top:6px">Journey: <strong>${cas.journey||cas.phase||'—'}</strong></div>
-    <div style="border-top:1px solid var(--border);margin:8px 0 6px"></div>
-    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">📞 Mobile numbers on record</div>
-    <div id="mobile-history" style="font-size:12px;color:var(--text2);margin-bottom:8px">
-      ${[cas.mobile, cas.mobile2, cas.mobile3].filter(Boolean).map((m,i)=>{
-        const n = cleanMob(m);
-        return n ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <a href="tel:${n}" style="color:var(--green);font-weight:600">${n}</a>
-          ${i===0?'<span style="font-size:10px;color:var(--text-light)">(primary)</span>':''}
-        </div>` : '';
-      }).filter(Boolean).join('') || '<div style="color:var(--text-light);font-size:11px">No number on record</div>'}
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input class="field-input" id="f-new-mobile" placeholder="Add / update mobile number" style="flex:1;font-size:12px;padding:7px 10px" oninput="this.classList.toggle('has-value',this.value.length>0)">
-      <div style="font-size:10px;color:var(--text-light);width:80px">All numbers saved &amp; visible</div>
+
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+      <div style="font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📞 Update Mobile Number</div>
+      <input class="field-input" id="f-new-mobile" type="tel"
+        placeholder="Add new / corrected mobile number"
+        style="font-size:13px;padding:8px 10px;width:100%"
+        oninput="this.classList.toggle('has-value',this.value.length>0)">
     </div>
   </div>`;
 }
+
 
 function cleanMob(m) {
   return String(m||'').replace(/\.0$/, '').replace(/[^0-9+]/g, '').trim();
@@ -1329,19 +1327,21 @@ function buildHospitalForm(cas) {
 
     <div class="form-section form-section--confirm">
       <div class="form-section-title confirm-title">2 · 🎧 Device Details</div>
-      <div class="field">
-        <div class="field-label">Manufacturer <span class="req">*</span></div>
-        <select class="field-input" id="f-mfr">
-          <option value="">Select...</option>
-          <option>Cochlear Limited (Australia)</option>
-          <option>MED-EL (Austria)</option>
-          <option>Advanced Bionics (USA)</option>
-          <option>Oticon Medical (Denmark)</option>
-        </select>
-      </div>
-      <div class="field">
-        <div class="field-label">Model</div>
-        <input class="field-input" id="f-model" placeholder="e.g. Nucleus 8">
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Manufacturer <span class="req">*</span></div>
+          <select class="field-input" id="f-mfr">
+            <option value="">Select...</option>
+            <option>Cochlear Limited (Australia)</option>
+            <option>MED-EL (Austria)</option>
+            <option>Advanced Bionics (USA)</option>
+            <option>Oticon Medical (Denmark)</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Model</div>
+          <input class="field-input" id="f-model" placeholder="e.g. Nucleus 8">
+        </div>
       </div>
       <div class="field">
         <div class="field-label">Serial number</div>
@@ -1370,11 +1370,12 @@ function buildHospitalForm(cas) {
       </div>
       <div class="field">
         <div class="field-label">Side (implanted ear) <span class="req">*</span></div>
-        <div class="radio-group" id="rg-side">
-          <div class="radio-item" onclick="selectRadio(this,'rg-side')"><div class="radio-dot"></div>Right ear</div>
-          <div class="radio-item" onclick="selectRadio(this,'rg-side')"><div class="radio-dot"></div>Left ear</div>
-          <div class="radio-item" onclick="selectRadio(this,'rg-side')"><div class="radio-dot"></div>Bilateral</div>
-        </div>
+        <select class="field-input" id="f-side">
+          <option value="">Select...</option>
+          <option>Right ear</option>
+          <option>Left ear</option>
+          <option>Bilateral</option>
+        </select>
       </div>
       <div class="field">
         <div class="field-label">Switch-on date</div>

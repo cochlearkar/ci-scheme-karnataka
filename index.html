@@ -434,13 +434,149 @@ body {
 
 ::-webkit-scrollbar-thumb { background: var(--gray-mid); border-radius: 3px; }
 
-/* ════════════════ DESKTOP FRAME ════════════════ */
-@
+}
+
+/* ════════════════════════════════════════
+   DESKTOP — phone frame centred on green
+   ════════════════════════════════════════ */
+@media (min-width: 769px) {
+
+  /* Green gradient fills the whole page */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(150deg, #061e14 0%, #0f3d26 40%, #082e1c 100%);
+    z-index: -1;
+  }
+
+  /* Body becomes a flex container to centre the phone frame */
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: transparent;
+  }
+
+  /* Each screen = one "phone" panel, floated centre */
+  .screen {
+    position: fixed !important;
+    width: 390px !important;
+    max-width: 390px !important;
+    height: 820px !important;
+    max-height: 90vh !important;
+    top: 50% !important;
+    left: 50% !important;
+    bottom: auto !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+    border-radius: 40px !important;
+    box-shadow:
+      0 0 0 2px rgba(255,255,255,.08),
+      0 0 0 10px rgba(0,0,0,.25),
+      0 50px 120px rgba(0,0,0,.7),
+      0 20px 40px rgba(0,0,0,.4) !important;
+    overflow: hidden !important;
+  }
+
+  /* Notch bar at top of phone frame */
+  .screen::before {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 6px;
+    background: rgba(0,0,0,.3);
+    border-radius: 3px;
+    z-index: 10000;
+    pointer-events: none;
+  }
+
+  /* Programme title above phone */
+  #dsk-brand {
+    position: fixed;
+    top: calc(50% - 430px);
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,.5);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 9999;
+    text-align: center;
+  }
+  #dsk-brand span {
+    display: block;
+    font-size: 22px;
+    letter-spacing: 0;
+    color: rgba(255,255,255,.75);
+    font-weight: 800;
+    margin-bottom: 4px;
+    text-transform: none;
+  }
+
+  /* Links below phone */
+  #dsk-bar {
+    position: fixed;
+    top: calc(50% + 435px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 9999;
+  }
+  .dsk-btn {
+    background: rgba(255,255,255,.1);
+    color: rgba(255,255,255,.8);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 20px;
+    padding: 7px 18px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: .2s;
+    backdrop-filter: blur(8px);
+  }
+  .dsk-btn:hover {
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    border-color: rgba(255,255,255,.35);
+  }
+
+  /* Decorative glow behind phone */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 500px;
+    height: 700px;
+    background: radial-gradient(ellipse, rgba(26,138,90,.25) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  #dsk-brand, #dsk-bar { display: none !important; }
+  body::before, body::after { display: none !important; }
+}
+</style>
+<script src="cases.js" defer></script>
+</head>
 <body>
 
-<div id="dsk-brand">🦻 Shravan Sanjeevini &nbsp;·&nbsp; Karnataka CI Programme</div>
+<div id="dsk-brand"><span>🦻 Shravan Sanjeevini</span>Karnataka Cochlear Implant Programme · Karnataka</div>
+<div id="dsk-bar"><a class="dsk-btn" href="dashboard.html" target="_blank">📊 Dashboard</a><span class="dsk-btn" onclick="doLogout()">Sign out</span></div>
 
-<div id="app-frame">
 <!-- ══════════════════ SCREEN: ROLE SELECTION ══════════════════ -->
 <div class="screen" id="screen-login">
   <div style="background:var(--green-dark);min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;overflow-y:auto;">
@@ -521,7 +657,7 @@ body {
       </div>
 
       <div style="text-align:right;margin-bottom:28px;">
-        <span style="font-size:11px;color:var(--text-light);">Forgot password? Contact <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a9cac6cac1c5ccc8dbc2c8dbe9cec4c8c0c587cac6c4">[email&#160;protected]</a></span>
+        <span style="font-size:11px;color:var(--text-light);">Forgot password? Contact <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6f0c000c07030a0e1d040e1d2f08020e0603410c0002">[email&#160;protected]</a></span>
       </div>
 
       <button id="login-submit-btn" onclick="authenticateAndLogin()"
@@ -2367,36 +2503,6 @@ function printReportCard() {
     h2{color:#0a3d2e;border-bottom:2px solid #0a3d2e;padding-bottom:6px}
     .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
     @media print{button{display:none}}</style>
-  </head><body>${document.getElementById('report-card-inner').innerHTML}
-</div>
-
-<div id="dsk-bar">
-  <a class="dsk-btn" href="dashboard.html" target="_blank">📊 Dashboard</a>
-  <span class="dsk-btn" onclick="doLogout()">Sign out</span>
-</div>
-
-</body>  document.getElementById('report-card-modal').style.display = 'block';
-  document.body.style.overflow = 'hidden';
-}
-
-function closeReportCard() {
-  document.getElementById('report-card-modal').style.display = 'none';
-  document.body.style.overflow = '';
-}
-
-function printReportCard() {
-  const content = document.getElementById('report-card-inner').innerHTML;
-  const w = window.open('','_blank','width=700,height=900');
-  w.document.write(`<!DOCTYPE html><html><head><title>Report Card</title>
-    <style>body{font-family:-apple-system,sans-serif;padding:24px;font-size:13px;color:#1a1a1a}
-    table{width:100%;border-collapse:collapse;margin-bottom:16px}
-    th{background:#0a3d2e;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
-    td{padding:7px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
-    tr:nth-child(even) td{background:#f9fafb}
-    .section-head{background:#e8f5ee;color:#0a3d2e;font-weight:700;font-size:12px;padding:6px 10px;margin:12px 0 4px}
-    h2{color:#0a3d2e;border-bottom:2px solid #0a3d2e;padding-bottom:6px}
-    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
-    @media print{button{display:none}}</style>
   </head><body>${document.getElementById('report-card-inner').innerHTML}</body></html>`);
   w.document.close();
   w.print();
@@ -2511,4 +2617,12 @@ window.addEventListener('load', () => {
     try {
       currentUser = JSON.parse(saved);
       currentRole = currentUser.role;
-      buildHo
+      buildHome();
+      showScreen('home', false);
+    } catch(e) { sessionStorage.removeItem('ci_user'); }
+  }
+});
+</script>
+<script src="cases.js" defer></script>
+</body>
+</html>

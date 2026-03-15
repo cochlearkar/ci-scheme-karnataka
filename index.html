@@ -935,6 +935,43 @@ function buildPatientCard(cas, role) {
   const sec = (title) => `<div class="pic-section-head">${title}</div>`;
   const mobHTML = mob ? `<a href="tel:${mob}" style="color:var(--green-dark);font-weight:700">${mob}</a>` : '—';
 
+  // ── HOSPITAL: exact fields as specified ────────────────────────────────────
+  if (isHosp) {
+    return `<div class="patient-info-card">
+      <div class="patient-info-header">
+        <span class="patient-info-icon">👶</span>
+        <div style="flex:1;min-width:0">
+          <div class="patient-info-name">${cas.name}</div>
+          <div class="patient-info-sub">${[cas.gender, cas.age, cas.caste].filter(Boolean).join(' · ')}</div>
+        </div>
+        <span class="status-pill ${statusClass}" style="flex-shrink:0">${statusLabel}</span>
+      </div>
+      <div class="patient-info-grid">
+        ${c('SAST Ref', cas.surgRefNo)}
+        ${c('FY', cas.fy)}
+        ${c('Village', cas.village)}
+        ${c('Taluk', cas.taluk)}
+        ${c('District', cas.district)}
+        ${c('Treating Doctor', cas.doctor)}
+        ${c('Admission', cas.surgAdmit)}
+        ${c('Discharge', cas.surgDisch)}
+        ${c('Preauth Status', cas.surgStatus)}
+        ${c('Package', cas.surgPkg)}
+        <div class="pic-section-head" style="grid-column:span 2">Programme Journey</div>
+        <div style="grid-column:span 2;padding:4px 0 8px">${buildJourneyInfographic(cas)}</div>
+        <div class="pic-cell"><span class="info-label">Mobile</span><span class="info-val">${mobHTML}</span></div>
+      </div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📞 Update Mobile Number</div>
+        <input class="field-input" id="f-new-mobile" type="tel"
+          placeholder="Add new / corrected mobile number"
+          style="font-size:13px;padding:8px 10px;width:100%"
+          oninput="this.classList.toggle('has-value',this.value.length>0)">
+      </div>
+    </div>`;
+  }
+
+  // ── ALL OTHER ROLES: full card ─────────────────────────────────────────────
   return `<div class="patient-info-card">
     <div class="patient-info-header">
       <span class="patient-info-icon">👶</span>
@@ -947,22 +984,22 @@ function buildPatientCard(cas, role) {
 
     <div class="patient-info-grid">
       ${sec('Patient Details')}
-      ${!isHosp ? c('Card No.', cas.id) : ''}
+      ${c('Card No.', cas.id)}
       ${c('FY', cas.fy)}
-      ${!isHosp ? c('TPA ID', cas.tpa) : ''}
-      ${!isHosp ? c('Date of Birth', cas.dob) : ''}
+      ${c('TPA ID', cas.tpa)}
+      ${c('Date of Birth', cas.dob)}
       ${c('Village', cas.village)}
       ${c('Taluk', cas.taluk)}
       ${c('District', cas.district)}
       <div class="pic-cell"><span class="info-label">Mobile</span><span class="info-val">${mobHTML}</span></div>
 
       ${sec('Hospital & Clinical')}
-      ${!isHosp ? cf('Hospital', cas.hospital) : ''}
+      ${cf('Hospital', cas.hospital)}
       ${c('Hosp. District', cas.hospDist)}
       ${c('Treating Doctor', cas.doctor)}
-      ${!isHosp ? c('Mentor Surgeon', cas.mentorSurgeon) : ''}
+      ${c('Mentor Surgeon', cas.mentorSurgeon)}
       ${cas.diagnosis ? cf('Diagnosis', cas.diagnosis) : ''}
-      ${!isHosp ? c('Hosp. Type', cas.hospType) : ''}
+      ${c('Hosp. Type', cas.hospType)}
 
       ${sec('Surgery (2001GP)')}
       ${cf('SAST Ref', cas.surgRefNo)}

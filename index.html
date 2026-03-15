@@ -643,12 +643,15 @@ let currentScreen = 'login';
 let selectedCase = null;
 let screenHistory = [];
 
+const MENTOR_SURGEONS = ["Dr. Sunil N. Dutt", "Dr. Ramesh K. Kaulgud", "Dr. Vasanthi Anand", "Dr. Bharathi M.B.", "Dr. Shanthi M.B.", "Dr. Shankar B. Medikeri", "Dr. P.S. Pradeep Kumar", "Dr. Lakshmi Shantharam", "Dr. B.Y. Praveen Kumar", "Dr. Dathathri H A", "Dr. Sumit Kumar Gaur", "Dr. Rohith Udaya Prasad"];
+const REHAB_CENTRES = ["AIISH Bengaluru", "AIISH Mysuru", "NIMHANS Bengaluru", "KSAD Dharwad", "SDM Dharwad", "Samspanda Mandya", "MIMS Mandya Rehab", "JSS Hospital Mysuru", "KMC Manipal Rehab", "Kasturba Hospital Udupi"];
+
 const ROLE_META = {
   hospital: { label: 'Hospital', chip: 'chip-hospital', color: '#0a3d2e', icon: '🏥',
     orgLabel: 'Hospital', orgOptions: [],
     yearLabel: 'Surgery year' },
   rehab: { label: 'Rehab Institute', chip: 'chip-rehab', color: '#1a4a7a', icon: '🎧',
-    orgLabel: 'Institute', orgOptions: ['AIISH Mysuru','NIMHANS Bengaluru','Samspanda Mandya','KSAD Dharwad','Other'],
+    orgLabel: 'Institute', orgOptions: ["AIISH Bengaluru", "AIISH Mysuru", "NIMHANS Bengaluru", "KSAD Dharwad", "SDM Dharwad", "Samspanda Mandya", "MIMS Mandya Rehab", "JSS Hospital Mysuru", "KMC Manipal Rehab", "Kasturba Hospital Udupi"],
     yearLabel: 'Enrolment year' },
   district: { label: 'District Officer', chip: 'chip-district', color: '#8a5a0a', icon: '📍',
     orgLabel: 'District', orgOptions: ["BAGALKOTE", "BALLARI", "BANGALORE - RURAL", "BANGALORE EAST", "BANGALORE NORTH", "BANGALORE SOUTH", "BANGALORE WEST", "BELAGAVI", "BENGALURU", "BENGALURU RURAL", "BIDAR", "CHAMARAJANAGARA", "CHIKKABALLAPURA", "CHIKKAMAGALURU", "CHITRADURGA", "DAKSHINA KANNADA", "DAVANAGERE", "DHARWAR", "GADAG", "HASSAN", "HAVERI", "KALABURAGI", "KODAGU", "KOLAR", "KOPPAL", "MANDYA", "MYSORE", "MYSURU", "RAICHUR", "RAMANAGARA", "SHIVAMOGGA", "TUMAKURU", "UDUPI", "UTTARA KANNADA", "VIJAYANAGAR", "VIJAYAPURA", "YADGIR"],
@@ -747,6 +750,21 @@ function buildPatientCard(cas) {
     </div>` : ''}
     <div style="border-top:1px solid var(--border);margin:8px 0 0"></div>
     <div style="font-size:10px;color:var(--text-light);margin-top:6px">Journey: <strong>${cas.journey||cas.phase||'—'}</strong></div>
+    <div style="border-top:1px solid var(--border);margin:8px 0 6px"></div>
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">📞 Mobile numbers on record</div>
+    <div id="mobile-history" style="font-size:12px;color:var(--text2);margin-bottom:8px">
+      ${[cas.mobile, cas.mobile2, cas.mobile3].filter(Boolean).map((m,i)=>{
+        const n = cleanMob(m);
+        return n ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <a href="tel:${n}" style="color:var(--green);font-weight:600">${n}</a>
+          ${i===0?'<span style="font-size:10px;color:var(--text-light)">(primary)</span>':''}
+        </div>` : '';
+      }).filter(Boolean).join('') || '<div style="color:var(--text-light);font-size:11px">No number on record</div>'}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="field-input" id="f-new-mobile" placeholder="Add / update mobile number" style="flex:1;font-size:12px;padding:7px 10px" oninput="this.classList.toggle('has-value',this.value.length>0)">
+      <div style="font-size:10px;color:var(--text-light);width:80px">All numbers saved &amp; visible</div>
+    </div>
   </div>`;
 }
 
@@ -1283,7 +1301,12 @@ function buildHospitalForm(cas) {
       <div class="field-row">
         <div class="field">
           <div class="field-label">Mentor surgeon</div>
-          <input class="field-input" id="f-mentor" placeholder="Mentor / supervising surgeon" value="${cas?cas.mentorSurgeon||'':''}">
+          <select class="field-input" id="f-mentor" onchange="onMentorChange(this)">
+            <option value="">Select mentor surgeon...</option>
+            ${MENTOR_SURGEONS.map(m=>`<option value="${m}" ${cas&&cas.mentorSurgeon===m?'selected':''}>${m}</option>`).join('')}
+            <option value="Other">Other (type below)</option>
+          </select>
+          <input class="field-input" id="f-mentor-other" placeholder="If 'Other', type name here" style="margin-top:6px;display:none">
         </div>
         <div class="field">
           <div class="field-label">Final diagnosis</div>
@@ -1404,7 +1427,7 @@ function buildHospitalForm(cas) {
         <div class="field-label">Recommended rehab centre</div>
         <select class="field-input" id="f-rehabcentre">
           <option value="">Select institute...</option>
-          ${ROLE_META.rehab.orgOptions.map(o=>`<option>${o}</option>`).join('')}
+          ${REHAB_CENTRES.map(o=>`<option>${o}</option>`).join('')}
         </select>
       </div>
       <div class="field">
@@ -1726,6 +1749,49 @@ function buildDistrictForm(cas) {
         <input class="field-input" id="f-officer" placeholder="Your name">
       </div>
     </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🏥 Primary Health Centre Details</div>
+      <div class="field">
+        <div class="field-label">PHC / Sub-centre name</div>
+        <input class="field-input" id="f-phc-name" placeholder="Name of PHC or sub-centre">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Medical Officer name</div>
+          <input class="field-input" id="f-mo-name" placeholder="Dr. name">
+        </div>
+        <div class="field">
+          <div class="field-label">Medical Officer mobile</div>
+          <input class="field-input" id="f-mo-mobile" placeholder="MO mobile number" type="tel">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🎧 Audiologist / ASHA Details</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Audiologist name</div>
+          <input class="field-input" id="f-audiologist-name" placeholder="Name of audiologist">
+        </div>
+        <div class="field">
+          <div class="field-label">Audiologist mobile</div>
+          <input class="field-input" id="f-audiologist-mobile" placeholder="Audiologist mobile" type="tel">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">ASHA worker name</div>
+          <input class="field-input" id="f-asha-name" placeholder="ASHA worker name">
+        </div>
+        <div class="field">
+          <div class="field-label">ASHA worker mobile</div>
+          <input class="field-input" id="f-asha-mobile" placeholder="ASHA mobile" type="tel">
+        </div>
+      </div>
+    </div>
+
     <div class="form-section">
       <div class="form-section-title">🎧 Device &amp; Equipment Status</div>
       <div class="field">
@@ -1769,6 +1835,46 @@ function calcAgeAtSurgery() {
   if (months < 0) { years--; months += 12; }
   ageField.value = years > 0 ? `${years} yr ${months} mo` : `${months} months`;
   ageField.classList.add('has-value');
+}
+
+
+function addRehabCentre() {
+  const input = document.getElementById('f-new-rehab-centre');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) { alert('Please enter a rehab centre name.'); return; }
+  if (REHAB_CENTRES.includes(name)) { alert('This centre is already in the list.'); return; }
+  REHAB_CENTRES.push(name);
+  input.value = '';
+  // Refresh the list display and all dropdowns
+  refreshRehabDisplay();
+  alert('✅ ' + name + ' added to rehab centres list. This applies for this session — to make permanent, contact the programme admin to update the app.');
+}
+
+function removeRehabCentre(name) {
+  if (!confirm('Remove "' + name + '" from the rehab centres list?')) return;
+  const idx = REHAB_CENTRES.indexOf(name);
+  if (idx > -1) { REHAB_CENTRES.splice(idx, 1); refreshRehabDisplay(); }
+}
+
+function refreshRehabDisplay() {
+  // Refresh the management list in state form
+  const listEl = document.getElementById('rehab-centre-list');
+  if (listEl) {
+    listEl.innerHTML = REHAB_CENTRES.map(r=>`<div style="background:var(--green-light);border:1px solid var(--green);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--green-dark);display:flex;align-items:center;gap:6px">
+      ${r}<span onclick="removeRehabCentre('${r}')" style="cursor:pointer;color:var(--red);font-size:13px;line-height:1">×</span></div>`).join('');
+  }
+  // Refresh all rehabcentre dropdowns currently visible
+  document.querySelectorAll('#f-rehabcentre').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Select institute...</option>' +
+      REHAB_CENTRES.map(o=>`<option value="${o}" ${o===cur?'selected':''}>${o}</option>`).join('');
+  });
+}
+
+function onMentorChange(sel) {
+  const other = document.getElementById('f-mentor-other');
+  if (other) other.style.display = sel.value === 'Other' ? 'block' : 'none';
 }
 
 function showDeviceNote(show) {
@@ -1953,7 +2059,12 @@ function buildStateForm(cas) {
         </div>
         <div class="field">
           <div class="field-label">Mentor surgeon</div>
-          <input class="field-input" id="f-mentor" placeholder="Mentor surgeon" value="${cas?cas.mentorSurgeon||'':''}">
+          <select class="field-input" id="f-mentor" onchange="onMentorChange(this)">
+            <option value="">Select mentor surgeon...</option>
+            ${MENTOR_SURGEONS.map(m=>`<option value="${m}" ${cas&&cas.mentorSurgeon===m?'selected':''}>${m}</option>`).join('')}
+            <option value="Other">Other (type below)</option>
+          </select>
+          <input class="field-input" id="f-mentor-other" placeholder="If 'Other', type name here" style="margin-top:6px;display:none">
         </div>
       </div>
       <div class="field-row">
@@ -2067,6 +2178,21 @@ function buildStateForm(cas) {
           <div class="field-label">Ref No.</div>
           <input class="field-input" id="f-r2-ref" value="${cas?cas.r2RefNo||'':''}">
         </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🎧 Rehab Centre Management</div>
+      <div style="font-size:11px;color:var(--text-light);margin-bottom:10px">Current list has ${REHAB_CENTRES.length} centres. Add new centres below — they will appear in all institute dropdowns.</div>
+      <div id="rehab-centre-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${REHAB_CENTRES.map(r=>`<div style="background:var(--green-light);border:1px solid var(--green);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--green-dark);display:flex;align-items:center;gap:6px">
+          ${r}
+          <span onclick="removeRehabCentre('${r}')" style="cursor:pointer;color:var(--red);font-size:13px;line-height:1">×</span>
+        </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input class="field-input" id="f-new-rehab-centre" placeholder="Type new rehab centre name..." style="flex:1">
+        <button type="button" onclick="addRehabCentre()" style="background:var(--green);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">+ Add</button>
       </div>
     </div>
 

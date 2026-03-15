@@ -669,6 +669,87 @@ let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
 // ══════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════
+
+// ── SHARED PATIENT INFO CARD ─────────────────────────────────
+function buildPatientCard(cas) {
+  if (!cas) return '<div class="info-banner" style="background:var(--gray-bg)"><div class="info-banner-text" style="color:var(--text-light)">Select a case from the cases list</div></div>';
+  const mob = cleanMob(cas.mobile);
+  const statusClass = cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending';
+  const statusLabel = cas.status==='paid'?'✓ Complete':cas.status==='risk'?'⚠ At risk':cas.status==='rehab1'?'Rehab 1 due':cas.status==='rehab2'?'Rehab 2 due':'Active';
+
+  // Helper to render a row — skip if value is empty
+  const row = (label, val, opts={}) => {
+    const v = val || '—';
+    const style = opts.small ? 'font-size:10px' : '';
+    const color = opts.highlight ? 'color:var(--green);font-weight:600' : '';
+    return `<div>
+      <span class="info-label">${label}</span>
+      <span class="info-val" style="${style};${color}">${v}</span>
+    </div>`;
+  };
+
+  const mobHTML = mob
+    ? `<a href="tel:${mob}" style="color:var(--green);font-weight:600">${mob}</a>`
+    : '—';
+
+  return `<div class="patient-info-card">
+    <div class="patient-info-header">
+      <span class="patient-info-icon">👶</span>
+      <div style="flex:1">
+        <div class="patient-info-name">${cas.name}</div>
+        <div class="patient-info-sub">${cas.gender||''} · ${cas.age||''} · ${cas.caste||''}</div>
+      </div>
+      <span class="status-pill ${statusClass}">${statusLabel}</span>
+    </div>
+    <div class="patient-info-grid">
+      ${row('Card No.', cas.id)}
+      ${row('FY', cas.fy)}
+      ${row('TPA ID', cas.tpa, {small:true})}
+      <div><span class="info-label">Mobile</span><span class="info-val">${mobHTML}</span></div>
+      ${row('Village', cas.village)}
+      ${row('Taluk', cas.taluk)}
+      ${row('District', cas.district)}
+      ${row('DOB', cas.dob)}
+    </div>
+    <div style="border-top:1px solid var(--border);margin:8px 0"></div>
+    <div class="patient-info-grid">
+      ${row('Hospital', cas.hospital, {small:true})}
+      ${row('Hosp. District', cas.hospDist)}
+      ${row('Treating Doctor', cas.doctor)}
+      ${row('Mentor Surgeon', cas.mentorSurgeon)}
+      ${row('Diagnosis', cas.diagnosis)}
+      ${row('Hosp. Type', cas.hospType)}
+    </div>
+    <div style="border-top:1px solid var(--border);margin:8px 0"></div>
+    <div class="patient-info-grid">
+      ${row('Surgery Ref', cas.surgRefNo, {small:true})}
+      ${row('Admission', cas.surgAdmit)}
+      ${row('Surgery date', cas.surgDisch ? cas.surgAdmit : cas.surgAdmit)}
+      ${row('Discharge', cas.surgDisch)}
+      ${row('Surgery status', cas.surgStatus)}
+      ${row('Surgery paid', cas.surgNet ? '₹'+Number(cas.surgNet).toLocaleString('en-IN') : '', {highlight:true})}
+    </div>
+    ${(cas.r1RefNo||cas.r1Admit) ? `
+    <div style="border-top:1px solid var(--border);margin:8px 0"></div>
+    <div class="patient-info-grid">
+      ${row('Rehab 1 Ref', cas.r1RefNo, {small:true})}
+      ${row('R1 Preauth date', cas.r1Admit)}
+      ${row('R1 Status', cas.r1Status)}
+      ${row('R1 Paid', cas.r1Net ? '₹'+Number(cas.r1Net).toLocaleString('en-IN') : '', {highlight:true})}
+    </div>` : ''}
+    ${(cas.r2RefNo||cas.r2Admit) ? `
+    <div style="border-top:1px solid var(--border);margin:8px 0"></div>
+    <div class="patient-info-grid">
+      ${row('Rehab 2 Ref', cas.r2RefNo, {small:true})}
+      ${row('R2 Preauth date', cas.r2Admit)}
+      ${row('R2 Status', cas.r2Status)}
+      ${row('R2 Paid', cas.r2Net ? '₹'+Number(cas.r2Net).toLocaleString('en-IN') : '', {highlight:true})}
+    </div>` : ''}
+    <div style="border-top:1px solid var(--border);margin:8px 0 0"></div>
+    <div style="font-size:10px;color:var(--text-light);margin-top:6px">Journey: <strong>${cas.journey||cas.phase||'—'}</strong></div>
+  </div>`;
+}
+
 function cleanMob(m) {
   return String(m||'').replace(/\.0$/, '').replace(/[^0-9+]/g, '').trim();
 }
@@ -1178,36 +1259,104 @@ function buildForm(cas) {
 }
 
 function buildHospitalForm(cas) {
-  const mob = cas ? cleanMob(cas.mobile) : '';
-  const patientBanner = cas ? `
-    <div class="patient-info-card">
-      <div class="patient-info-header">
-        <span class="patient-info-icon">👶</span>
-        <div>
-          <div class="patient-info-name">${cas.name}</div>
-          <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.caste||''}</div>
-        </div>
-        <span class="status-pill ${cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
-      </div>
-      <div class="patient-info-grid">
-        <div><span class="info-label">Card No.</span><span class="info-val">${cas.id||'—'}</span></div>
-        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
-        <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
-        <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
-        <div><span class="info-label">District</span><span class="info-val">${cas.district||'—'}</span></div>
-        <div><span class="info-label">Surgeon</span><span class="info-val">${cas.doctor||'—'}</span></div>
-        <div><span class="info-label">Mobile</span><span class="info-val">${mob ? '<a href="tel:'+mob+'" style="color:var(--green);font-weight:600">'+mob+'</a>' : '—'}</span></div>
-        <div><span class="info-label">SAST Ref</span><span class="info-val" style="font-size:10px">${cas.surgRefNo||cas.r1RefNo||'—'}</span></div>
-      </div>
-    </div>` : '<div class="info-banner" style="background:var(--gray-bg)"><div class="info-banner-text" style="color:var(--text-light)">Select a case from the cases list to pre-fill details</div></div>';
-
   const hospitalLabel = currentUser ? currentUser.unit : 'Hospital';
 
   return `
     <div class="form-section">
       <div class="form-section-title">🏥 ${hospitalLabel}</div>
-      ${patientBanner}
+      ${buildPatientCard(cas)}
     </div>
+
+    <div class="form-section">
+      <div class="form-section-title" style="color:var(--amber);border-left:3px solid var(--amber);padding-left:8px">✏️ Confirm & Complete SAST Data</div>
+      <div style="font-size:11px;color:var(--text-light);margin-bottom:12px">These fields from SAST need to be confirmed or corrected by your hospital</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Date of Birth <span class="req">*</span></div>
+          <input type="date" class="field-input ${cas&&cas.dob?'has-value':''}" id="f-dob" value="${cas&&cas.dob?cas.dob:''}" onchange="calcAgeAtSurgery()">
+        </div>
+        <div class="field">
+          <div class="field-label">Age at surgery</div>
+          <input class="field-input" id="f-age-calc" placeholder="Auto-calculated" readonly style="background:var(--gray-bg);color:var(--text2)">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Mentor surgeon</div>
+          <input class="field-input" id="f-mentor" placeholder="Mentor / supervising surgeon" value="${cas?cas.mentorSurgeon||'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Final diagnosis</div>
+          <select class="field-input" id="f-diagnosis">
+            <option value="">Select...</option>
+            <option>Bilateral Sensorineural Hearing Loss — Profound</option>
+            <option>Bilateral Sensorineural Hearing Loss — Severe</option>
+            <option>Auditory Neuropathy Spectrum Disorder</option>
+            <option>Post-meningitic Deafness</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Admission date</div>
+          <input type="date" class="field-input ${cas&&cas.surgAdmit?'has-value':''}" id="f-admit" value="${cas&&cas.surgAdmit?cas.surgAdmit.substring(0,10):''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Date of surgery <span class="req">*</span></div>
+          <input type="date" class="field-input ${cas&&cas.surgAdmit?'has-value':''}" id="f-surgdate" value="${cas&&cas.surgAdmit?cas.surgAdmit.substring(0,10):''}" onchange="calcAgeAtSurgery()">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Discharge date</div>
+          <input type="date" class="field-input ${cas&&cas.surgDisch?'has-value':''}" id="f-discharge" value="${cas&&cas.surgDisch?cas.surgDisch.substring(0,10):''}">
+        </div>
+        <div class="field">
+          <div class="field-label">BPL / APL</div>
+          <select class="field-input" id="f-bpl">
+            <option value="">Select...</option>
+            <option>BPL — Below Poverty Line</option>
+            <option>APL — Above Poverty Line</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Rehab 1 preauth submit date</div>
+          <input type="date" class="field-input ${cas&&cas.r1Admit?'has-value':''}" id="f-r1-preauth-submit" value="${cas&&cas.r1Admit?cas.r1Admit.substring(0,10):''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Rehab 1 preauth approved date</div>
+          <input type="date" class="field-input" id="f-r1-preauth-date">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Rehab 1 claim approved date</div>
+          <input type="date" class="field-input" id="f-r1-claim-date">
+        </div>
+        <div class="field">
+          <div class="field-label">Rehab 2 preauth submit date</div>
+          <input type="date" class="field-input ${cas&&cas.r2Admit?'has-value':''}" id="f-r2-preauth-submit" value="${cas&&cas.r2Admit?cas.r2Admit.substring(0,10):''}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Rehab 2 preauth approved date</div>
+          <input type="date" class="field-input" id="f-r2-preauth-date">
+        </div>
+        <div class="field">
+          <div class="field-label">Rehab 2 preauth approved amount (₹)</div>
+          <input type="number" class="field-input" id="f-r2-preauth-amt" value="${cas?cas.r2Net||'':''}">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Rehab 2 claim approved date</div>
+        <input type="date" class="field-input" id="f-r2-claim-date">
+      </div>
+    </div>
+
     <div class="form-section">
       <div class="form-section-title">🎧 Device Details</div>
       <div class="field">
@@ -1238,57 +1387,17 @@ function buildHospitalForm(cas) {
         <input class="field-input" id="f-serial" placeholder="Device serial number">
       </div>
     </div>
+
     <div class="form-section">
-      <div class="form-section-title">👶 Patient Details (to confirm)</div>
+      <div class="form-section-title">🗓 Additional Operative Details</div>
       <div class="field-row">
-        <div class="field">
-          <div class="field-label">Date of Birth <span class="req">*</span></div>
-          <input type="date" class="field-input ${cas&&cas.dob?'has-value':''}" id="f-dob" value="${cas&&cas.dob?cas.dob:''}" onchange="calcAgeAtSurgery()">
-        </div>
-        <div class="field">
-          <div class="field-label">Age at surgery</div>
-          <input class="field-input" id="f-age-calc" placeholder="Auto-calculated" readonly style="background:var(--gray-bg);color:var(--text2)">
-        </div>
-      </div>
-      <div class="field">
-        <div class="field-label">BPL / APL Status</div>
-        <div class="radio-group" id="rg-bpl">
-          <div class="radio-item" onclick="selectRadio(this,'rg-bpl')"><div class="radio-dot"></div>BPL — Below Poverty Line</div>
-          <div class="radio-item" onclick="selectRadio(this,'rg-bpl')"><div class="radio-dot"></div>APL — Above Poverty Line</div>
-        </div>
-      </div>
-    </div>
-    <div class="form-section">
-      <div class="form-section-title">🗓 Operative Details</div>
-      <div class="field-row">
-        <div class="field">
-          <div class="field-label">Surgery date <span class="req">*</span></div>
-          <input type="date" class="field-input ${cas?'has-value':''}" id="f-surgdate" value="${cas&&cas.surgAdmit?cas.surgAdmit.substring(0,10):''}" onchange="calcAgeAtSurgery()">
-        </div>
         <div class="field">
           <div class="field-label">Switch-on date</div>
           <input type="date" class="field-input" id="f-switchon">
         </div>
-      </div>
-      <div class="field">
-        <div class="field-label">Final diagnosis</div>
-        <select class="field-input" id="f-diagnosis">
-          <option value="">Select...</option>
-          <option>Bilateral Sensorineural Hearing Loss — Profound</option>
-          <option>Bilateral Sensorineural Hearing Loss — Severe</option>
-          <option>Auditory Neuropathy Spectrum Disorder</option>
-          <option>Post-meningitic Deafness</option>
-          <option>Other</option>
-        </select>
-      </div>
-      <div class="field-row">
         <div class="field">
           <div class="field-label">Treating surgeon</div>
           <input class="field-input" id="f-surgeon" placeholder="Operating surgeon" value="${cas?cas.doctor||'':''}">
-        </div>
-        <div class="field">
-          <div class="field-label">Mentor surgeon</div>
-          <input class="field-input" id="f-mentor" placeholder="Mentor / supervising surgeon" value="${cas?cas.mentorSurgeon||'':''}">
         </div>
       </div>
       <div class="field">
@@ -1342,6 +1451,7 @@ function buildHospitalForm(cas) {
         </select>
       </div>
     </div>
+
     <div class="form-section">
       <div class="form-section-title">📝 Notes</div>
       <div class="field">
@@ -1356,32 +1466,7 @@ function buildRehabForm(cas) {
   const rehabUnit = currentUser ? currentUser.unit : 'Rehab Institute';
 
   // Patient info card — same style as hospital form
-  const patientBanner = cas ? (() => {
-    const mob = cleanMob(cas.mobile);
-    return `
-    <div class="patient-info-card">
-      <div class="patient-info-header">
-        <span class="patient-info-icon">👶</span>
-        <div>
-          <div class="patient-info-name">${cas.name}</div>
-          <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.caste||''}</div>
-        </div>
-        <span class="status-pill ${cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
-      </div>
-      <div class="patient-info-grid">
-        <div><span class="info-label">Card No.</span><span class="info-val">${cas.id||'—'}</span></div>
-        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
-        <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
-        <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
-        <div><span class="info-label">District</span><span class="info-val">${cas.district||'—'}</span></div>
-        <div><span class="info-label">Mobile</span><span class="info-val">${mob?`<a href="tel:${mob}" style="color:var(--green);font-weight:600">${mob}</a>`:'—'}</span></div>
-        <div><span class="info-label">Surgery date</span><span class="info-val">${cas.surgAdmit||'—'}</span></div>
-        <div><span class="info-label">Hospital</span><span class="info-val" style="font-size:11px">${cas.hospital||'—'}</span></div>
-        <div><span class="info-label">Rehab 1 Ref</span><span class="info-val" style="font-size:10px">${cas.r1RefNo||'—'}</span></div>
-        <div><span class="info-label">Rehab 2 Ref</span><span class="info-val" style="font-size:10px">${cas.r2RefNo||'—'}</span></div>
-      </div>
-    </div>`;
-  })() : '<div class="info-banner" style="background:var(--gray-bg)"><div class="info-banner-text" style="color:var(--text-light)">Select a case from the cases list</div></div>';
+  const patientBanner = buildPatientCard(cas);
 
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> This case is flagged at-risk. Last contact: ${cas.lastContact||'not recorded'}.</div>` : '';
 
@@ -1568,25 +1653,7 @@ function buildRehabForm(cas) {
 
 
 function buildDistrictForm(cas) {
-  const bannerHTML = cas ? `
-    <div class="patient-info-card">
-      <div class="patient-info-header">
-        <span class="patient-info-icon">👶</span>
-        <div>
-          <div class="patient-info-name">${cas.name}</div>
-          <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.caste||''}</div>
-        </div>
-        <span class="status-pill ${cas.risk?'pill-risk':'pill-pending'}">${cas.journey||cas.phase||''}</span>
-      </div>
-      <div class="patient-info-grid">
-        <div><span class="info-label">Village</span><span class="info-val">${cas.village||'—'}</span></div>
-        <div><span class="info-label">Taluk</span><span class="info-val">${cas.taluk||'—'}</span></div>
-        <div><span class="info-label">District</span><span class="info-val">${cas.district||'—'}</span></div>
-        <div><span class="info-label">Mobile</span><span class="info-val">${cleanMob(cas.mobile)?`<a href="tel:${cleanMob(cas.mobile)}" style="color:var(--green);font-weight:600">${cleanMob(cas.mobile)}</a>`:'\u2014'}</span></div>
-        <div><span class="info-label">Hospital</span><span class="info-val">${cas.hospital||'—'}</span></div>
-        <div><span class="info-label">Surgery</span><span class="info-val">${cas.surgAdmit||'—'}</span></div>
-      </div>
-    </div>` : '';
+  const bannerHTML = buildPatientCard(cas);
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last contact: ${cas.lastContact}. This case is flagged as at-risk.</div>` : '';
 
   return `
@@ -1711,23 +1778,7 @@ function showDeviceNote(show) {
 
 function buildStateForm(cas) {
   const isNew = !cas;
-  const patientBanner = cas ? (() => {
-    const mob = cleanMob(cas.mobile);
-    return `<div class="patient-info-card">
-      <div class="patient-info-header">
-        <span class="patient-info-icon">👶</span>
-        <div><div class="patient-info-name">${cas.name}</div>
-        <div class="patient-info-sub">${cas.gender}, ${cas.age} · ${cas.district}</div></div>
-        <span class="status-pill pill-pending">${cas.journey||cas.status||''}</span>
-      </div>
-      <div class="patient-info-grid">
-        <div><span class="info-label">Card No.</span><span class="info-val">${cas.id}</span></div>
-        <div><span class="info-label">FY</span><span class="info-val">${cas.fy||'—'}</span></div>
-        <div><span class="info-label">Hospital</span><span class="info-val" style="font-size:11px">${cas.hospital||'—'}</span></div>
-        <div><span class="info-label">Mobile</span><span class="info-val">${mob?`<a href="tel:${mob}" style="color:var(--green);font-weight:600">${mob}</a>`:'—'}</span></div>
-      </div>
-    </div>`;
-  })() : '';
+  const patientBanner = buildPatientCard(cas);
 
   return `
     <div class="form-section">

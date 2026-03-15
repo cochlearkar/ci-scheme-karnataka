@@ -569,6 +569,7 @@ body {
   #dsk-brand, #dsk-bar { display: none !important; }
   body::before, body::after { display: none !important; }
 }
+
 </style>
 <script src="cases.js" defer></script>
 </head>
@@ -828,6 +829,88 @@ let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
 // ══════════════════════════════════════════
 
 // ── SHARED PATIENT INFO CARD ─────────────────────────────────
+function buildJourneyInfographic(cas) {
+  if (!cas) return '';
+
+  const hasSurg = !!(cas.surgAdmit || cas.surgStatus);
+  const hasR1   = !!(cas.r1Admit   || cas.r1Status);
+  const hasR2   = !!(cas.r2Admit   || cas.r2Status);
+  const isDone  = cas.status === 'paid';
+  const isRisk  = cas.risk;
+
+  // How many stages are done (0-4)
+  const doneCount = [hasSurg, hasR1, hasR2, isDone].filter(Boolean).length;
+  // Total gaps = 4 (between 5 nodes)
+  const fillPct = Math.round((doneCount / 4) * 100);
+
+  const stages = [
+    { label: 'Enrolled', date: cas.fy ? cas.fy.replace('-20','–') : '',            done: true,    },
+    { label: 'Surgery',  date: cas.surgAdmit ? cas.surgAdmit.substring(0,6) : '',  done: hasSurg, },
+    { label: 'Rehab 1',  date: cas.r1Admit   ? cas.r1Admit.substring(0,6)   : '',  done: hasR1,   },
+    { label: 'Rehab 2',  date: cas.r2Admit   ? cas.r2Admit.substring(0,6)   : '',  done: hasR2,   },
+    { label: 'Complete', date: isDone ? '✓ Done' : '',                              done: isDone,  },
+  ];
+
+  // Active stage = first not done (except stage 0 always done)
+  const activeIdx = isDone ? 4 : stages.findIndex((s, i) => i > 0 && !s.done);
+
+  const G = '#1a8a5a';   // green
+  const R = '#dc2626';   // red
+  const MUTED = '#d1d5db'; // grey
+
+  const dotColor   = (i) => i < activeIdx ? G : i === activeIdx ? (isRisk ? R : G) : MUTED;
+  const dotBg      = (i) => i < activeIdx ? G : '#fff';
+  const dotBorder  = (i) => `border:2.5px solid ${dotColor(i)}`;
+  const dotShadow  = (i) => i === activeIdx ? `box-shadow:0 0 0 4px ${isRisk ? 'rgba(220,38,38,.15)' : 'rgba(26,138,90,.18)'}` : '';
+  const dotIcon    = (i) => i < activeIdx ? `<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+                           : i === activeIdx ? `<div style="width:7px;height:7px;border-radius:50%;background:${isRisk?R:G}"></div>`
+                           : `<div style="width:6px;height:6px;border-radius:50%;background:${MUTED}"></div>`;
+  const lblColor   = (i) => i < activeIdx ? '#065f46' : i === activeIdx ? (isRisk ? R : G) : '#9ca3af';
+  const lblWeight  = (i) => i === activeIdx ? '700' : '600';
+
+  // Build nodes
+  let nodesHTML = stages.map((s, i) => `
+    <div style="display:flex;flex-direction:column;align-items:center;width:20%;flex-shrink:0;position:relative;z-index:2">
+      <div style="width:28px;height:28px;border-radius:50%;background:${dotBg(i)};${dotBorder(i)};${dotShadow(i)};display:flex;align-items:center;justify-content:center;transition:all .3s">
+        ${dotIcon(i)}
+      </div>
+      <div style="font-size:9px;font-weight:${lblWeight(i)};color:${lblColor(i)};margin-top:5px;text-align:center;letter-spacing:.2px;text-transform:uppercase;line-height:1.3">${s.label}</div>
+      ${s.date ? `<div style="font-size:8px;color:#9ca3af;margin-top:1px;text-align:center">${s.date}</div>` : `<div style="font-size:8px;color:transparent">·</div>`}
+    </div>
+  `).join('');
+
+  // Status message
+  const nextLabel = activeIdx < stages.length ? stages[activeIdx].label : '';
+  const statusMsg = isDone
+    ? '✓ Programme complete'
+    : isRisk
+    ? '⚠ At risk — needs follow-up'
+    : `Currently at: ${nextLabel}`;
+  const statusColor = isDone ? '#065f46' : isRisk ? R : G;
+
+  return `<div style="padding:2px 0 6px">
+    <div style="position:relative;padding:14px 10px 6px">
+
+      <!-- Full background track -->
+      <div style="position:absolute;top:27px;left:calc(10% + 4px);right:calc(10% + 4px);height:3px;background:${MUTED};border-radius:2px;z-index:0"></div>
+
+      <!-- Green fill track — grows with progress -->
+      <div style="position:absolute;top:27px;left:calc(10% + 4px);width:calc(${fillPct}% * 0.8);height:3px;background:${G};border-radius:2px;z-index:1;transition:width .5s ease"></div>
+
+      <!-- Nodes row -->
+      <div style="display:flex;align-items:flex-start;position:relative;z-index:2">
+        ${nodesHTML}
+      </div>
+    </div>
+
+    <!-- Status line -->
+    <div style="font-size:11px;font-weight:600;color:${statusColor};padding:2px 10px 0;display:flex;align-items:center;gap:5px">
+      ${isDone ? '🎉' : isRisk ? '⚠️' : '→'} ${statusMsg}
+    </div>
+  </div>`;
+}
+
+
 function buildPatientCard(cas) {
   if (!cas) return '<div style="background:#fef3c7;border:2px solid #d97706;border-radius:12px;padding:16px;text-align:center;margin:8px 0">' +
     '<div style="font-size:24px;margin-bottom:8px">📋</div>' +
@@ -906,8 +989,8 @@ function buildPatientCard(cas) {
       ${cas.r2Net ? c('Net Paid', '₹'+Number(cas.r2Net).toLocaleString('en-IN'), true) : ''}
       ` : ''}
 
-      ${sec('Journey')}
-      ${cf('Stage', cas.journey||cas.phase)}
+      <div class="pic-section-head" style="grid-column:span 2">Programme Journey</div>
+      <div style="grid-column:span 2;padding:4px 0 8px">${buildJourneyInfographic(cas)}</div>
     </div>
 
     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
@@ -1293,15 +1376,13 @@ function filterCases(q) {
 }
 
 function caseCardHTML(c) {
-  const pct = c.totalSessions ? Math.round(c.sessions / c.totalSessions * 100) : 0;
   const pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':'pill-pending';
   const pillLabel = c.status==='paid'?'✓ Complete':c.status==='risk'?'⚠ At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pending':'Active';
-  const dateLabel = c.surgAdmit ? `Surgery: ${c.surgAdmit}` : c.r1Admit ? `Rehab1: ${c.r1Admit}` : c.r2Admit ? `Rehab2: ${c.r2Admit}` : '—';
-  // Source badge — SAST only vs institution-updated
-  const hasUpdate = c.surgDateUpdated || c.dob || c.mentorSurgeon;
+  const hasUpdate = c.dob || c.mentorSurgeon;
   const sourceBadge = hasUpdate
-    ? '<span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:6px;font-weight:700">✓ UPDATED</span>'
-    : '<span style="font-size:9px;background:#f3f4f6;color:#9ca3af;padding:1px 5px;border-radius:6px;font-weight:600">SAST only</span>';
+    ? '<span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:6px;font-weight:700">✓ Updated</span>'
+    : '<span style="font-size:9px;background:#f3f4f6;color:#9ca3af;padding:1px 5px;border-radius:6px;font-weight:600">SAST</span>';
+  const dateLabel = c.surgAdmit ? `Surgery: ${c.surgAdmit}` : c.r1Admit ? `Rehab1: ${c.r1Admit}` : c.r2Admit ? `Rehab2: ${c.r2Admit}` : '—';
   return `<div class="case-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
     <div class="case-header">
       <div class="case-name">${c.name} ${sourceBadge}</div>
@@ -1310,11 +1391,11 @@ function caseCardHTML(c) {
     <div class="case-meta">
       <span>${c.gender}, ${c.age} · ${c.district}</span>
       <span>${dateLabel}</span>
-      <span style="color:var(--text-light);font-size:11px">${c.journey||c.phase||''}</span>
+      <span style="color:var(--text-light);font-size:11px">${c.fy||''}</span>
     </div>
-    ${c.sessions>0?`<div class="case-progress"><div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div><div class="progress-label">${c.sessions}/${c.totalSessions} sessions</div></div>`:''}
   </div>`;
 }
+
 
 function renderCaseList() {
   document.getElementById('case-count').textContent = `Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''}`;

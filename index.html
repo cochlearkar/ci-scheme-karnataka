@@ -935,7 +935,60 @@ function buildPatientCard(cas, role) {
   const sec = (title) => `<div class="pic-section-head">${title}</div>`;
   const mobHTML = mob ? `<a href="tel:${mob}" style="color:var(--green-dark);font-weight:700">${mob}</a>` : '—';
 
-  // ── HOSPITAL: exact fields as specified ────────────────────────────────────
+  // Inline editable field — shows value if present, input if empty
+  const editable = (label, id, val, placeholder='', type='text') => {
+    if (val) {
+      // Has value — show as info with small edit hint
+      return `<div class="pic-cell">
+        <span class="info-label">${label}</span>
+        <span class="info-val">${val}
+          <span style="font-size:9px;color:var(--text-light);margin-left:4px;cursor:pointer"
+            onclick="document.getElementById('${id}').style.display='block';this.parentElement.style.display='none'"
+            title="Edit">✏</span>
+        </span>
+        <input id="${id}" type="${type}" class="field-input" value="${val}"
+          placeholder="${placeholder}"
+          style="display:none;margin-top:4px;font-size:12px;padding:5px 8px"
+          oninput="this.classList.toggle('has-value',this.value.length>0)">
+      </div>`;
+    } else {
+      // Empty — show input directly
+      return `<div class="pic-cell">
+        <span class="info-label">${label} <span style="color:var(--amber);font-size:9px">● missing</span></span>
+        <input id="${id}" type="${type}" class="field-input" value=""
+          placeholder="${placeholder}"
+          style="margin-top:3px;font-size:12px;padding:5px 8px"
+          oninput="this.classList.toggle('has-value',this.value.length>0)">
+      </div>`;
+    }
+  };
+
+  const editableFull = (label, id, val, placeholder='') => {
+    if (val) {
+      return `<div class="pic-full">
+        <span class="info-label">${label}</span>
+        <span class="info-val">${val}
+          <span style="font-size:9px;color:var(--text-light);margin-left:4px;cursor:pointer"
+            onclick="document.getElementById('${id}').style.display='block';this.parentElement.style.display='none'"
+            title="Edit">✏</span>
+        </span>
+        <input id="${id}" class="field-input" value="${val}"
+          placeholder="${placeholder}"
+          style="display:none;margin-top:4px;font-size:12px;padding:5px 8px"
+          oninput="this.classList.toggle('has-value',this.value.length>0)">
+      </div>`;
+    } else {
+      return `<div class="pic-full">
+        <span class="info-label">${label} <span style="color:var(--amber);font-size:9px">● missing</span></span>
+        <input id="${id}" class="field-input" value=""
+          placeholder="${placeholder}"
+          style="margin-top:3px;font-size:12px;padding:5px 8px"
+          oninput="this.classList.toggle('has-value',this.value.length>0)">
+      </div>`;
+    }
+  };
+
+  // ── HOSPITAL: clean info card with inline editables for missing data ────────
   if (isHosp) {
     return `<div class="patient-info-card">
       <div class="patient-info-header">
@@ -947,9 +1000,9 @@ function buildPatientCard(cas, role) {
         <span class="status-pill ${statusClass}" style="flex-shrink:0">${statusLabel}</span>
       </div>
       <div class="patient-info-grid">
-        ${c('SAST Ref', cas.surgRefNo)}
+        ${editableFull('SAST Ref', 'f-sast-ref-inline', cas.surgRefNo, 'Enter SAST ref number')}
         ${c('FY', cas.fy)}
-        ${c('Village', cas.village)}
+        ${editable('Village', 'f-village-inline', cas.village, 'Enter village name')}
         ${c('Taluk', cas.taluk)}
         ${c('District', cas.district)}
         ${c('Treating Doctor', cas.doctor)}
@@ -959,12 +1012,16 @@ function buildPatientCard(cas, role) {
         ${c('Package', cas.surgPkg)}
         <div class="pic-section-head" style="grid-column:span 2">Programme Journey</div>
         <div style="grid-column:span 2;padding:4px 0 8px">${buildJourneyInfographic(cas)}</div>
-        <div class="pic-cell"><span class="info-label">Mobile</span><span class="info-val">${mobHTML}</span></div>
+        <div class="pic-full">
+          <span class="info-label">Mobile</span>
+          <span class="info-val">${mob ? `<a href="tel:${mob}" style="color:var(--green-dark);font-weight:700">${mob}</a>` : '<span style="color:var(--amber);font-size:9px">● missing</span>'}</span>
+        </div>
       </div>
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
-        <div style="font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📞 Update Mobile Number</div>
+        <div style="font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📞 Add / Update Mobile Number</div>
         <input class="field-input" id="f-new-mobile" type="tel"
-          placeholder="Add new / corrected mobile number"
+          placeholder="Enter mobile number"
+          value="${mob||''}"
           style="font-size:13px;padding:8px 10px;width:100%"
           oninput="this.classList.toggle('has-value',this.value.length>0)">
       </div>
@@ -981,7 +1038,6 @@ function buildPatientCard(cas, role) {
       </div>
       <span class="status-pill ${statusClass}" style="flex-shrink:0">${statusLabel}</span>
     </div>
-
     <div class="patient-info-grid">
       ${sec('Patient Details')}
       ${c('Card No.', cas.id)}
@@ -1028,7 +1084,6 @@ function buildPatientCard(cas, role) {
       <div class="pic-section-head" style="grid-column:span 2">Programme Journey</div>
       <div style="grid-column:span 2;padding:4px 0 8px">${buildJourneyInfographic(cas)}</div>
     </div>
-
     <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
       <div style="font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">📞 Update Mobile Number</div>
       <input class="field-input" id="f-new-mobile" type="tel"

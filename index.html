@@ -911,24 +911,23 @@ function buildJourneyInfographic(cas) {
 }
 
 
-function buildPatientCard(cas) {
-  if (!cas) return '<div style="background:#fef3c7;border:2px solid #d97706;border-radius:12px;padding:16px;text-align:center;margin:8px 0">' +
-    '<div style="font-size:24px;margin-bottom:8px">📋</div>' +
-    '<div style="font-weight:700;color:#92400e;margin-bottom:6px">No case selected</div>' +
-    '<div style="font-size:13px;color:#78350f;margin-bottom:12px">Go back to the cases list and tap a case to update it.</div>' +
-    '<button onclick="goBack()" style="background:#d97706;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">← Go to Cases List</button>' +
-    '</div>';
+function buildPatientCard(cas, role) {
+  if (!cas) return '<div style="background:#fef3c7;border:2px solid #d97706;border-radius:12px;padding:16px;text-align:center;margin:8px 0">'
+    + '<div style="font-size:24px;margin-bottom:8px">📋</div>'
+    + '<div style="font-weight:700;color:#92400e;margin-bottom:6px">No case selected</div>'
+    + '<div style="font-size:13px;color:#78350f;margin-bottom:12px">Go back to the cases list and tap a case to update it.</div>'
+    + '<button onclick="goBack()" style="background:#d97706;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">← Go to Cases List</button>'
+    + '</div>';
 
   const mob = cleanMob(cas.mobile);
+  const isHosp = role === 'hospital';
   const statusClass = cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending';
   const statusLabel = cas.status==='paid'?'✓ Complete':cas.status==='risk'?'⚠ At risk':cas.status==='rehab1'?'Rehab 1 due':cas.status==='rehab2'?'Rehab 2 due':'Active';
 
-  // Cell helper — label + value in one grid cell
   const c = (label, val, highlight=false) => {
-    if (!val) return '<div class="pic-cell"><span class="info-label">'+label+'</span><span class="info-val" style="color:var(--text-light)">—</span></div>';
+    if (!val) return `<div class="pic-cell"><span class="info-label">${label}</span><span class="info-val" style="color:var(--text-light)">—</span></div>`;
     return `<div class="pic-cell"><span class="info-label">${label}</span><span class="info-val${highlight?' highlight':''}">${val}</span></div>`;
   };
-  // Full-width cell
   const cf = (label, val) => {
     if (!val) return '';
     return `<div class="pic-full"><span class="info-label">${label}</span><span class="info-val">${val}</span></div>`;
@@ -941,29 +940,29 @@ function buildPatientCard(cas) {
       <span class="patient-info-icon">👶</span>
       <div style="flex:1;min-width:0">
         <div class="patient-info-name">${cas.name}</div>
-        <div class="patient-info-sub">${[cas.gender,cas.age,cas.caste].filter(Boolean).join(' · ')}</div>
+        <div class="patient-info-sub">${[cas.gender, cas.age, cas.caste].filter(Boolean).join(' · ')}</div>
       </div>
       <span class="status-pill ${statusClass}" style="flex-shrink:0">${statusLabel}</span>
     </div>
 
     <div class="patient-info-grid">
       ${sec('Patient Details')}
-      ${c('Card No.', cas.id)}
+      ${!isHosp ? c('Card No.', cas.id) : ''}
       ${c('FY', cas.fy)}
-      ${c('TPA ID', cas.tpa)}
-      ${c('Date of Birth', cas.dob)}
+      ${!isHosp ? c('TPA ID', cas.tpa) : ''}
+      ${!isHosp ? c('Date of Birth', cas.dob) : ''}
       ${c('Village', cas.village)}
       ${c('Taluk', cas.taluk)}
       ${c('District', cas.district)}
       <div class="pic-cell"><span class="info-label">Mobile</span><span class="info-val">${mobHTML}</span></div>
 
       ${sec('Hospital & Clinical')}
-      ${cf('Hospital', cas.hospital)}
+      ${!isHosp ? cf('Hospital', cas.hospital) : ''}
       ${c('Hosp. District', cas.hospDist)}
       ${c('Treating Doctor', cas.doctor)}
-      ${c('Mentor Surgeon', cas.mentorSurgeon)}
-      ${cas.diagnosis?cf('Diagnosis', cas.diagnosis):''}
-      ${c('Hosp. Type', cas.hospType)}
+      ${!isHosp ? c('Mentor Surgeon', cas.mentorSurgeon) : ''}
+      ${cas.diagnosis ? cf('Diagnosis', cas.diagnosis) : ''}
+      ${!isHosp ? c('Hosp. Type', cas.hospType) : ''}
 
       ${sec('Surgery (2001GP)')}
       ${cf('SAST Ref', cas.surgRefNo)}
@@ -1526,7 +1525,7 @@ function buildHospitalForm(cas) {
   return `
     <div class="form-section">
       <div class="form-section-title">🏥 ${hospitalLabel}</div>
-      ${buildPatientCard(cas)}
+      ${buildPatientCard(cas, 'hospital')}
     </div>
 
     <div class="form-section form-section--confirm">
@@ -1673,7 +1672,7 @@ function buildRehabForm(cas) {
   const rehabUnit = currentUser ? currentUser.unit : 'Rehab Institute';
 
   // Patient info card — same style as hospital form
-  const patientBanner = buildPatientCard(cas);
+  const patientBanner = buildPatientCard(cas, 'rehab');
 
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> This case is flagged at-risk. Last contact: ${cas.lastContact||'not recorded'}.</div>` : '';
 
@@ -1860,7 +1859,7 @@ function buildRehabForm(cas) {
 
 
 function buildDistrictForm(cas) {
-  const bannerHTML = buildPatientCard(cas);
+  const bannerHTML = buildPatientCard(cas, 'district');
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> Last contact: ${cas.lastContact}. This case is flagged as at-risk.</div>` : '';
 
   return `
@@ -2068,7 +2067,7 @@ function showDeviceNote(show) {
 
 function buildStateForm(cas) {
   const isNew = !cas;
-  const patientBanner = buildPatientCard(cas);
+  const patientBanner = buildPatientCard(cas, 'state');
 
   return `
     <div class="form-section">
@@ -2408,23 +2407,74 @@ function selectRadio(el, groupId) {
 // SUBMIT
 // ══════════════════════════════════════════
 function submitForm() {
-  // ── Block submission if no case is selected (all roles except state new entry) ──
-  const isStateNewEntry = currentRole === 'state' && !selectedCase;
+  // ── 1. Case must be selected (except state new entry) ────────────────────
   if (!selectedCase && currentRole !== 'state') {
     alert('⚠ Please select a case from the cases list before submitting.');
     goBack();
     return;
   }
-  // ── Mandatory field validation ──
-  if (currentRole === 'district') {
-    const devStatus = document.querySelector('#rg-device-status .radio-item.checked');
-    if (!devStatus) {
-      alert('⚠ Device status is required. Please select the equipment condition before submitting.');
-      const el = document.getElementById('rg-device-status');
-      if (el) el.scrollIntoView({behavior:'smooth'});
-      return;
-    }
+
+  // ── 2. Per-role mandatory field validation ────────────────────────────────
+  const missing = [];
+
+  function chk(id, label) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const val = el.value ? el.value.trim() : '';
+    if (!val || val === '') missing.push(label);
   }
+  function chkRadio(groupId, label) {
+    const el = document.querySelector('#' + groupId + ' .radio-item.checked');
+    if (!el) missing.push(label);
+  }
+  function chkSelect(id, label) {
+    const el = document.getElementById(id);
+    if (!el || !el.value || el.value === '') missing.push(label);
+  }
+
+  if (currentRole === 'hospital') {
+    chk('f-dob',         'Date of Birth');
+    chk('f-surgdate',    'Date of Surgery');
+    chkSelect('f-mfr',   'Device Manufacturer');
+    chkSelect('f-side',  'Implanted Side (Left/Right/Bilateral)');
+    chk('f-serial',      'Device Serial Number');
+    chkSelect('f-rehabcentre', 'Recommended Rehab Centre');
+    chkSelect('f-res-district','Residential District of Child');
+  }
+
+  if (currentRole === 'rehab') {
+    chkRadio('rg-rehab-stage',  'Rehab Stage (Part 1 / Part 2)');
+    chk('f-sessdate',           'Session Date');
+    chkSelect('f-duration',     'Session Duration');
+    chk('f-therapist',          'Audiologist / Therapist Name');
+    chkRadio('rg-attendance',   'Attendance');
+    chkSelect('f-res-district', 'Child\'s Home District');
+  }
+
+  if (currentRole === 'district') {
+    chkRadio('contact-group',      'Contact Method');
+    chk('f-contactdate',           'Contact Date');
+    chkRadio('rg-device-status',   'Device Condition');
+    chk('f-officer',               'Officer Name');
+  }
+
+  if (currentRole === 'state') {
+    chk('f-pat-name',   'Patient Name');
+    chkSelect('f-gender','Gender');
+    chk('f-sast-ref',   'SAST Reference Number');
+    chkSelect('f-district','Patient District');
+    chk('f-hospital-name','Hospital Name');
+  }
+
+  if (missing.length > 0) {
+    alert('⚠ Please fill in the following required fields before submitting:\n\n• ' + missing.join('\n• '));
+    // Scroll to first missing field
+    const firstMissing = document.querySelector('.field-input:invalid, .field-input[value=""], select.field-input:not([value])');
+    if (firstMissing) firstMissing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  // ── 3. Submit ─────────────────────────────────────────────────────────────
   const btn = document.getElementById('submit-btn');
   btn.innerHTML = '<span class="spinner"></span>';
   btn.disabled = true;
@@ -2433,12 +2483,10 @@ function submitForm() {
   formData.role = currentRole;
   formData.timestamp = new Date().toISOString();
   formData.entryId = 'CI-' + Date.now();
-  // Include session token and case card number for Apps Script verification
   if (currentUser) {
-    formData.token = currentUser.token || '';
+    formData.token    = currentUser.token || '';
     formData.username = currentUser.username || '';
-    formData.unit = currentUser.unit || '';
-    // Ensure card number is captured even if not an editable field
+    formData.unit     = currentUser.unit || '';
     if (!formData['f-card'] && selectedCase) formData['f-card'] = selectedCase.id || '';
   }
 
@@ -2449,72 +2497,6 @@ function submitForm() {
   }
 }
 
-function submitToSheet(formData) {
-  const btn = document.getElementById('submit-btn');
-
-  // Use no-cors POST — reaches Apps Script but response is opaque
-  // We verify by also sending a JSONP GET callback to confirm receipt
-  const payload = JSON.stringify(formData);
-
-  fetch(SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain' },
-    body: payload
-  })
-  .then(() => {
-    // POST fired (no-cors = opaque response, can't confirm content)
-    // Now verify via JSONP GET
-    verifyViaJSONP(formData);
-  })
-  .catch(() => {
-    // Network error — save offline
-    saveOffline(formData);
-  });
-}
-
-function verifyViaJSONP(formData) {
-  const cbName = 'cb_' + Date.now();
-  const params = new URLSearchParams({
-    action: 'ping',
-    entryId: formData.entryId,
-    card: formData['f-card'] || '',
-    role: formData.role || '',
-    callback: cbName
-  });
-
-  const script = document.createElement('script');
-  let done = false;
-
-  window[cbName] = function(response) {
-    done = true;
-    delete window[cbName];
-    document.head.removeChild(script);
-    // POST already sent — show success regardless of ping result
-    showSuccess(formData.entryId, false);
-  };
-
-  script.onerror = function() {
-    done = true;
-    delete window[cbName];
-    try { document.head.removeChild(script); } catch(e) {}
-    // JSONP failed but POST may still have reached — show success
-    showSuccess(formData.entryId, false);
-  };
-
-  // Timeout fallback — 5 seconds
-  setTimeout(() => {
-    if (!done) {
-      done = true;
-      delete window[cbName];
-      try { document.head.removeChild(script); } catch(e) {}
-      showSuccess(formData.entryId, false);
-    }
-  }, 5000);
-
-  script.src = SCRIPT_URL + '?' + params.toString();
-  document.head.appendChild(script);
-}
 
 function collectFormData() {
   const data = {};

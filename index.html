@@ -809,6 +809,21 @@ body {
   </div>
 </div>
 
+<!-- ══════════════════ SCREEN: REHAB SESSION ══════════════════ -->
+<div class="screen hidden" id="screen-rehabsession">
+  <div class="app-header" style="background:var(--blue)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff">←</div>
+      <div>
+        <div class="header-title" style="color:#fff" id="rs-title">Log Session</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.6)" id="rs-sub">Rehab session entry</div>
+      </div>
+    </div>
+    <div class="role-chip chip-rehab">Rehab</div>
+  </div>
+  <div class="form-scroll" id="rs-body"></div>
+</div>
+
 <!-- ══════════════════ SCREEN: HOSPITAL UPDATE ══════════════════ -->
 <div class="screen hidden" id="screen-hospupdate">
   <div class="app-header" style="background:var(--green-dark)">
@@ -1549,9 +1564,12 @@ function filterCasesByUser(cases) {
     return [];
   }
   if (currentUser.role === 'rehab') {
-    // Rehab sees ALL cases that have had surgery — they need to update ANY child
-    // coming for sessions (SAST data has no rehab institute field)
-    return cases.filter(c => c.surgAdmit || c.status === 'rehab1' || c.status === 'rehab2' || c.status === 'paid');
+    // Rehab sees only cases where their centre is the recommended rehab centre
+    const unit = (currentUser.unit || '').toLowerCase().trim();
+    return cases.filter(c => {
+      const rec = (c.rehabCentre || '').toLowerCase().trim();
+      return rec && rec === unit;
+    });
   }
   if (currentUser.role === 'district') {
     const d = (currentUser.district||currentUser.unit||'').toUpperCase();
@@ -3197,6 +3215,8 @@ function summaryAction() {
   const cas = selectedCase;
   if (currentRole === 'hospital') {
     openHospitalUpdate(cas);
+  } else if (currentRole === 'rehab') {
+    openRehabSession(cas);
   } else {
     buildForm(cas);
     showScreen('form');
@@ -3267,6 +3287,185 @@ function buildSummaryHTML(c) {
     +'<div style="height:24px"></div></div>';
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// REHAB SESSION FORM
+// ══════════════════════════════════════════════════════════════
+
+function openRehabSession(cas) {
+  selectedCase = cas;
+  document.getElementById('rs-title').textContent = cas.name || 'Log Session';
+  document.getElementById('rs-sub').textContent = 'Card: ' + cas.id + ' · ' + (cas.rehabCentre || '');
+  const sessionsDone = cas.sessions || 0;
+  const totalSess    = cas.totalSessions || 54;
+  const dotsHTML = Array.from({length: Math.min(18, totalSess)}, (_,i) => {
+    const n = i + 1;
+    if (n <= sessionsDone)      return '<div class="sdot sdot-done">'+n+'</div>';
+    if (n === sessionsDone + 1) return '<div class="sdot sdot-today">'+n+'</div>';
+    return '<div class="sdot sdot-pending">'+n+'</div>';
+  }).join('');
+  const today = new Date().toISOString().split('T')[0];
+
+  document.getElementById('rs-body').innerHTML =
+    '<div style="margin:14px 16px 0;background:var(--blue-light);border:1px solid #B5D4F4;border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128203; Patient Information</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
+    +rsRow('SAST Ref', cas.surgRefNo||cas.tpa||'&mdash;')
+    +rsRow('FY',       cas.fy||'&mdash;')
+    +rsRow('Name',     cas.name||'&mdash;')
+    +rsRow('Gender',   cas.gender||'&mdash;')
+    +rsRow('Village',  cas.village||'&mdash;')
+    +rsRow('District', cas.district||'&mdash;')
+    +rsRow('Hospital', cas.hospital||'&mdash;')
+    +rsRow('Mobile',   cleanMob(cas.mobile)||'&mdash;')
+    +'</div></div>'
+    +'<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128202; Programme Journey</div>'
+    +buildJourneyInfographic(cas)+'</div>'
+    +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">&#128202; Session Progress</div>'
+    +'<div class="session-dots">'+dotsHTML+'</div>'
+    +'<div style="font-size:11px;color:var(--text-light);margin-top:4px">'+sessionsDone+' completed &middot; '+(totalSess-sessionsDone)+' remaining</div></div>'
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128197; Session Details</div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Session date <span class="req">*</span></div><input type="date" class="field-input has-value" id="rs-sessdate" value="'+today+'"></div>'
+    +'<div class="field"><div class="field-label">Session number</div><input type="number" class="field-input" id="rs-sessnum" min="1" max="54" placeholder="e.g. 3" value="'+(sessionsDone+1)+'"></div>'
+    +'</div>'
+    +'<div class="field"><div class="field-label">Rehab stage <span class="req">*</span></div>'
+    +'<div class="radio-group" id="rs-stage">'
+    +'<div class="radio-item '+(cas.r1Admit&&!cas.r2Admit?'checked':'')+'" onclick="selectRadio(this,'rs-stage')"><div class="radio-dot"></div>Rehab Part 1 (2002GP)</div>'
+    +'<div class="radio-item '+(cas.r2Admit?'checked':'')+'" onclick="selectRadio(this,'rs-stage')"><div class="radio-dot"></div>Rehab Part 2 (2003GP)</div>'
+    +'</div></div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Duration <span class="req">*</span></div>'
+    +'<select class="field-input" id="rs-duration"><option value="">Select</option><option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option></select></div>'
+    +'<div class="field"><div class="field-label">Session type</div>'
+    +'<select class="field-input" id="rs-sesstype"><option>AVT (Auditory Verbal Therapy)</option><option>Mapping / Programming</option><option>Counselling</option><option>Parent training</option><option>Assessment</option></select></div>'
+    +'</div>'
+    +'<div class="field"><div class="field-label">Therapist name <span class="req">*</span></div><input class="field-input" id="rs-therapist" placeholder="Name of AVT therapist / audiologist"></div>'
+    +'</div>'
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#9989; Attendance &amp; Response</div>'
+    +'<div class="field"><div class="field-label">Attendance <span class="req">*</span></div>'
+    +'<div class="radio-group" id="rs-attendance">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,'rs-attendance')"><div class="radio-dot"></div>Present — child + guardian attended</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,'rs-attendance')"><div class="radio-dot"></div>Absent — family informed</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,'rs-attendance')"><div class="radio-dot"></div>Absent — not reachable</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Child's progress this session</div>'
+    +'<div class="radio-group" id="rs-progress">'
+    +'<div class="radio-item" onclick="selectRadio(this,'rs-progress')"><div class="radio-dot"></div>&#127775; Excellent</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,'rs-progress')"><div class="radio-dot"></div>&#9989; Good — on track</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,'rs-progress')"><div class="radio-dot"></div>&#9888; Fair — needs attention</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,'rs-progress')"><div class="radio-dot"></div>&#10060; Poor — significant difficulty</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Speech &amp; Language milestone</div>'
+    +'<select class="field-input" id="rs-milestone"><option value="">Select milestone...</option>'
+    +'<option>Detection — responds to sounds</option><option>Discrimination — distinguishes sounds</option>'
+    +'<option>Identification — recognises familiar words</option><option>Comprehension — understands spoken language</option>'
+    +'<option>Verbal expression — producing speech</option><option>Age-appropriate communication</option>'
+    +'</select></div></div>'
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128196; Claim &amp; Follow-up</div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Claim reference no.</div><input class="field-input" id="rs-claimref" placeholder="e.g. COC_H_..."></div>'
+    +'<div class="field"><div class="field-label">Claim status</div>'
+    +'<select class="field-input" id="rs-claimstatus"><option value="">Select</option>'
+    +'<option>CLAIMS PAID</option><option>SUBMITTED</option><option>PENDING</option><option>NEED MORE INFO</option><option>REJECTED</option>'
+    +'</select></div></div>'
+    +'<div class="field"><div class="field-label">Next session date</div><input type="date" class="field-input" id="rs-nextsess"></div>'
+    +'</div>'
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128221; Notes</div>'
+    +'<div class="field"><div class="field-label">Session notes / observations</div><textarea class="field-input" id="rs-notes" rows="3" placeholder="Progress notes, parent feedback..."></textarea></div>'
+    +'<div class="field"><div class="field-label">Issues flagged</div><textarea class="field-input" id="rs-issues" rows="2" placeholder="Device issues, attendance concerns..."></textarea></div>'
+    +'</div>'
+    +'<div style="padding:0 16px 40px">'
+    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
+    +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="rs-submit-btn">Save Session &#8594;</button>'
+    +'</div>';
+
+  showScreen('rehabsession');
+}
+
+function rsRow(label, value) {
+  return '<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+label+'</div>'
+    +'<div style="color:var(--blue-mid);font-weight:500;font-size:12px;margin-top:1px">'+value+'</div></div>';
+}
+
+async function submitRehabSession() {
+  const errEl = document.getElementById('rs-error');
+  const btn   = document.getElementById('rs-submit-btn');
+  errEl.style.display = 'none';
+
+  const sessdate  = document.getElementById('rs-sessdate').value;
+  const therapist = document.getElementById('rs-therapist').value.trim();
+  const duration  = document.getElementById('rs-duration').value;
+  const attendance= document.querySelector('#rs-attendance .radio-item.checked');
+  const stage     = document.querySelector('#rs-stage .radio-item.checked');
+
+  if (!sessdate)   { errEl.textContent='Session date is required.';     errEl.style.display='block'; return; }
+  if (!therapist)  { errEl.textContent='Therapist name is required.';   errEl.style.display='block'; return; }
+  if (!duration)   { errEl.textContent='Session duration is required.'; errEl.style.display='block'; return; }
+  if (!attendance) { errEl.textContent='Attendance is required.';       errEl.style.display='block'; return; }
+  if (!stage)      { errEl.textContent='Rehab stage is required.';      errEl.style.display='block'; return; }
+
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  const sessNum  = parseInt(document.getElementById('rs-sessnum').value) || (selectedCase.sessions||0) + 1;
+  const progress = document.querySelector('#rs-progress .radio-item.checked');
+  const now      = new Date().toISOString();
+
+  const sessionEntry = {
+    caseId: String(selectedCase.id), caseName: selectedCase.name||'',
+    caseDistrict: selectedCase.district||'',
+    rehabCentre: currentUser?currentUser.unit:'',
+    submittedBy: currentUser?currentUser.username:'',
+    sessdate, sessNum,
+    stage: stage.textContent.trim(),
+    duration, sesstype: document.getElementById('rs-sesstype').value,
+    therapist, attendance: attendance.textContent.trim(),
+    progress: progress?progress.textContent.trim():'',
+    milestone: document.getElementById('rs-milestone').value,
+    claimRef:    document.getElementById('rs-claimref').value.trim(),
+    claimStatus: document.getElementById('rs-claimstatus').value,
+    nextSess:    document.getElementById('rs-nextsess').value,
+    notes:       document.getElementById('rs-notes').value.trim(),
+    issues:      document.getElementById('rs-issues').value.trim(),
+    timestamp: now, entryId: 'RS-'+Date.now()
+  };
+
+  try {
+    const { collection, addDoc, doc, updateDoc } = window._fbFns;
+    await addDoc(collection(window._fbDb, 'submissions_rehab'), sessionEntry);
+
+    const caseUpdates = { sessions: sessNum, lastContact: sessdate, _lastRole:'rehab', _lastModified: now };
+    const stageText = stage.textContent.trim();
+    if (stageText.includes('Part 1')) {
+      if (sessionEntry.claimRef)    caseUpdates.r1RefNo  = sessionEntry.claimRef;
+      if (sessionEntry.claimStatus) caseUpdates.r1Status = sessionEntry.claimStatus;
+      if (sessionEntry.claimStatus === 'CLAIMS PAID') caseUpdates.status = 'rehab2';
+    } else if (stageText.includes('Part 2')) {
+      if (sessionEntry.claimRef)    caseUpdates.r2RefNo  = sessionEntry.claimRef;
+      if (sessionEntry.claimStatus) caseUpdates.r2Status = sessionEntry.claimStatus;
+      if (sessionEntry.claimStatus === 'CLAIMS PAID') caseUpdates.status = 'paid';
+    }
+    await updateDoc(doc(window._fbDb, 'cases', String(selectedCase.id)), caseUpdates);
+    const idx = SAMPLE_CASES.findIndex(c => String(c.id) === String(selectedCase.id));
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
+
+    btn.textContent = 'Save Session →';
+    btn.disabled = false;
+    document.getElementById('success-msg').textContent = 'Session '+sessNum+' logged for '+selectedCase.name+'.';
+    document.getElementById('success-id').textContent  = sessionEntry.entryId;
+    document.getElementById('offline-note').style.display = 'none';
+    screenHistory = ['home'];
+    showScreen('success');
+  } catch(e) {
+    errEl.textContent = 'Error saving: ' + e.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Save Session →';
+    btn.disabled = false;
+  }
+}
+
 // HOSPITAL UPDATE FUNCTIONS
 // ══════════════════════════════════════════════════════════════
 function openCaseFromList(caseId) {
@@ -3274,9 +3473,11 @@ function openCaseFromList(caseId) {
   if (!cas) return;
   selectedCase = cas;
   if (currentRole === 'hospital') {
-    openHospitalUpdate(cas);   // hospital goes straight to combined form
+    openHospitalUpdate(cas);     // hospital — combined patient card + form
+  } else if (currentRole === 'rehab') {
+    openRehabSession(cas);       // rehab — patient card + session form
   } else {
-    openCaseSummary(cas);      // all other roles see the summary first
+    openCaseSummary(cas);        // state & district — full summary first
   }
 }
 

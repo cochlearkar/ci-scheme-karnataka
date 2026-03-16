@@ -762,6 +762,7 @@ body {
       <input type="text" placeholder="Search by name, village or taluk..." oninput="filterCases(this.value)" id="case-search">
     </div>
     <div class="filter-row" id="filter-row"></div>
+    <div id="hosp-status-banner" style="display:none"></div>
     <div style="font-size:11px;color:var(--text-light);margin-bottom:10px" id="case-count"></div>
     <div class="case-list" id="case-list"></div>
   </div>
@@ -789,6 +790,36 @@ body {
   </div>
 </div>
 
+
+<!-- ══════════════════ SCREEN: HOSPITAL UPDATE ══════════════════ -->
+<div class="screen hidden" id="screen-hospupdate">
+  <div class="app-header" style="background:var(--green-dark)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff" id="hu-title">Update Case</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.6)" id="hu-sub">Surgery &amp; Device Details</div>
+      </div>
+    </div>
+    <div class="role-chip chip-hospital">Hospital</div>
+  </div>
+  <div class="form-scroll" id="hu-body"></div>
+</div>
+
+<!-- ══════════════════ SCREEN: HOSPITAL UPDATE ══════════════════ -->
+<div class="screen hidden" id="screen-hospupdate">
+  <div class="app-header" style="background:var(--green-dark)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff">←</div>
+      <div>
+        <div class="header-title" style="color:#fff" id="hospupdate-title">Surgery Details</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.6)" id="hospupdate-sub">Update case information</div>
+      </div>
+    </div>
+    <div class="role-chip chip-hospital">Hospital</div>
+  </div>
+  <div class="form-scroll" id="hospupdate-body"></div>
+</div>
 
 <!-- ══════════════════ SCREEN: NEW CASE (State Team only) ══════════════════ -->
 <div class="screen hidden" id="screen-newcase">
@@ -1562,7 +1593,14 @@ function buildHome() {
   html += `<div class="section-label">Quick action</div>`;
   html += `<div class="action-grid">`;
   if (currentRole === 'hospital') {
-
+    const pending = allMyCases.filter(c => !c.hospSubmitted).length;
+    const updated = allMyCases.filter(c =>  c.hospSubmitted).length;
+    if (pending > 0) {
+      html += `<div class="action-card primary" onclick="buildCaseList('hosp-pending');showScreen('cases')" style="background:var(--red);border-color:var(--red)"><div class="action-icon">&#128308;</div><div><div class="action-title">${pending} case${pending!==1?'s':''} need your update</div><div class="action-desc">Surgery &amp; device details not yet submitted</div></div><div class="action-arrow">&#8594;</div></div>`;
+    }
+    if (updated > 0) {
+      html += `<div class="action-card" onclick="buildCaseList('hosp-updated');showScreen('cases')"><div class="action-icon">&#9989;</div><div class="action-title">${updated} updated</div><div class="action-desc">Surgery details submitted</div></div>`;
+    }
   } else if (currentRole === 'rehab') {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Update Rehab Sessions</div><div class="action-desc">Select a case to log today's session</div></div><div class="action-arrow">→</div></div>`;
   } else if (currentRole === 'district') {
@@ -1586,7 +1624,7 @@ function buildHome() {
   if (risks.length) {
     html += `<div class="section-label" style="margin-top:20px">Needs attention</div>`;
     risks.forEach(c => {
-      html += `<div class="alert-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
+      html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
         <div class="alert-dot"></div>
         <div style="flex:1"><div class="alert-name">${c.name}</div><div class="alert-detail">${c.village} · ${c.phase} · Last contact: ${c.lastContact}</div></div>
         <span class="alert-tag">At risk</span>
@@ -1609,15 +1647,29 @@ function buildCaseList(filter = 'all') {
   chip.textContent = meta.label;
   chip.className = 'role-chip ' + meta.chip;
 
-  if (filter === 'risk') activeStatusFilter = 'At risk';
+  if (filter === 'pending-hosp') activeStatusFilter = 'Pending Update';
+  else if (filter === 'done-hosp') activeStatusFilter = 'Updated';
+  else if (filter === 'pending-hosp') activeStatusFilter = 'Pending Update';
+  else if (filter === 'done-hosp') activeStatusFilter = 'Updated';
+  else if (filter === 'risk') activeStatusFilter = 'At risk';
   else if (filter === 'confirm') activeStatusFilter = 'Confirm';
+  else if (filter === 'hosp-pending') activeStatusFilter = 'Needs update';
+  else if (filter === 'hosp-updated') activeStatusFilter = 'Updated';
   else activeStatusFilter = 'All';
 
-
   const filterRow = document.getElementById('filter-row');
-  filterRow.innerHTML = ['All','On track','At risk','Rehab 1','Rehab 2','Completed'].map(f =>
-    `<div class="filter-chip ${f===activeStatusFilter?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
-  ).join('');
+  if (currentRole === 'hospital') {
+    filterRow.innerHTML = ['All','Needs update','Updated'].map(f =>
+      `<div class="filter-chip ${f===activeStatusFilter?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
+    ).join('');
+  } else {
+    const chipOptions = currentRole === 'hospital'
+    ? ['All','Pending Update','Updated']
+    : ['All','On track','At risk','Rehab 1','Rehab 2','Completed'];
+  filterRow.innerHTML = chipOptions.map(f =>
+      `<div class="filter-chip ${f===activeStatusFilter?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
+    ).join('');
+  }
 
   applyAllFilters();
 }
@@ -1673,9 +1725,20 @@ function toggleAllYears(el) {
 
 function applyAllFilters() {
   let cases = filterCasesByUser(SAMPLE_CASES);
-  if (activeStatusFilter === 'Confirm') {
-    // Show cases that need confirmation (missing data or at-risk)
+  if (activeStatusFilter === 'Pending Update') {
+    cases = cases.filter(c => !c.hospSubmitted);
+  } else if (activeStatusFilter === 'Updated') {
+    cases = cases.filter(c => c.hospSubmitted === true);
+  } else if (activeStatusFilter === 'Pending Update') {
+    cases = cases.filter(c => !c.hospSubmitted);
+  } else if (activeStatusFilter === 'Updated') {
+    cases = cases.filter(c => c.hospSubmitted === true);
+  } else if (activeStatusFilter === 'Confirm') {
     cases = cases.filter(c => c.risk || !c.surgAdmit || c.status === 'pending');
+  } else if (activeStatusFilter === 'Needs update') {
+    cases = cases.filter(c => !c.hospSubmitted);
+  } else if (activeStatusFilter === 'Updated') {
+    cases = cases.filter(c => c.hospSubmitted);
   } else if (activeStatusFilter === 'On track') {
     cases = cases.filter(c => !c.risk && c.status !== 'pending');
   } else if (activeStatusFilter === 'At risk') {
@@ -1714,29 +1777,57 @@ function filterCases(q) {
 }
 
 function caseCardHTML(c) {
-  const pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':'pill-pending';
-  const pillLabel = c.status==='paid'?'✓ Complete':c.status==='risk'?'⚠ At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pending':'Active';
-  const hasUpdate = c.dob || c.mentorSurgeon;
-  const sourceBadge = hasUpdate
-    ? '<span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:6px;font-weight:700">✓ Updated</span>'
-    : '<span style="font-size:9px;background:#f3f4f6;color:#9ca3af;padding:1px 5px;border-radius:6px;font-weight:600">SAST</span>';
-  const dateLabel = c.surgAdmit ? `Surgery: ${c.surgAdmit}` : c.r1Admit ? `Rehab1: ${c.r1Admit}` : c.r2Admit ? `Rehab2: ${c.r2Admit}` : '—';
-  return `<div class="case-card" onclick="selectedCase=SAMPLE_CASES.find(x=>x.id==='${c.id}');buildForm(selectedCase);showScreen('form')">
-    <div class="case-header">
-      <div class="case-name">${c.name} ${sourceBadge}</div>
-      <span class="status-pill ${pillClass}">${pillLabel}</span>
-    </div>
-    <div class="case-meta">
-      <span>${c.gender}, ${c.age} · ${c.district}</span>
-      <span>${dateLabel}</span>
-      <span style="color:var(--text-light);font-size:11px">${c.fy||''}</span>
-    </div>
-  </div>`;
+  let pillClass, pillLabel, cardBorder = '';
+  if (currentRole === 'hospital') {
+    if (c.hospSubmitted) {
+      pillClass = 'pill-paid'; pillLabel = '&#10003; Updated';
+      cardBorder = 'border-left:4px solid var(--green-mid);';
+    } else {
+      pillClass = 'pill-risk'; pillLabel = '&#9888; Needs update';
+      cardBorder = 'border-left:4px solid var(--red);';
+    }
+  } else {
+    pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':c.status==='rehab1'||c.status==='rehab2'?'pill-rehab':'pill-pending';
+    pillLabel = c.status==='paid'?'&#10003; Complete':c.status==='risk'?'&#9888; At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pending':'Active';
+  }
+  const dateLabel = c.surgAdmit ? 'Surgery: '+c.surgAdmit : c.r1Admit ? 'Rehab1: '+c.r1Admit : c.r2Admit ? 'Rehab2: '+c.r2Admit : 'Pre-auth stage';
+  return '<div class="case-card" style="'+cardBorder+'" onclick="openCaseFromList(\''+c.id+'\')">'+
+    '<div class="case-header">'+
+    '<div class="case-name">'+c.name+'</div>'+
+    '<span class="status-pill '+pillClass+'">'+pillLabel+'</span>'+
+    '</div>'+
+    '<div class="case-meta">'+
+    '<span>'+(c.gender||'')+(c.age?', '+c.age:'')+' · '+(c.district||'')+'</span>'+
+    '<span>'+dateLabel+'</span>'+
+    '<span style="color:var(--text-light);font-size:11px">'+(c.fy||'')+'</span>'+
+    '</div></div>';
 }
 
 
 function renderCaseList() {
   document.getElementById('case-count').textContent = `Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''}`;
+
+  // Hospital pending/updated summary banner
+  const banner = document.getElementById('hosp-status-banner');
+  if (banner) {
+    if (currentRole === 'hospital' && filteredCases.length > 0) {
+      const updated = filteredCases.filter(c => c.hospSubmitted).length;
+      const pending = filteredCases.length - updated;
+      banner.style.display = 'block';
+      banner.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+        '<div style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px;text-align:center">' +
+        '<div style="font-size:22px;font-weight:700;color:var(--red)">'+pending+'</div>' +
+        '<div style="font-size:10px;color:var(--red);margin-top:2px;font-weight:600">PENDING UPDATE</div></div>' +
+        '<div style="background:var(--green-light);border:0.5px solid var(--green-border);border-radius:10px;padding:10px;text-align:center">' +
+        '<div style="font-size:22px;font-weight:700;color:var(--green)">'+updated+'</div>' +
+        '<div style="font-size:10px;color:var(--green);margin-top:2px;font-weight:600">UPDATED ✓</div></div>' +
+        '</div>';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
   const list = document.getElementById('case-list');
   if (!filteredCases.length) {
     list.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:32px;font-size:13px">No cases found</div>';
@@ -3050,9 +3141,167 @@ function buildReportCardHTML(c) {
 }
 
 
+
 // ══════════════════════════════════════════════════════════════
-// ADD NEW CASE — State Team Only
+// HOSPITAL UPDATE FUNCTIONS
 // ══════════════════════════════════════════════════════════════
+function openCaseFromList(caseId) {
+  const cas = SAMPLE_CASES.find(x => String(x.id) === String(caseId));
+  if (!cas) return;
+  selectedCase = cas;
+  if (currentRole === 'hospital') { openHospitalUpdate(cas); }
+  else { buildForm(cas); showScreen('form'); }
+}
+
+function openHospitalUpdate(cas) {
+  document.getElementById('hu-title').textContent = cas.name || 'Update Case';
+  document.getElementById('hu-sub').textContent   = 'Card: ' + cas.id;
+  if (cas.hospSubmitted) { buildHospitalReadOnly(cas); }
+  else { buildHospitalUpdateForm(cas); }
+  showScreen('hospupdate');
+}
+
+function roCell(label, val) {
+  return '<div class="pic-cell"><span class="info-label">'+label+'</span><span class="info-val">'+(val||'&mdash;')+'</span></div>';
+}
+
+function buildHospitalReadOnly(cas) {
+  document.getElementById('hu-body').innerHTML =
+    '<div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:14px 16px;margin:16px 16px 0;display:flex;gap:10px">' +
+    '<div style="font-size:20px">&#9989;</div><div>' +
+    '<div style="font-size:13px;font-weight:600;color:var(--green-dark)">Surgery details submitted &amp; locked</div>' +
+    '<div style="font-size:11px;color:var(--green);margin-top:2px">By '+(cas.hospSubmittedBy||'&mdash;')+' on '+(cas.hospSubmittedAt?cas.hospSubmittedAt.substring(0,10):'&mdash;')+'</div>' +
+    '</div></div>' +
+    '<div class="form-section" style="margin-top:16px"><div class="form-section-title">&#128118; Patient</div><div class="pic-grid">' +
+    roCell('Name',cas.name)+roCell('Gender',cas.gender)+roCell('Date of Birth',cas.dob)+roCell('Age at Surgery',cas.age)+
+    roCell('District',cas.district)+roCell('Residential District',cas.resDist)+roCell('Taluk',cas.taluk)+roCell('Mobile',cas.mobile)+
+    '</div></div>' +
+    '<div class="form-section"><div class="form-section-title">&#127973; Surgery Details</div><div class="pic-grid">' +
+    roCell('Admission Date',cas.surgAdmit)+roCell('Surgery Date',cas.surgDate)+roCell('Discharge Date',cas.surgDisch)+
+    roCell('Switch-on Date',cas.switchOn)+roCell('Implanted Side',cas.side)+roCell('Mentor Surgeon',cas.mentorSurgeon)+
+    roCell('Rehab Centre',cas.rehabCentre)+
+    '</div></div>' +
+    '<div class="form-section"><div class="form-section-title">&#128295; Device Details</div><div class="pic-grid">' +
+    roCell('Manufacturer',cas.manufacturer)+roCell('Model',cas.model)+roCell('Serial Number',cas.serialNo)+
+    '</div></div>' +
+    (cas.remarks?'<div class="form-section"><div class="form-section-title">&#128221; Remarks</div><div style="font-size:13px;padding:4px 0">'+cas.remarks+'</div></div>':'') +
+    '<div style="padding:16px 0 32px"><button onclick="goBack()" style="width:100%;padding:13px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;">&#8592; Back to Cases</button></div>';
+}
+
+function buildHospitalUpdateForm(cas) {
+  const mOpts = MENTOR_SURGEONS.map(m=>'<option value="'+m+'">'+m+'</option>').join('');
+  const rOpts = REHAB_CENTRES.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
+  const dOpts = ['BAGALKOTE','BALLARI','BANGALORE - RURAL','BANGALORE EAST','BANGALORE NORTH','BANGALORE SOUTH','BANGALORE WEST',
+    'BELAGAVI','BENGALURU','BENGALURU RURAL','BIDAR','CHAMARAJANAGARA','CHIKKABALLAPURA','CHIKKAMAGALURU','CHITRADURGA',
+    'DAKSHINA KANNADA','DAVANAGERE','DHARWAR','GADAG','HASSAN','HAVERI','KALABURAGI','KODAGU','KOLAR','KOPPAL',
+    'MANDYA','MYSORE','MYSURU','RAICHUR','RAMANAGARA','SHIVAMOGGA','TUMAKURU','UDUPI','UTTARA KANNADA',
+    'VIJAYANAGAR','VIJAYAPURA','YADGIR'].map(d=>'<option>'+d+'</option>').join('');
+
+  document.getElementById('hu-body').innerHTML =
+    '<div style="background:var(--amber-light);border:1px solid #FAC775;border-radius:12px;padding:12px 16px;margin:16px 16px 0;font-size:12px;color:var(--amber)">'+
+    '&#9888;&#65039; Once submitted this form will be <strong>locked permanently</strong>. Check all details carefully.</div>' +
+
+    '<div class="form-section" style="margin-top:16px"><div class="form-section-title">&#128118; Patient Details</div>'+
+    '<div class="field"><div class="field-label">Date of Birth <span class="req">*</span></div>'+
+    '<input type="date" class="field-input" id="hu-dob"></div>'+
+    '<div class="field"><div class="field-label">Residential district of child <span class="req">*</span></div>'+
+    '<select class="field-input" id="hu-resdist"><option value="">Select district</option>'+dOpts+'</select></div></div>'+
+
+    '<div class="form-section"><div class="form-section-title">&#127973; Surgery Details</div>'+
+    '<div class="field-row">'+
+    '<div class="field"><div class="field-label">Admission date <span class="req">*</span></div><input type="date" class="field-input" id="hu-admit"></div>'+
+    '<div class="field"><div class="field-label">Surgery date <span class="req">*</span></div><input type="date" class="field-input" id="hu-surgdate"></div>'+
+    '</div><div class="field-row">'+
+    '<div class="field"><div class="field-label">Discharge date <span class="req">*</span></div><input type="date" class="field-input" id="hu-dischdate"></div>'+
+    '<div class="field"><div class="field-label">Switch-on date</div><input type="date" class="field-input" id="hu-switchon"></div>'+
+    '</div>'+
+    '<div class="field"><div class="field-label">Implanted side <span class="req">*</span></div>'+
+    '<select class="field-input" id="hu-side"><option value="">Select</option><option>Right ear</option><option>Left ear</option><option>Bilateral</option></select></div>'+
+    '<div class="field"><div class="field-label">Mentor surgeon <span class="req">*</span></div>'+
+    '<select class="field-input" id="hu-mentor"><option value="">Select mentor surgeon...</option>'+mOpts+'</select></div>'+
+    '<div class="field"><div class="field-label">Recommended Rehab Centre <span class="req">*</span></div>'+
+    '<select class="field-input" id="hu-rehabcentre"><option value="">Select institute...</option>'+rOpts+'</select></div></div>'+
+
+    '<div class="form-section"><div class="form-section-title">&#128295; Device Details</div>'+
+    '<div class="field"><div class="field-label">Manufacturer <span class="req">*</span></div>'+
+    '<select class="field-input" id="hu-mfr"><option value="">Select manufacturer</option>'+
+    '<option>Cochlear Limited (Australia)</option><option>Advanced Bionics (USA)</option>'+
+    '<option>MED-EL (Austria)</option><option>Nurotron (China)</option><option>Oticon Medical (Denmark)</option></select></div>'+
+    '<div class="field-row">'+
+    '<div class="field"><div class="field-label">Model</div><input class="field-input" id="hu-model" placeholder="Device model"></div>'+
+    '<div class="field"><div class="field-label">Serial Number <span class="req">*</span></div><input class="field-input" id="hu-serial" placeholder="Serial no."></div>'+
+    '</div></div>'+
+
+    '<div class="form-section"><div class="form-section-title">&#128221; Remarks</div>'+
+    '<textarea class="field-input" id="hu-remarks" rows="3" placeholder="Complications, notes..."></textarea></div>'+
+
+    '<div style="padding:0 0 32px">'+
+    '<div id="hu-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'+
+    '<button onclick="submitHospitalUpdate()" style="width:100%;padding:14px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="hu-submit-btn">Submit &amp; Lock &#8594;</button></div>';
+}
+
+async function submitHospitalUpdate() {
+  const errEl = document.getElementById('hu-error');
+  const btn   = document.getElementById('hu-submit-btn');
+  errEl.style.display = 'none';
+
+  const dob       = document.getElementById('hu-dob').value.trim();
+  const admit     = document.getElementById('hu-admit').value.trim();
+  const surgdate  = document.getElementById('hu-surgdate').value.trim();
+  const dischdate = document.getElementById('hu-dischdate').value.trim();
+  const side      = document.getElementById('hu-side').value.trim();
+  const mentor    = document.getElementById('hu-mentor').value.trim();
+  const rehab     = document.getElementById('hu-rehabcentre').value.trim();
+  const mfr       = document.getElementById('hu-mfr').value.trim();
+  const serial    = document.getElementById('hu-serial').value.trim();
+  const resdist   = document.getElementById('hu-resdist').value.trim();
+
+  if (!dob)       { errEl.textContent='Date of Birth is required.';            errEl.style.display='block'; return; }
+  if (!admit)     { errEl.textContent='Admission date is required.';           errEl.style.display='block'; return; }
+  if (!surgdate)  { errEl.textContent='Surgery date is required.';             errEl.style.display='block'; return; }
+  if (!dischdate) { errEl.textContent='Discharge date is required.';           errEl.style.display='block'; return; }
+  if (!side)      { errEl.textContent='Implanted side is required.';           errEl.style.display='block'; return; }
+  if (!mentor)    { errEl.textContent='Mentor surgeon is required.';           errEl.style.display='block'; return; }
+  if (!rehab)     { errEl.textContent='Recommended Rehab Centre is required.'; errEl.style.display='block'; return; }
+  if (!mfr)       { errEl.textContent='Device manufacturer is required.';      errEl.style.display='block'; return; }
+  if (!serial)    { errEl.textContent='Device serial number is required.';     errEl.style.display='block'; return; }
+  if (!resdist)   { errEl.textContent='Residential district is required.';     errEl.style.display='block'; return; }
+
+  if (!confirm('Are you sure? This form will be LOCKED after submission and cannot be edited again.')) return;
+
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  const now = new Date().toISOString();
+  const updates = {
+    dob, surgAdmit: admit, surgDate: surgdate, surgDisch: dischdate,
+    switchOn:      document.getElementById('hu-switchon').value.trim(),
+    side, mentorSurgeon: mentor, rehabCentre: rehab,
+    manufacturer:  mfr,
+    model:         document.getElementById('hu-model').value.trim(),
+    serialNo:      serial, resDist: resdist,
+    remarks:       document.getElementById('hu-remarks').value.trim(),
+    status: 'rehab1', hospSubmitted: true,
+    hospSubmittedBy: currentUser ? currentUser.username : '',
+    hospSubmittedAt: now, _lastModified: now
+  };
+
+  try {
+    const { doc, updateDoc } = window._fbFns;
+    await updateDoc(doc(window._fbDb, 'cases', String(selectedCase.id)), updates);
+    const idx = SAMPLE_CASES.findIndex(c => String(c.id) === String(selectedCase.id));
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
+    alert('Surgery details saved and locked successfully!');
+    goBack();
+    buildCaseList();
+  } catch(e) {
+    errEl.textContent = 'Error saving: ' + e.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Submit & Lock';
+    btn.disabled = false;
+  }
+}
+
 async function submitNewCase() {
   const errEl = document.getElementById('nc-error');
   const btn   = document.getElementById('nc-submit-btn');
@@ -3072,6 +3321,10 @@ async function submitNewCase() {
   if (!district) { errEl.textContent = 'Patient District is required.'; errEl.style.display='block'; return; }
   if (!hospital) { errEl.textContent = 'Hospital Name is required.';  errEl.style.display='block'; return; }
   if (!fy)       { errEl.textContent = 'Financial Year is required.'; errEl.style.display='block'; return; }
+
+
+// ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 
   // Check for duplicate card number
   const existing = SAMPLE_CASES.find(c => String(c.id).trim() === id);
@@ -3150,7 +3403,6 @@ async function submitNewCase() {
   }
 }
 
-// ══════════════════════════════════════════
 // OFFLINE SYNC
 // ══════════════════════════════════════════
 

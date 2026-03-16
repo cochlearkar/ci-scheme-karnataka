@@ -790,6 +790,181 @@ body {
 </div>
 
 
+<!-- ══════════════════ SCREEN: NEW CASE (State Team only) ══════════════════ -->
+<div class="screen hidden" id="screen-newcase">
+  <div class="app-header" style="background:var(--purple)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff">←</div>
+      <div>
+        <div class="header-title" style="color:#fff">Add New Case</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.6)">From SAST Pre-auth Data</div>
+      </div>
+    </div>
+    <div class="role-chip chip-state">State Team</div>
+  </div>
+  <div class="form-scroll">
+    <div class="form-section">
+      <div class="form-section-title">📋 SAST Reference</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Card No. <span class="req">*</span></div>
+          <input class="field-input" id="nc-id" placeholder="e.g. 100100171464">
+        </div>
+        <div class="field">
+          <div class="field-label">Patient TPA ID</div>
+          <input class="field-input" id="nc-tpa" placeholder="TPA number">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Financial Year <span class="req">*</span></div>
+          <select class="field-input" id="nc-fy">
+            <option value="">Select FY...</option>
+            <option>2025-2026</option><option>2024-2025</option>
+            <option>2023-2024</option><option>2022-2023</option><option>2021-2022</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Scheme</div>
+          <select class="field-input" id="nc-scheme">
+            <option value="">Select...</option>
+            <option>NPPCD</option><option>AYUSHMAN BHARAT</option>
+            <option>AROGYA KARNATAKA</option><option>OTHER</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">👶 Patient Details</div>
+      <div class="field">
+        <div class="field-label">Patient Name <span class="req">*</span></div>
+        <input class="field-input" id="nc-name" placeholder="Full name as in SAST">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Gender <span class="req">*</span></div>
+          <select class="field-input" id="nc-gender">
+            <option value="">Select</option>
+            <option>Male</option><option>Female</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Age at Surgery</div>
+          <input class="field-input" id="nc-age" placeholder="e.g. 2 Years">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Caste / Category</div>
+          <select class="field-input" id="nc-caste">
+            <option value="">Select</option>
+            <option>General</option><option>OBC</option>
+            <option>SC</option><option>ST</option><option>MBC</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Mobile</div>
+          <input class="field-input" id="nc-mobile" type="tel" placeholder="10-digit mobile">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">📍 Patient Address</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">District <span class="req">*</span></div>
+          <select class="field-input" id="nc-district">
+            <option value="">Select district</option>
+            <option>BAGALKOTE</option><option>BALLARI</option><option>BANGALORE - RURAL</option>
+            <option>BANGALORE EAST</option><option>BANGALORE NORTH</option><option>BANGALORE SOUTH</option>
+            <option>BANGALORE WEST</option><option>BELAGAVI</option><option>BENGALURU</option>
+            <option>BENGALURU RURAL</option><option>BIDAR</option><option>CHAMARAJANAGARA</option>
+            <option>CHIKKABALLAPURA</option><option>CHIKKAMAGALURU</option><option>CHITRADURGA</option>
+            <option>DAKSHINA KANNADA</option><option>DAVANAGERE</option><option>DHARWAR</option>
+            <option>GADAG</option><option>HASSAN</option><option>HAVERI</option>
+            <option>KALABURAGI</option><option>KODAGU</option><option>KOLAR</option>
+            <option>KOPPAL</option><option>MANDYA</option><option>MYSORE</option>
+            <option>MYSURU</option><option>RAICHUR</option><option>RAMANAGARA</option>
+            <option>SHIVAMOGGA</option><option>TUMAKURU</option><option>UDUPI</option>
+            <option>UTTARA KANNADA</option><option>VIJAYANAGAR</option><option>VIJAYAPURA</option>
+            <option>YADGIR</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Payer Zone</div>
+          <select class="field-input" id="nc-zone">
+            <option value="">Select zone</option>
+            <option>BANGALORE</option><option>MYSORE</option>
+            <option>BELGAUM</option><option>KALBURGI</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Taluk</div>
+          <input class="field-input" id="nc-taluk" placeholder="Taluk">
+        </div>
+        <div class="field">
+          <div class="field-label">Village</div>
+          <input class="field-input" id="nc-village" placeholder="Village / Town">
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Pincode</div>
+        <input class="field-input" id="nc-pincode" type="tel" placeholder="6-digit pincode" maxlength="6">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">🏥 Hospital Details</div>
+      <div class="field">
+        <div class="field-label">Hospital Name <span class="req">*</span></div>
+        <input class="field-input" id="nc-hospital" placeholder="Full hospital name">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Hospital District</div>
+          <select class="field-input" id="nc-hospdist">
+            <option value="">Select district</option>
+            <option>BAGALKOTE</option><option>BALLARI</option><option>BELAGAVI</option>
+            <option>BENGALURU</option><option>BIDAR</option><option>CHAMARAJANAGARA</option>
+            <option>CHIKKABALLAPURA</option><option>CHIKKAMAGALURU</option><option>CHITRADURGA</option>
+            <option>DAKSHINA KANNADA</option><option>DAVANAGERE</option><option>DHARWAR</option>
+            <option>GADAG</option><option>HASSAN</option><option>HAVERI</option>
+            <option>KALABURAGI</option><option>KODAGU</option><option>KOLAR</option>
+            <option>KOPPAL</option><option>MANDYA</option><option>MYSORE</option>
+            <option>MYSURU</option><option>RAICHUR</option><option>RAMANAGARA</option>
+            <option>SHIVAMOGGA</option><option>TUMAKURU</option><option>UDUPI</option>
+            <option>UTTARA KANNADA</option><option>VIJAYANAGAR</option><option>VIJAYAPURA</option>
+            <option>YADGIR</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-label">Hospital Type</div>
+          <select class="field-input" id="nc-hosptype">
+            <option value="">Select</option>
+            <option>Government</option><option>Semi-Government</option>
+            <option>Corporate</option><option>Trust</option><option>Private</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Treating Doctor</div>
+        <input class="field-input" id="nc-doctor" placeholder="Dr. name">
+      </div>
+    </div>
+
+    <div style="padding:0 0 32px">
+      <div id="nc-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>
+      <button onclick="submitNewCase()"
+        style="width:100%;padding:14px;background:var(--purple);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;"
+        id="nc-submit-btn">Save Case to Firestore →</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════ SCREEN: SUCCESS ══════════════════ -->
 <div class="screen hidden" id="screen-success">
   <div class="success-ring">✓</div>
@@ -1396,7 +1571,7 @@ function buildHome() {
   }
   if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
   } else {
-    html += `<div class="action-card primary" onclick="buildForm(null);showScreen('form')"><div class="action-icon">➕</div><div><div class="action-title">Enter new SAST case</div><div class="action-desc">Add case details from SAST portal</div></div><div class="action-arrow">→</div></div>`;
+    html += `<div class="action-card primary" onclick="showScreen('newcase')" style="background:var(--purple);border-color:var(--purple)"><div class="action-icon">➕</div><div><div class="action-title">Add New Case</div><div class="action-desc">Enter new SAST pre-auth data</div></div><div class="action-arrow">→</div></div>`;
   }
   html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">${currentRole === 'district' ? 'By district' : 'By ' + meta.orgLabel.toLowerCase()}</div></div>`;
   html += `<div class="action-card" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">🔔</div><div class="action-title">Alerts</div><div class="action-desc">${risks.length} need attention</div></div>`;
@@ -2874,6 +3049,107 @@ function buildReportCardHTML(c) {
     </div>`;
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// ADD NEW CASE — State Team Only
+// ══════════════════════════════════════════════════════════════
+async function submitNewCase() {
+  const errEl = document.getElementById('nc-error');
+  const btn   = document.getElementById('nc-submit-btn');
+  errEl.style.display = 'none';
+
+  // Required field check
+  const id       = document.getElementById('nc-id').value.trim();
+  const name     = document.getElementById('nc-name').value.trim();
+  const gender   = document.getElementById('nc-gender').value.trim();
+  const district = document.getElementById('nc-district').value.trim();
+  const hospital = document.getElementById('nc-hospital').value.trim();
+  const fy       = document.getElementById('nc-fy').value.trim();
+
+  if (!id)       { errEl.textContent = 'Card No. is required.';       errEl.style.display='block'; return; }
+  if (!name)     { errEl.textContent = 'Patient Name is required.';   errEl.style.display='block'; return; }
+  if (!gender)   { errEl.textContent = 'Gender is required.';         errEl.style.display='block'; return; }
+  if (!district) { errEl.textContent = 'Patient District is required.'; errEl.style.display='block'; return; }
+  if (!hospital) { errEl.textContent = 'Hospital Name is required.';  errEl.style.display='block'; return; }
+  if (!fy)       { errEl.textContent = 'Financial Year is required.'; errEl.style.display='block'; return; }
+
+  // Check for duplicate card number
+  const existing = SAMPLE_CASES.find(c => String(c.id).trim() === id);
+  if (existing) {
+    errEl.textContent = 'A case with Card No. ' + id + ' already exists (' + existing.name + '). Please check and try again.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  const newCase = {
+    id:        id,
+    tpa:       document.getElementById('nc-tpa').value.trim(),
+    name:      name,
+    gender:    gender,
+    age:       document.getElementById('nc-age').value.trim(),
+    caste:     document.getElementById('nc-caste').value.trim(),
+    zone:      document.getElementById('nc-zone').value.trim(),
+    district:  district,
+    village:   document.getElementById('nc-village').value.trim(),
+    taluk:     document.getElementById('nc-taluk').value.trim(),
+    pincode:   document.getElementById('nc-pincode').value.trim(),
+    mobile:    document.getElementById('nc-mobile').value.trim(),
+    fy:        fy,
+    scheme:    document.getElementById('nc-scheme').value.trim(),
+    hospital:  hospital,
+    hospDist:  document.getElementById('nc-hospdist').value.trim(),
+    doctor:    document.getElementById('nc-doctor').value.trim(),
+    hospType:  document.getElementById('nc-hosptype').value.trim(),
+    // Default empty fields for future updates
+    surgRefNo: '', surgAdmit: '', surgDisch: '', surgStatus: '',
+    surgPkg: '', surgNet: '',
+    r1RefNo: '', r1Admit: '', r1Status: '', r1Net: '',
+    r2RefNo: '', r2Admit: '', r2Status: '', r2Net: '',
+    journey: 'Pre-auth', phase: 'Pre-auth',
+    totalNet: '0', status: 'pending',
+    risk: false, sessions: 0, totalSessions: 54,
+    lastContact: 'Not recorded',
+    _addedBy: currentUser ? currentUser.username : 'state',
+    _addedAt: new Date().toISOString()
+  };
+
+  try {
+    const { doc, setDoc } = window._fbFns;
+    await setDoc(doc(window._fbDb, 'cases', id), newCase);
+
+    // Add to local SAMPLE_CASES so it's immediately visible
+    SAMPLE_CASES.push(newCase);
+
+    // Clear the form
+    ['nc-id','nc-tpa','nc-name','nc-age','nc-mobile','nc-taluk','nc-village',
+     'nc-pincode','nc-hospital','nc-doctor'].forEach(fid => {
+      const el = document.getElementById(fid);
+      if (el) el.value = '';
+    });
+    ['nc-gender','nc-caste','nc-zone','nc-district','nc-hospdist',
+     'nc-hosptype','nc-fy','nc-scheme'].forEach(fid => {
+      const el = document.getElementById(fid);
+      if (el) el.selectedIndex = 0;
+    });
+
+    btn.textContent = 'Save Case to Firestore →';
+    btn.disabled = false;
+
+    alert('✅ Case for ' + name + ' (Card: ' + id + ') saved successfully!\n\nIt is now visible to all logins.');
+    showScreen('home');
+    buildHome();
+
+  } catch(e) {
+    errEl.textContent = 'Error saving case: ' + e.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Save Case to Firestore →';
+    btn.disabled = false;
+  }
+}
+
 // ══════════════════════════════════════════
 // OFFLINE SYNC
 // ══════════════════════════════════════════
@@ -2904,5 +3180,6 @@ window.addEventListener('load', async () => {
   }
 });
 </script>
+<script src="cases.js" defer></script>
 </body>
 </html>

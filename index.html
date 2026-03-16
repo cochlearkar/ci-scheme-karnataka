@@ -3299,6 +3299,10 @@ function buildHospitalReadOnly(cas) {
     '<div style="font-size:13px;font-weight:600;color:var(--green-dark)">Surgery details submitted &amp; locked</div>' +
     '<div style="font-size:11px;color:var(--green);margin-top:2px">By '+(cas.hospSubmittedBy||'&mdash;')+' on '+(cas.hospSubmittedAt?cas.hospSubmittedAt.substring(0,10):'&mdash;')+'</div>' +
     '</div></div>' +
+    '<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128202; Programme Journey</div>'
+    +buildJourneyInfographic(cas)
+    +'</div>' +
     '<div class="form-section" style="margin-top:16px"><div class="form-section-title">&#128118; Patient</div><div class="pic-grid">' +
     roCell('Name',cas.name)+roCell('Gender',cas.gender)+roCell('Date of Birth',cas.dob)+roCell('Age at Surgery',cas.age)+
     roCell('District',cas.district)+roCell('Residential District',cas.resDist)+roCell('Taluk',cas.taluk)+roCell('Mobile',cas.mobile)+
@@ -3352,6 +3356,12 @@ function buildHospitalUpdateForm(cas) {
     +'<div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:5px">&#128222; Update Mobile Number</div>'
     +'<input class="field-input" id="hu-mobile" type="tel" placeholder="'+(mob||'Add / correct mobile number')+'" style="font-size:13px;padding:8px 10px;width:100%;background:#fff">'
     +'</div></div>'
+
+    // ── JOURNEY INFOGRAPHIC ──────────────────────────────────────────────
+    +'<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128202; Programme Journey</div>'
+    +buildJourneyInfographic(cas)
+    +'</div>'
 
     // ── SURGERY DATES ─────────────────────────────────────────────────
     +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">&#127973; Surgery Dates</div>'

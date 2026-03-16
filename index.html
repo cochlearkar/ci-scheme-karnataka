@@ -10,6 +10,38 @@
 <link rel="manifest" href="manifest.json">
 <title>Shravan Sanjeevini</title>
 
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword,
+         updatePassword, reauthenticateWithCredential,
+         EmailAuthProvider }                      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, collection, getDocs,
+         doc, updateDoc, addDoc,
+         serverTimestamp }                        from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI",
+  authDomain:        "shravan-sanjeevini.firebaseapp.com",
+  projectId:         "shravan-sanjeevini",
+  storageBucket:     "shravan-sanjeevini.firebasestorage.app",
+  messagingSenderId: "130742586600",
+  appId:             "1:130742586600:web:1618bb56710c6fbbcc8d5d",
+  measurementId:     "G-FZYBGTZ2YJ"
+};
+
+const _app  = initializeApp(firebaseConfig);
+const _auth = getAuth(_app);
+const _db   = getFirestore(_app);
+
+// Expose to global scope for use in regular scripts below
+window._fbAuth = _auth;
+window._fbDb   = _db;
+window._fbFns  = { signInWithEmailAndPassword, updatePassword,
+                   reauthenticateWithCredential, EmailAuthProvider,
+                   collection, getDocs, doc, updateDoc, addDoc, serverTimestamp };
+</script>
+
 <style>
 :root {
   --green-dark: #0a3d2e;
@@ -778,17 +810,11 @@ body {
 // ══════════════════════════════════════════
 // CONFIG — replace with your Apps Script URL
 // ══════════════════════════════════════════
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXOFLbvK6lCpTaAlToPaYgbwCBzgLCuATZPJn9M3_PR-xXCNAHN_yxTzVxsC5a98Ad/exec';
-
-// ── USER DATABASE (hashed passwords) ──────────────────────
-const USER_DB = {"ci_admin":{"h":"e95630ad872a180c","r":"state","u":"State Team Karnataka","d":"ALL","z":"ALL"},"cochlearkar":{"h":"e95630ad872a180c","r":"state","u":"Programme Manager","d":"ALL","z":"ALL"},"h_mandya_institu":{"h":"e95630ad872a180c","r":"hospital","u":"Mandya Institute of Medical Sciences Mandya","d":"MANDYA","z":"MYSORE"},"h_apollo_hospita":{"h":"e95630ad872a180c","r":"hospital","u":"Apollo Hospitals, A Unit of Imperial Hospital","d":"BENGALURU","z":"BANGALORE"},"h_k_c":{"h":"e95630ad872a180c","r":"hospital","u":"K C General Hospital","d":"BENGALURU","z":"BANGALORE"},"h_jagadguru_sri":{"h":"e95630ad872a180c","r":"hospital","u":"JAGADGURU SRI SHIVARATHREESHWARA HOSPITAL","d":"MYSURU","z":"MYSORE"},"h_indira_gandhi":{"h":"e95630ad872a180c","r":"hospital","u":"INDIRA GANDHI INSTITUTE OF CHILD HEALTH","d":"BENGALURU","z":"BANGALORE"},"h_wenlock_distri":{"h":"e95630ad872a180c","r":"hospital","u":"WENLOCK DISTRICT HOSPITAL","d":"DAKSHINA KANNADA","z":"MYSORE"},"h_sri_sathya":{"h":"e95630ad872a180c","r":"hospital","u":"SRI SATHYA SAI SARLA  MEMORIAL HOSPITAL","d":"CHIKKABALLAPURA","z":"BANGALORE"},"h_mc_gann":{"h":"e95630ad872a180c","r":"hospital","u":"Mc Gann Teaching District Hospital","d":"SHIVAMOGGA","z":"BANGALORE"},"h_karnataka_inst":{"h":"e95630ad872a180c","r":"hospital","u":"KARNATAKA  INSTITUTE OF MEDICAL SCINCES","d":"DHARWAR","z":"BELGAUM"},"h_dr_b":{"h":"e95630ad872a180c","r":"hospital","u":"DR B R AMBEDKAR MEDICAL COLLEGE AND HOSPITAL","d":"BENGALURU","z":"BANGALORE"},"h_victoria_hospi":{"h":"e95630ad872a180c","r":"hospital","u":"VICTORIA HOSPITAL","d":"BENGALURU","z":"BANGALORE"},"h_bowring_and":{"h":"e95630ad872a180c","r":"hospital","u":"Bowring and Lady Curzon Hospitals","d":"BENGALURU","z":"BANGALORE"},"h_sdm_college":{"h":"e95630ad872a180c","r":"hospital","u":"SDM COLLEGE OF MEDICAL SCIENCES AND HOSPITAL","d":"DHARWAR","z":"BELGAUM"},"h_unity_superspe":{"h":"e95630ad872a180c","r":"hospital","u":"Unity Superspeciality Hospital","d":"DHARWAR","z":"BELGAUM"},"h_krishnarajendr":{"h":"e95630ad872a180c","r":"hospital","u":"Krishnarajendra Hospital","d":"MYSURU","z":"MYSORE"},"h_rims_teaching":{"h":"e95630ad872a180c","r":"hospital","u":"RIMS Teaching Hospital Raichur","d":"RAICHUR","z":"KALBURGI"},"h_narayana_hruda":{"h":"e95630ad872a180c","r":"hospital","u":"Narayana Hrudayalaya Private Limited","d":"BENGALURU","z":"BANGALORE"},"h_shree_chamaraj":{"h":"e95630ad872a180c","r":"hospital","u":"Shree Chamarajendra Hospital/HIMS","d":"HASSAN","z":"MYSORE"},"h_snmc_hsk":{"h":"e95630ad872a180c","r":"hospital","u":"SNMC  HSK HSopital","d":"BAGALKOTE","z":"BELGAUM"},"h_aster_rv":{"h":"e95630ad872a180c","r":"hospital","u":"Aster RV Hospital","d":"BENGALURU","z":"BANGALORE"},"h_medikeri_super":{"h":"e95630ad872a180c","r":"hospital","u":"MEDIKERI SUPER SPECIALITY ENT CENTRE","d":"BENGALURU","z":"BANGALORE"},"h_yenepoya_medic":{"h":"e95630ad872a180c","r":"hospital","u":"YENEPOYA MEDICAL COLLEGE HOSPITAL","d":"DAKSHINA KANNADA","z":"MYSORE"},"h_kmc_hospital":{"h":"e95630ad872a180c","r":"hospital","u":"KMC HOSPITAL","d":"DAKSHINA KANNADA","z":"MYSORE"},"h_kasturba_hospi":{"h":"e95630ad872a180c","r":"hospital","u":"KASTURBA HOSPITAL","d":"UDUPI","z":"MYSORE"},"h_akash_hospital":{"h":"e95630ad872a180c","r":"hospital","u":"AKASH HOSPITAL","d":"BENGALURU RURAL","z":"BANGALORE"},"h_blde_universit":{"h":"e95630ad872a180c","r":"hospital","u":"BLDE University Shri BM Patil Medical College Hosp","d":"VIJAYAPURA","z":"BELGAUM"},"h_kims_hospital":{"h":"e95630ad872a180c","r":"hospital","u":"KIMS HOSPITAL AND RESEARCH CENTER","d":"BENGALURU","z":"BANGALORE"},"h_justice_ks":{"h":"e95630ad872a180c","r":"hospital","u":"JUSTICE KS HEGDE CHARITABLE HOSPITAL","d":"DAKSHINA KANNADA","z":"MYSORE"},"h_kles_dr":{"h":"e95630ad872a180c","r":"hospital","u":"KLES Dr Prabhakar Kore Hospital and MRC","d":"BELAGAVI","z":"BELGAUM"},"h_bims_hospital":{"h":"e95630ad872a180c","r":"hospital","u":"BIMS HOSPITAL BELGAUM","d":"BELAGAVI","z":"BELGAUM"},"h_meenakshi_ent":{"h":"e95630ad872a180c","r":"hospital","u":"Meenakshi ENT Speciality centre","d":"BENGALURU","z":"BANGALORE"},"r_aiish_mysuru":{"h":"e95630ad872a180c","r":"rehab","u":"AIISH Mysuru","d":"","z":""},"r_nimhans_bengal":{"h":"e95630ad872a180c","r":"rehab","u":"NIMHANS Bengaluru","d":"","z":""},"r_samspanda_mand":{"h":"e95630ad872a180c","r":"rehab","u":"Samspanda Mandya","d":"","z":""},"r_ksad_dharwad":{"h":"e95630ad872a180c","r":"rehab","u":"KSAD Dharwad","d":"","z":""},"r_sdm_dharwad":{"h":"e95630ad872a180c","r":"rehab","u":"SDM Dharwad","d":"","z":""},"r_aiish_bengalur":{"h":"e95630ad872a180c","r":"rehab","u":"AIISH Bengaluru","d":"","z":""},"r_mims_mandya":{"h":"e95630ad872a180c","r":"rehab","u":"MIMS Mandya Rehab","d":"","z":""},"r_other":{"h":"e95630ad872a180c","r":"rehab","u":"Other","d":"","z":""},"do_bagalkote_do":{"h":"e95630ad872a180c","r":"district","u":"BAGALKOTE","d":"BAGALKOTE","z":""},"do_ballari_do":{"h":"e95630ad872a180c","r":"district","u":"BALLARI","d":"BALLARI","z":""},"do_bangalore_rura":{"h":"e95630ad872a180c","r":"district","u":"BANGALORE - RURAL","d":"BANGALORE - RURAL","z":""},"do_bangalore_east":{"h":"e95630ad872a180c","r":"district","u":"BANGALORE EAST","d":"BANGALORE EAST","z":""},"do_bangalore_nort":{"h":"e95630ad872a180c","r":"district","u":"BANGALORE NORTH","d":"BANGALORE NORTH","z":""},"do_bangalore_sout":{"h":"e95630ad872a180c","r":"district","u":"BANGALORE SOUTH","d":"BANGALORE SOUTH","z":""},"do_bangalore_west":{"h":"e95630ad872a180c","r":"district","u":"BANGALORE WEST","d":"BANGALORE WEST","z":""},"do_belagavi_do":{"h":"e95630ad872a180c","r":"district","u":"BELAGAVI","d":"BELAGAVI","z":""},"do_bengaluru_do":{"h":"e95630ad872a180c","r":"district","u":"BENGALURU","d":"BENGALURU","z":""},"do_bengaluru_rura":{"h":"e95630ad872a180c","r":"district","u":"BENGALURU RURAL","d":"BENGALURU RURAL","z":""},"do_bidar_do":{"h":"e95630ad872a180c","r":"district","u":"BIDAR","d":"BIDAR","z":""},"do_chamarajanagar":{"h":"e95630ad872a180c","r":"district","u":"CHAMARAJANAGARA","d":"CHAMARAJANAGARA","z":""},"do_chikkaballapur":{"h":"e95630ad872a180c","r":"district","u":"CHIKKABALLAPURA","d":"CHIKKABALLAPURA","z":""},"do_chikkamagaluru":{"h":"e95630ad872a180c","r":"district","u":"CHIKKAMAGALURU","d":"CHIKKAMAGALURU","z":""},"do_chitradurga_do":{"h":"e95630ad872a180c","r":"district","u":"CHITRADURGA","d":"CHITRADURGA","z":""},"do_dakshina_kanna":{"h":"e95630ad872a180c","r":"district","u":"DAKSHINA KANNADA","d":"DAKSHINA KANNADA","z":""},"do_davanagere_do":{"h":"e95630ad872a180c","r":"district","u":"DAVANAGERE","d":"DAVANAGERE","z":""},"do_dharwar_do":{"h":"e95630ad872a180c","r":"district","u":"DHARWAR","d":"DHARWAR","z":""},"do_gadag_do":{"h":"e95630ad872a180c","r":"district","u":"GADAG","d":"GADAG","z":""},"do_hassan_do":{"h":"e95630ad872a180c","r":"district","u":"HASSAN","d":"HASSAN","z":""},"do_haveri_do":{"h":"e95630ad872a180c","r":"district","u":"HAVERI","d":"HAVERI","z":""},"do_kalaburagi_do":{"h":"e95630ad872a180c","r":"district","u":"KALABURAGI","d":"KALABURAGI","z":""},"do_kodagu_do":{"h":"e95630ad872a180c","r":"district","u":"KODAGU","d":"KODAGU","z":""},"do_kolar_do":{"h":"e95630ad872a180c","r":"district","u":"KOLAR","d":"KOLAR","z":""},"do_koppal_do":{"h":"e95630ad872a180c","r":"district","u":"KOPPAL","d":"KOPPAL","z":""},"do_mandya_do":{"h":"e95630ad872a180c","r":"district","u":"MANDYA","d":"MANDYA","z":""},"do_mysore_do":{"h":"e95630ad872a180c","r":"district","u":"MYSORE","d":"MYSORE","z":""},"do_mysuru_do":{"h":"e95630ad872a180c","r":"district","u":"MYSURU","d":"MYSURU","z":""},"do_raichur_do":{"h":"e95630ad872a180c","r":"district","u":"RAICHUR","d":"RAICHUR","z":""},"do_ramanagara_do":{"h":"e95630ad872a180c","r":"district","u":"RAMANAGARA","d":"RAMANAGARA","z":""},"do_shivamogga_do":{"h":"e95630ad872a180c","r":"district","u":"SHIVAMOGGA","d":"SHIVAMOGGA","z":""},"do_tumakuru_do":{"h":"e95630ad872a180c","r":"district","u":"TUMAKURU","d":"TUMAKURU","z":""},"do_udupi_do":{"h":"e95630ad872a180c","r":"district","u":"UDUPI","d":"UDUPI","z":""},"do_uttara_kannada":{"h":"e95630ad872a180c","r":"district","u":"UTTARA KANNADA","d":"UTTARA KANNADA","z":""},"do_vijayanagar_do":{"h":"e95630ad872a180c","r":"district","u":"VIJAYANAGAR","d":"VIJAYANAGAR","z":""},"do_vijayapura_do":{"h":"e95630ad872a180c","r":"district","u":"VIJAYAPURA","d":"VIJAYAPURA","z":""},"do_yadgir_do":{"h":"e95630ad872a180c","r":"district","u":"YADGIR","d":"YADGIR","z":""}};
-
-// Simple password hash (SHA-256 first 16 chars)
-async function hashPwd(pwd) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').substring(0,16);
-}
-// cochlearkar@gmail.com — paste your deployed Apps Script URL above
+// ══════════════════════════════════════════
+// FIREBASE CONFIG (SDK loaded in <head>)
+// ══════════════════════════════════════════
+// SCRIPT_URL no longer used — kept as empty string so any legacy references don't crash
+const SCRIPT_URL = '';
 
 // ══════════════════════════════════════════
 // STATE
@@ -1135,24 +1161,31 @@ function selectRole(role, el) {
 
 async function submitPasswordChange() {
   const current = document.getElementById('sp-current').value.trim();
-  const newPwd = document.getElementById('sp-new').value.trim();
+  const newPwd  = document.getElementById('sp-new').value.trim();
   const confirm = document.getElementById('sp-confirm').value.trim();
-  const errEl = document.getElementById('sp-error');
+  const errEl   = document.getElementById('sp-error');
   errEl.style.display = 'none';
+
   if (newPwd.length < 8) { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = 'block'; return; }
   if (newPwd !== confirm) { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
+
   try {
-    const res = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'change_password', username: currentUser.username, oldPassword: current, newPassword: newPwd }) });
-    const data = await res.json();
-    if (data.status === 'ok') {
-      currentUser.mustChangePassword = false;
-      sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
-      buildHome(); showScreen('home');
-    } else {
-      errEl.textContent = data.message; errEl.style.display = 'block';
-    }
+    const { reauthenticateWithCredential, EmailAuthProvider, updatePassword } = window._fbFns;
+    const user  = window._fbAuth.currentUser;
+    const email = `${currentUser.username}@shravan.app`;
+    const cred  = EmailAuthProvider.credential(email, current);
+
+    await reauthenticateWithCredential(user, cred);
+    await updatePassword(user, newPwd);
+
+    currentUser.mustChangePassword = false;
+    sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
+    buildHome();
+    showScreen('home');
   } catch(e) {
-    errEl.textContent = 'Connection error. Please try again.'; errEl.style.display = 'block';
+    const msg = e.code === 'auth/wrong-password' ? 'Current password is incorrect.' : e.message;
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
   }
 }
 
@@ -1171,46 +1204,84 @@ async function authenticateAndLogin() {
   btn.innerHTML = '<span class="spinner"></span> Signing in...';
   btn.disabled = true;
 
-  // Hash the entered password and compare with stored hash
-  const hashed = await hashPwd(password);
-  const user = USER_DB[username];
+  try {
+    // Firebase Auth — email is username@shravan.app
+    const email = `${username}@shravan.app`;
+    const { signInWithEmailAndPassword } = window._fbFns;
+    const cred = await signInWithEmailAndPassword(window._fbAuth, email, password);
 
-  await new Promise(r => setTimeout(r, 400)); // small delay for UX
+    // Fetch profile from Firestore users collection
+    const { collection, getDocs } = window._fbFns;
+    const snap = await getDocs(collection(window._fbDb, 'users'));
+    let profile = null;
+    snap.forEach(d => { if (d.data().username === username) profile = d.data(); });
 
-  if (!user) {
-    errEl.textContent = 'Username not found. Please check and try again.';
+    if (!profile) {
+      errEl.textContent = 'User profile not found. Contact cochlearkar@gmail.com.';
+      errEl.style.display = 'block';
+      btn.innerHTML = 'Sign in →'; btn.disabled = false;
+      return;
+    }
+
+    if (profile.status !== 'active') {
+      errEl.textContent = 'Account inactive. Contact cochlearkar@gmail.com.';
+      errEl.style.display = 'block';
+      btn.innerHTML = 'Sign in →'; btn.disabled = false;
+      return;
+    }
+
+    // Login successful — build user session
+    currentUser = {
+      status:             'ok',
+      username:           username,
+      role:               profile.role,
+      unit:               profile.unit     || '',
+      district:           profile.district || '',
+      zone:               profile.zone     || '',
+      mustChangePassword: profile.mustChangePassword || false,
+      token:              cred.user.uid
+    };
+    currentRole = profile.role;
+    sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
+
+    btn.innerHTML = 'Sign in →'; btn.disabled = false;
+
+    // Load cases from Firestore then show home
+    await loadCasesFromFirestore();
+
+    if (currentUser.mustChangePassword) {
+      showScreen('setpwd');
+    } else {
+      buildHome();
+      showScreen('home');
+    }
+
+  } catch(e) {
+    const msg = (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential')
+      ? 'Incorrect username or password.' : e.message;
+    errEl.textContent = msg;
     errEl.style.display = 'block';
     btn.innerHTML = 'Sign in →'; btn.disabled = false;
-    return;
   }
+}
 
-  if (user.h !== hashed) {
-    errEl.textContent = 'Incorrect password. Please try again.';
-    errEl.style.display = 'block';
-    btn.innerHTML = 'Sign in →'; btn.disabled = false;
-    return;
+// Load ALL cases from Firestore into SAMPLE_CASES
+async function loadCasesFromFirestore() {
+  try {
+    const { collection, getDocs } = window._fbFns;
+    const snap = await getDocs(collection(window._fbDb, 'cases'));
+    SAMPLE_CASES = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+    console.log('Loaded', SAMPLE_CASES.length, 'cases from Firestore');
+  } catch(e) {
+    console.error('loadCasesFromFirestore error:', e);
+    // Fallback to cases.js if available
+    if (typeof PRELOADED_CASES_DATA !== 'undefined') SAMPLE_CASES = PRELOADED_CASES_DATA;
   }
-
-  // Login successful
-  currentUser = {
-    status: 'ok',
-    username: username,
-    role: user.r,
-    unit: user.u,
-    district: user.d,
-    zone: user.z,
-    token: 'local_' + Date.now()
-  };
-  currentRole = user.r;
-  sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
-  if (typeof PRELOADED_CASES_DATA !== 'undefined') SAMPLE_CASES = PRELOADED_CASES_DATA;
-
-  btn.innerHTML = 'Sign in →'; btn.disabled = false;
-  buildHome();
-  showScreen('home');
 }
 
 function doLogout() {
+  // Sign out from Firebase Auth
+  if (window._fbAuth) window._fbAuth.signOut().catch(()=>{});
   currentUser = null; sessionStorage.removeItem('ci_user');
   currentRole = null; screenHistory = [];
   showScreen('login', false);
@@ -1280,7 +1351,8 @@ function filterCasesByUser(cases) {
 }
 
 function buildHome() {
-  // Ensure cases are loaded
+  // Cases already loaded into SAMPLE_CASES by loadCasesFromFirestore() at login
+  // Fallback to cases.js if Firestore hasn't loaded yet
   if (SAMPLE_CASES.length === 0 && typeof PRELOADED_CASES_DATA !== 'undefined') {
     SAMPLE_CASES = PRELOADED_CASES_DATA;
   }
@@ -2582,7 +2654,7 @@ function submitForm() {
     if (!formData['f-card'] && selectedCase) formData['f-card'] = selectedCase.id || '';
   }
 
-  if (navigator.onLine && SCRIPT_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+  if (navigator.onLine) {
     submitToSheet(formData);
   } else {
     saveOffline(formData);
@@ -2610,49 +2682,61 @@ function collectFormData() {
   return data;
 }
 
-function submitToSheet(formData) {
-  const btn = document.getElementById('submit-btn');
-  // Send via no-cors POST — reaches Apps Script, response is opaque (can't read it)
-  fetch(SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(formData)
-  })
-  .then(() => {
-    // POST fired successfully — verify via JSONP ping then show success
-    const cbName = 'cb_' + Date.now();
-    const params = new URLSearchParams({
-      action: 'ping',
-      entryId: formData.entryId || '',
-      callback: cbName
+async function submitToSheet(formData) {
+  const { collection, addDoc, doc, updateDoc, serverTimestamp } = window._fbFns;
+  const role = formData.role || currentRole;
+  const card = formData['f-card'];
+
+  try {
+    // 1. Save to the appropriate submissions collection
+    const collName = role === 'hospital' ? 'submissions_hospital'
+                   : role === 'rehab'    ? 'submissions_rehab'
+                   : role === 'district' ? 'submissions_district'
+                   : 'submissions_state';
+
+    await addDoc(collection(window._fbDb, collName), {
+      ...formData,
+      _savedAt: serverTimestamp()
     });
-    const script = document.createElement('script');
-    let done = false;
-    window[cbName] = function() {
-      done = true;
-      delete window[cbName];
-      try { document.head.removeChild(script); } catch(e) {}
-      showSuccess(formData.entryId, false);
-    };
-    script.onerror = function() {
-      done = true;
-      delete window[cbName];
-      try { document.head.removeChild(script); } catch(e) {}
-      showSuccess(formData.entryId, false);
-    };
-    setTimeout(() => {
-      if (!done) {
-        done = true;
-        delete window[cbName];
-        try { document.head.removeChild(script); } catch(e) {}
-        showSuccess(formData.entryId, false);
+
+    // 2. Update the case document in Firestore
+    if (card) {
+      const caseRef = doc(window._fbDb, 'cases', String(card));
+      const updates = { _lastSubmission: serverTimestamp(), _lastRole: role };
+
+      if (role === 'hospital') {
+        if (formData['f-surgdate'])    updates.surgAdmit   = formData['f-surgdate'];
+        if (formData['f-switchon'])    updates.switchOn    = formData['f-switchon'];
+        if (formData['f-rehabcentre']) updates.rehabCentre = formData['f-rehabcentre'];
+        if (formData['f-res-district']) updates.district   = formData['f-res-district'];
+        updates.status = 'rehab1';
       }
-    }, 5000);
-    script.src = SCRIPT_URL + '?' + params.toString();
-    document.head.appendChild(script);
-  })
-  .catch(() => saveOffline(formData));
+      if (role === 'rehab') {
+        updates.lastContact = formData['f-sessdate'] || new Date().toISOString().split('T')[0];
+        if (formData['f-sessnum']) updates.sessions = parseInt(formData['f-sessnum']) || 0;
+      }
+      if (role === 'district') {
+        updates.lastContact = formData['f-contactdate'] || new Date().toISOString().split('T')[0];
+      }
+      if (role === 'state') {
+        if (formData['f-pat-name'])     updates.name     = formData['f-pat-name'];
+        if (formData['f-district'])     updates.district = formData['f-district'];
+        if (formData['f-hospital-name'])updates.hospital = formData['f-hospital-name'];
+      }
+
+      await updateDoc(caseRef, updates);
+
+      // Also update the local SAMPLE_CASES so the UI reflects the change immediately
+      const idx = SAMPLE_CASES.findIndex(c => String(c.id) === String(card));
+      if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
+    }
+
+    showSuccess(formData.entryId, false);
+
+  } catch(e) {
+    console.error('submitToSheet (Firestore) error:', e);
+    saveOffline(formData);
+  }
 }
 
 function saveOffline(data) {
@@ -2806,17 +2890,14 @@ function updateOfflineBanner(){
 }
 window.addEventListener('online', updateOfflineBanner);
 window.addEventListener('offline', updateOfflineBanner);
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   updateOfflineBanner();
-  // cases.js (defer) is guaranteed loaded by window load event
-  if (typeof PRELOADED_CASES_DATA !== 'undefined') {
-    SAMPLE_CASES = PRELOADED_CASES_DATA;
-  }
   const saved = sessionStorage.getItem('ci_user');
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
       currentRole = currentUser.role;
+      await loadCasesFromFirestore();
       buildHome();
       showScreen('home', false);
     } catch(e) { sessionStorage.removeItem('ci_user'); }

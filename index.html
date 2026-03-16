@@ -791,6 +791,24 @@ body {
 </div>
 
 
+<!-- ══════════════════ SCREEN: CASE SUMMARY ══════════════════ -->
+<div class="screen hidden" id="screen-casesummary">
+  <div class="app-header" id="summary-header">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" id="summary-back-btn">←</div>
+      <div>
+        <div class="header-title" id="summary-title">Case Summary</div>
+        <div class="header-sub" id="summary-sub"></div>
+      </div>
+    </div>
+    <div class="role-chip" id="summary-chip"></div>
+  </div>
+  <div class="form-scroll" id="summary-body"></div>
+  <div class="bottom-bar" id="summary-action-bar" style="display:none">
+    <button class="btn-submit" id="summary-action-btn" onclick="summaryAction()">Update →</button>
+  </div>
+</div>
+
 <!-- ══════════════════ SCREEN: HOSPITAL UPDATE ══════════════════ -->
 <div class="screen hidden" id="screen-hospupdate">
   <div class="app-header" style="background:var(--green-dark)">
@@ -3129,14 +3147,133 @@ function buildReportCardHTML(c) {
 
 
 // ══════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════
+// CASE SUMMARY — shown to all logins when tapping a case
+// ══════════════════════════════════════════════════════════════
+
+function openCaseSummary(cas) {
+  selectedCase = cas;
+  const meta = ROLE_META[currentRole];
+  const colors = { hospital:'var(--green-dark)', rehab:'var(--blue)', district:'var(--amber)', state:'var(--purple)' };
+  const header = document.getElementById('summary-header');
+  const backBtn = document.getElementById('summary-back-btn');
+  header.style.background = colors[currentRole] || 'var(--green-dark)';
+  backBtn.style.cssText = 'background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;';
+  document.getElementById('summary-title').style.color = '#fff';
+  document.getElementById('summary-sub').style.color = 'rgba(255,255,255,0.6)';
+  document.getElementById('summary-title').textContent = cas.name || 'Case Summary';
+  document.getElementById('summary-sub').textContent = 'Card: ' + cas.id + (cas.fy ? ' · FY ' + cas.fy : '');
+  const chip = document.getElementById('summary-chip');
+  chip.textContent = meta.label;
+  chip.className = 'role-chip ' + meta.chip;
+  document.getElementById('summary-body').innerHTML = buildSummaryHTML(cas);
+
+  const bar = document.getElementById('summary-action-bar');
+  const btn = document.getElementById('summary-action-btn');
+  bar.style.display = 'flex';
+
+  if (currentRole === 'hospital') {
+    if (cas.hospSubmitted) {
+      bar.style.display = 'none';
+    } else {
+      btn.textContent = '✏️ Update Surgery Details →';
+      btn.className = 'btn-submit hospital';
+    }
+  } else if (currentRole === 'rehab') {
+    btn.textContent = '🎧 Log Rehab Session →';
+    btn.className = 'btn-submit rehab';
+  } else if (currentRole === 'district') {
+    btn.textContent = '📍 Log Follow-up →';
+    btn.className = 'btn-submit district';
+  } else if (currentRole === 'state') {
+    btn.textContent = '✏️ Update Claim Details →';
+    btn.className = 'btn-submit state';
+  }
+  showScreen('casesummary');
+}
+
+function summaryAction() {
+  const cas = selectedCase;
+  if (currentRole === 'hospital') {
+    openHospitalUpdate(cas);
+  } else {
+    buildForm(cas);
+    showScreen('form');
+  }
+}
+
+function buildSummaryHTML(c) {
+  const mob = cleanMob(c.mobile);
+  const statusLabel = c.status==='paid'?'Complete':c.status==='risk'?'At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pre-auth / Pending':'Active';
+  const statusColor = c.status==='paid'?'var(--green)':c.status==='risk'?'var(--red)':c.status==='pending'?'var(--amber)':'var(--blue)';
+  const statusBg    = c.status==='paid'?'var(--green-light)':c.status==='risk'?'var(--red-light)':c.status==='pending'?'var(--amber-light)':'var(--blue-light)';
+
+  function sec(title, icon) {
+    return '<div class="form-section-title" style="margin-top:4px">'+icon+' '+title+'</div>';
+  }
+  function row(label, value, bold) {
+    if (!value) return '';
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:11px;color:var(--text-light);flex-shrink:0;width:45%">'+label+'</span><span style="font-size:13px;font-weight:'+(bold?'600':'400')+';color:var(--text-mid);text-align:right;flex:1">'+value+'</span></div>';
+  }
+  function rowFull(label, value) {
+    if (!value) return '';
+    return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:11px;color:var(--text-light);margin-bottom:3px">'+label+'</div><div style="font-size:13px;color:var(--text-mid)">'+value+'</div></div>';
+  }
+
+  const hospBadge = c.hospSubmitted
+    ? '<div style="background:var(--green-light);border:0.5px solid var(--green-border);border-radius:8px;padding:6px 12px;font-size:11px;color:var(--green);margin-bottom:12px;display:inline-flex;gap:6px;align-items:center">&#9989; Surgery details verified by hospital</div>'
+    : '<div style="background:var(--amber-light);border:0.5px solid #FAC775;border-radius:8px;padding:6px 12px;font-size:11px;color:var(--amber);margin-bottom:12px;display:inline-flex;gap:6px;align-items:center">&#8987; Awaiting hospital surgery update</div>';
+
+  const journey = buildJourneyInfographic(c);
+
+  return '<div style="padding:16px 16px 0">'
+    +'<div style="background:'+statusBg+';border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">'
+    +'<div><div style="font-size:11px;color:'+statusColor+';font-weight:600;text-transform:uppercase;letter-spacing:.05em">Status</div>'
+    +'<div style="font-size:16px;font-weight:700;color:'+statusColor+';margin-top:2px">'+statusLabel+'</div></div>'
+    +'<div style="text-align:right"><div style="font-size:10px;color:var(--text-light)">Total Paid</div>'
+    +'<div style="font-size:16px;font-weight:700;color:var(--text)">'+(c.totalNet&&c.totalNet!='0'?'&#8377;'+Number(c.totalNet).toLocaleString('en-IN'):'&#8212;')+'</div></div></div>'
+    +'<div style="margin-bottom:16px">'+journey+'</div>'
+    +hospBadge
+    +'<div class="form-section">'+sec('Patient Information','&#128118;')
+    +row('TPA ID',c.tpa)+row('Gender',c.gender)+row('Age at Surgery',c.age)
+    +row('Date of Birth',c.dob)+row('Caste / Category',c.caste)
+    +(mob?row('Mobile','<a href="tel:'+mob+'" style="color:var(--blue-mid)">'+mob+'</a>'):'')
+    +row('Village / Taluk',[c.village,c.taluk].filter(Boolean).join(' · '))
+    +row('District',c.district,true)+row('Residential District',c.resDistrict||c.resDist)
+    +row('Pincode',c.pincode)+row('Zone',c.zone)+row('FY',c.fy)+row('Scheme',c.scheme)+'</div>'
+    +'<div class="form-section">'+sec('Hospital & Surgery','&#127973;')
+    +row('Hospital',c.hospital,true)+row('Hospital District',c.hospDist)
+    +row('Hospital Type',c.hospType)+row('Treating Doctor',c.doctor)
+    +row('Mentor Surgeon',c.mentorSurgeon)+row('Admission Date',c.surgAdmit)
+    +row('Surgery Date',c.surgDate)+row('Discharge Date',c.surgDisch)
+    +row('Switch-on Date',c.switchOn)+row('SAST Ref No.',c.surgRefNo)
+    +row('Pre-auth Status',c.surgStatus)+row('Package',c.surgPkg)
+    +(c.surgNet?row('Surgery Net Paid','&#8377;'+Number(c.surgNet).toLocaleString('en-IN'),true):'')
+    +rowFull('Complications / Remarks',c.hospRemarks||c.remarks)+'</div>'
+    +((c.manufacturer||c.serialNo)?'<div class="form-section">'+sec('Device Details','&#129ear;')
+    +row('Manufacturer',c.manufacturer)+row('Model',c.model)
+    +row('Implanted Side',c.side)+row('Serial Number',c.serialNo)
+    +row('Recommended Rehab',c.rehabCentre)+'</div>':'')
+    +((c.r1RefNo||c.r1Admit||c.r1Status)?'<div class="form-section">'+sec('Rehab Part 1 (2002GP)','&#127911;')
+    +row('Ref No.',c.r1RefNo)+row('Preauth Date',c.r1Admit)+row('Claim Status',c.r1Status)
+    +(c.r1Net?row('Net Paid','&#8377;'+Number(c.r1Net).toLocaleString('en-IN'),true):'')+'</div>':'')
+    +((c.r2RefNo||c.r2Admit||c.r2Status)?'<div class="form-section">'+sec('Rehab Part 2 (2003GP)','&#127911;')
+    +row('Ref No.',c.r2RefNo)+row('Preauth Date',c.r2Admit)+row('Claim Status',c.r2Status)
+    +(c.r2Net?row('Net Paid','&#8377;'+Number(c.r2Net).toLocaleString('en-IN'),true):'')+'</div>':'')
+    +(c.sessions>0?'<div class="form-section">'+sec('Rehab Sessions','&#128202;')
+    +row('Sessions Completed',c.sessions+' / '+(c.totalSessions||54))
+    +row('Last Contact',c.lastContact)+'</div>':'')
+    +'<div style="height:24px"></div></div>';
+}
+
 // HOSPITAL UPDATE FUNCTIONS
 // ══════════════════════════════════════════════════════════════
 function openCaseFromList(caseId) {
   const cas = SAMPLE_CASES.find(x => String(x.id) === String(caseId));
   if (!cas) return;
   selectedCase = cas;
-  if (currentRole === 'hospital') { openHospitalUpdate(cas); }
-  else { buildForm(cas); showScreen('form'); }
+  openCaseSummary(cas);
 }
 
 function openHospitalUpdate(cas) {

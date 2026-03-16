@@ -3273,7 +3273,11 @@ function openCaseFromList(caseId) {
   const cas = SAMPLE_CASES.find(x => String(x.id) === String(caseId));
   if (!cas) return;
   selectedCase = cas;
-  openCaseSummary(cas);
+  if (currentRole === 'hospital') {
+    openHospitalUpdate(cas);   // hospital goes straight to combined form
+  } else {
+    openCaseSummary(cas);      // all other roles see the summary first
+  }
 }
 
 function openHospitalUpdate(cas) {
@@ -3320,48 +3324,87 @@ function buildHospitalUpdateForm(cas) {
     'MANDYA','MYSORE','MYSURU','RAICHUR','RAMANAGARA','SHIVAMOGGA','TUMAKURU','UDUPI','UTTARA KANNADA',
     'VIJAYANAGAR','VIJAYAPURA','YADGIR'].map(d=>'<option>'+d+'</option>').join('');
 
+  const mob = cleanMob(cas.mobile||'');
+
   document.getElementById('hu-body').innerHTML =
-    '<div style="background:var(--amber-light);border:1px solid #FAC775;border-radius:12px;padding:12px 16px;margin:16px 16px 0;font-size:12px;color:var(--amber)">'+
-    '&#9888;&#65039; Once submitted this form will be <strong>locked permanently</strong>. Check all details carefully.</div>' +
 
-    '<div class="form-section" style="margin-top:16px"><div class="form-section-title">&#128118; Patient Details</div>'+
-    '<div class="field"><div class="field-label">Date of Birth <span class="req">*</span></div>'+
-    '<input type="date" class="field-input" id="hu-dob"></div>'+
-    '<div class="field"><div class="field-label">Residential district of child <span class="req">*</span></div>'+
-    '<select class="field-input" id="hu-resdist"><option value="">Select district</option>'+dOpts+'</select></div></div>'+
+    // ── WARNING BANNER ────────────────────────────────────────────────
+    '<div style="background:var(--amber-light);border:1px solid #FAC775;padding:12px 16px;font-size:12px;color:var(--amber);display:flex;gap:8px">'
+    +'<span>&#9888;&#65039;</span><span>Once submitted this form is <strong>locked permanently</strong>. Check all details carefully.</span></div>'
 
-    '<div class="form-section"><div class="form-section-title">&#127973; Surgery Details</div>'+
-    '<div class="field-row">'+
-    '<div class="field"><div class="field-label">Admission date <span class="req">*</span></div><input type="date" class="field-input" id="hu-admit"></div>'+
-    '<div class="field"><div class="field-label">Surgery date <span class="req">*</span></div><input type="date" class="field-input" id="hu-surgdate"></div>'+
-    '</div><div class="field-row">'+
-    '<div class="field"><div class="field-label">Discharge date <span class="req">*</span></div><input type="date" class="field-input" id="hu-dischdate"></div>'+
-    '<div class="field"><div class="field-label">Switch-on date</div><input type="date" class="field-input" id="hu-switchon"></div>'+
-    '</div>'+
-    '<div class="field"><div class="field-label">Implanted side <span class="req">*</span></div>'+
-    '<select class="field-input" id="hu-side"><option value="">Select</option><option>Right ear</option><option>Left ear</option><option>Bilateral</option></select></div>'+
-    '<div class="field"><div class="field-label">Mentor surgeon <span class="req">*</span></div>'+
-    '<select class="field-input" id="hu-mentor"><option value="">Select mentor surgeon...</option>'+mOpts+'</select></div>'+
-    '<div class="field"><div class="field-label">Recommended Rehab Centre <span class="req">*</span></div>'+
-    '<select class="field-input" id="hu-rehabcentre"><option value="">Select institute...</option>'+rOpts+'</select></div></div>'+
+    // ── PATIENT INFO CARD ─────────────────────────────────────────────
+    +'<div style="margin:14px 16px 0;background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128203; Patient Information</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
+    +piRow('SAST Ref',    cas.surgRefNo||cas.tpa||'&mdash;')
+    +piRow('FY',          cas.fy||'&mdash;')
+    +piRow('Name',        cas.name||'&mdash;')
+    +piRow('Gender',      cas.gender||'&mdash;')
+    +piRow('Caste',       cas.caste||'&mdash;')
+    +piRow('Village',     cas.village||'&mdash;')
+    +piRow('Taluk',       cas.taluk||'&mdash;')
+    +piRow('District',    cas.district||'&mdash;')
+    +piRow('Hospital',    cas.hospital||'&mdash;')
+    +piRow('Doctor',      cas.doctor||'&mdash;')
+    +'</div>'
+    // Mobile update field inside the card
+    +'<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--green-border)">'
+    +'<div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:5px">&#128222; Update Mobile Number</div>'
+    +'<input class="field-input" id="hu-mobile" type="tel" placeholder="'+(mob||'Add / correct mobile number')+'" style="font-size:13px;padding:8px 10px;width:100%;background:#fff">'
+    +'</div></div>'
 
-    '<div class="form-section"><div class="form-section-title">&#128295; Device Details</div>'+
-    '<div class="field"><div class="field-label">Manufacturer <span class="req">*</span></div>'+
-    '<select class="field-input" id="hu-mfr"><option value="">Select manufacturer</option>'+
-    '<option>Cochlear Limited (Australia)</option><option>Advanced Bionics (USA)</option>'+
-    '<option>MED-EL (Austria)</option><option>Nurotron (China)</option><option>Oticon Medical (Denmark)</option></select></div>'+
-    '<div class="field-row">'+
-    '<div class="field"><div class="field-label">Model</div><input class="field-input" id="hu-model" placeholder="Device model"></div>'+
-    '<div class="field"><div class="field-label">Serial Number <span class="req">*</span></div><input class="field-input" id="hu-serial" placeholder="Serial no."></div>'+
-    '</div></div>'+
+    // ── SURGERY DATES ─────────────────────────────────────────────────
+    +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">&#127973; Surgery Dates</div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Admission date <span class="req">*</span></div><input type="date" class="field-input" id="hu-admit"></div>'
+    +'<div class="field"><div class="field-label">Surgery date <span class="req">*</span></div><input type="date" class="field-input" id="hu-surgdate"></div>'
+    +'</div><div class="field-row">'
+    +'<div class="field"><div class="field-label">Discharge date <span class="req">*</span></div><input type="date" class="field-input" id="hu-dischdate"></div>'
+    +'<div class="field"><div class="field-label">Switch-on date</div><input type="date" class="field-input" id="hu-switchon"></div>'
+    +'</div></div>'
 
-    '<div class="form-section"><div class="form-section-title">&#128221; Remarks</div>'+
-    '<textarea class="field-input" id="hu-remarks" rows="3" placeholder="Complications, notes..."></textarea></div>'+
+    // ── PATIENT DETAILS ───────────────────────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128118; Patient Details</div>'
+    +'<div class="field"><div class="field-label">Date of Birth <span class="req">*</span></div>'
+    +'<input type="date" class="field-input" id="hu-dob"></div>'
+    +'<div class="field"><div class="field-label">Residential district of child <span class="req">*</span></div>'
+    +'<select class="field-input" id="hu-resdist"><option value="">Select district</option>'+dOpts+'</select></div></div>'
 
-    '<div style="padding:0 0 32px">'+
-    '<div id="hu-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'+
-    '<button onclick="submitHospitalUpdate()" style="width:100%;padding:14px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="hu-submit-btn">Submit &amp; Lock &#8594;</button></div>';
+    // ── DEVICE DETAILS ────────────────────────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#129955; Device Details</div>'
+    +'<div class="field"><div class="field-label">Manufacturer <span class="req">*</span></div>'
+    +'<select class="field-input" id="hu-mfr"><option value="">Select manufacturer</option>'
+    +'<option>Cochlear Limited (Australia)</option><option>Advanced Bionics (USA)</option>'
+    +'<option>MED-EL (Austria)</option><option>Nurotron (China)</option><option>Oticon Medical (Denmark)</option></select></div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Model</div><input class="field-input" id="hu-model" placeholder="Device model"></div>'
+    +'<div class="field"><div class="field-label">Serial Number <span class="req">*</span></div><input class="field-input" id="hu-serial" placeholder="Serial no."></div>'
+    +'</div>'
+    +'<div class="field"><div class="field-label">Implanted side <span class="req">*</span></div>'
+    +'<select class="field-input" id="hu-side"><option value="">Select</option><option>Right ear</option><option>Left ear</option><option>Bilateral</option></select></div></div>'
+
+    // ── CLINICAL ──────────────────────────────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128104;&#8205;&#9877;&#65039; Clinical</div>'
+    +'<div class="field"><div class="field-label">Mentor surgeon <span class="req">*</span></div>'
+    +'<select class="field-input" id="hu-mentor"><option value="">Select mentor surgeon...</option>'+mOpts+'</select></div>'
+    +'<div class="field"><div class="field-label">Recommended Rehab Centre <span class="req">*</span></div>'
+    +'<select class="field-input" id="hu-rehabcentre"><option value="">Select institute...</option>'+rOpts+'</select></div>'
+    +'<div class="field"><div class="field-label">Complications / Remarks</div>'
+    +'<textarea class="field-input" id="hu-remarks" rows="3" placeholder="Any complications, notes or observations..."></textarea></div></div>'
+
+    // ── SUBMIT BUTTON ─────────────────────────────────────────────────
+    +'<div style="padding:0 16px 40px">'
+    +'<div id="hu-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
+    +'<button onclick="submitHospitalUpdate()" style="width:100%;padding:14px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="hu-submit-btn">Submit &amp; Lock &#8594;</button>'
+    +'</div>';
 }
+
+// Helper: patient info card row
+function piRow(label, value) {
+  return '<div><div style="color:var(--green);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+label+'</div>'
+    +'<div style="color:var(--green-dark);font-weight:500;font-size:12px;margin-top:1px">'+value+'</div></div>';
+}
+
 
 async function submitHospitalUpdate() {
   const errEl = document.getElementById('hu-error');
@@ -3396,18 +3439,23 @@ async function submitHospitalUpdate() {
   btn.disabled = true;
 
   const now = new Date().toISOString();
+  const newMobile = document.getElementById('hu-mobile') ? document.getElementById('hu-mobile').value.trim() : '';
   const updates = {
     dob, surgAdmit: admit, surgDate: surgdate, surgDisch: dischdate,
     switchOn:      document.getElementById('hu-switchon').value.trim(),
     side, mentorSurgeon: mentor, rehabCentre: rehab,
     manufacturer:  mfr,
     model:         document.getElementById('hu-model').value.trim(),
-    serialNo:      serial, resDist: resdist,
+    serialNo:      serial, resDist: resdist, resDistrict: resdist,
+    district:      resdist,
     remarks:       document.getElementById('hu-remarks').value.trim(),
-    status: 'rehab1', hospSubmitted: true,
+    hospRemarks:   document.getElementById('hu-remarks').value.trim(),
+    status: 'rehab1', journey: 'Surgery', phase: 'Surgery',
+    hospSubmitted: true,
     hospSubmittedBy: currentUser ? currentUser.username : '',
     hospSubmittedAt: now, _lastModified: now
   };
+  if (newMobile) updates.mobile = newMobile;
 
   try {
     const { doc, updateDoc } = window._fbFns;

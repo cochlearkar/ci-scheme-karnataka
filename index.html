@@ -15,7 +15,7 @@
 import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword,
          updatePassword, reauthenticateWithCredential,
-         EmailAuthProvider, onAuthStateChanged }  from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+         EmailAuthProvider }                      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
 import { getFirestore, collection, getDocs,
          doc, updateDoc, addDoc,
          serverTimestamp }                        from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
@@ -39,58 +39,7 @@ window._fbAuth = _auth;
 window._fbDb   = _db;
 window._fbFns  = { signInWithEmailAndPassword, updatePassword,
                    reauthenticateWithCredential, EmailAuthProvider,
-                   onAuthStateChanged,
                    collection, getDocs, doc, updateDoc, addDoc, serverTimestamp };
-
-// ── BACKGROUND AUTH CHECK ────────────────────────────────────────────────────
-// Runs automatically on every page load. If Firebase already has a valid
-// session, it restores the user and loads cases without needing a manual login.
-onAuthStateChanged(_auth, async (firebaseUser) => {
-  if (!firebaseUser) {
-    // Not signed in — stay on login screen (do nothing)
-    return;
-  }
-
-  // Already signed in — check if we already have a session loaded
-  const saved = sessionStorage.getItem('ci_user');
-  if (saved) {
-    // Session already active in this tab — window.load handler will manage it
-    return;
-  }
-
-  // Firebase has a session but this tab doesn't — restore it silently
-  try {
-    showScreen('loading', false);
-    const { collection, getDocs } = window._fbFns;
-    const snap = await getDocs(collection(_db, 'users'));
-    let profile = null;
-    snap.forEach(d => {
-      if (d.data().email === firebaseUser.email) profile = d.data();
-    });
-
-    if (!profile || profile.status !== 'active') return;
-
-    window.currentUser = {
-      status: 'ok',
-      username: profile.username,
-      role: profile.role,
-      unit: profile.unit || '',
-      district: profile.district || '',
-      zone: profile.zone || '',
-      mustChangePassword: profile.mustChangePassword || false,
-      token: firebaseUser.uid
-    };
-    window.currentRole = profile.role;
-    sessionStorage.setItem('ci_user', JSON.stringify(window.currentUser));
-
-    await loadCasesFromFirestore();
-    buildHome();
-    showScreen('home', false);
-  } catch(e) {
-    console.error('Auth restore error:', e);
-    // Silently fail — user stays on login screen
-  }
-});
 </script>
 
 <style>
@@ -739,7 +688,7 @@ body {
             placeholder="Enter your password"
             onfocus="this.style.borderColor=loginAccentColor"
             onblur="this.style.borderColor='var(--border)'"
-            onkeydown="if(event.key==='Enter')doLogin()">
+            onkeydown="if(event.key==='Enter')authenticateAndLogin()">
           <span onclick="togglePwd()" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;color:var(--text-light);" id="pwd-eye">👁</span>
         </div>
       </div>
@@ -1497,6 +1446,19 @@ async function authenticateAndLogin() {
 
   btn.innerHTML = '<span class="spinner"></span> Signing in...';
   btn.disabled = true;
+
+  // Wait for Firebase SDK to be ready (module loads async)
+  let attempts = 0;
+  while (!window._fbFns && attempts < 20) {
+    await new Promise(r => setTimeout(r, 250));
+    attempts++;
+  }
+  if (!window._fbFns) {
+    errEl.textContent = 'App not ready. Please refresh the page and try again.';
+    errEl.style.display = 'block';
+    btn.innerHTML = 'Sign in →'; btn.disabled = false;
+    return;
+  }
 
   try {
     // Firebase Auth — email is username@shravan.app
@@ -3726,6 +3688,39 @@ async function submitHospitalUpdate() {
   if (!serial)    { errEl.textContent='Device serial number is required.';     errEl.style.display='block'; return; }
   if (!resdist)   { errEl.textContent='Residential district is required.';     errEl.style.display='block'; return; }
 
+  // Date logic validation
+  var _dob    = new Date(dob);
+  var _admit  = new Date(admit);
+  var _surg   = new Date(surgdate);
+  var _disch  = new Date(dischdate);
+  var _today  = new Date(); _today.setHours(0,0,0,0);
+
+  if (_dob >= _admit) {
+    errEl.textContent = 'Date of Birth must be before the Admission Date.';
+    errEl.style.display = 'block'; return;
+  }
+  if (_admit > _surg) {
+    errEl.textContent = 'Admission Date cannot be after the Surgery Date.';
+    errEl.style.display = 'block'; return;
+  }
+  if (_surg > _disch) {
+    errEl.textContent = 'Surgery Date cannot be after the Discharge Date.';
+    errEl.style.display = 'block'; return;
+  }
+  if (_admit > _today) {
+    errEl.textContent = 'Admission Date cannot be in the future.';
+    errEl.style.display = 'block'; return;
+  }
+  if (_disch > _today) {
+    errEl.textContent = 'Discharge Date cannot be in the future.';
+    errEl.style.display = 'block'; return;
+  }
+  var _stayDays = (_disch - _admit) / (1000*60*60*24);
+  if (_stayDays > 60) {
+    errEl.textContent = 'Discharge Date is more than 60 days after Admission — please check the dates.';
+    errEl.style.display = 'block'; return;
+  }
+
   if (!confirm('Are you sure? This form will be LOCKED after submission and cannot be edited again.')) return;
 
   btn.textContent = 'Saving...';
@@ -3886,7 +3881,6 @@ window.addEventListener('online', updateOfflineBanner);
 window.addEventListener('offline', updateOfflineBanner);
 window.addEventListener('load', async () => {
   updateOfflineBanner();
-  // Session restore for same-tab refresh (faster than onAuthStateChanged)
   const saved = sessionStorage.getItem('ci_user');
   if (saved) {
     try {
@@ -3896,12 +3890,8 @@ window.addEventListener('load', async () => {
       await loadCasesFromFirestore();
       buildHome();
       showScreen('home', false);
-    } catch(e) {
-      sessionStorage.removeItem('ci_user');
-      // onAuthStateChanged will handle the cross-tab/fresh restore
-    }
+    } catch(e) { sessionStorage.removeItem('ci_user'); }
   }
-  // If no session in sessionStorage, onAuthStateChanged handles it
 });
 </script>
 <script src="cases.js" defer></script>

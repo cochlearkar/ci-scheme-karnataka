@@ -1844,30 +1844,17 @@ function shareWhatsApp() {
 
   var NL = '\n';
 
-  // Build message using \n escape — safe inside JS strings
+  // Clean minimal message — just totals + live link
   var lines = [
-    '\uD83E\uDDB7 *Shravan Sanjeevini \u2014 Daily Update*',
+    '\uD83E\uDDB7 *Shravan Sanjeevini — Hospital Update*',
     '\uD83D\uDCC5 ' + dateStr + ' | ' + timeStr,
     '',
-    '\uD83D\uDCCA *Overall Status*',
-    '\u2705 Cases Updated: ' + updatedCases + ' of ' + totalCases,
-    '\uD83D\uDD34 Cases Pending: ' + pendingCases,
+    '\u2705 Updated: ' + updatedHosp + ' hospitals (' + updatedCases + ' cases)',
+    '\uD83D\uDD34 Pending: ' + pendingHosp + ' hospitals (' + pendingCases + ' cases)',
     '',
-    '\uD83C\uDFE5 *Hospital Submissions*',
-    '\u2705 Fully Updated: ' + updatedHosp + ' hospitals',
-    '\uD83D\uDD34 Pending Update: ' + pendingHosp + ' hospitals'
+    '\uD83D\uDC49 View live status:',
+    'https://cochlearkar.github.io/ci-scheme-karnataka/status.html'
   ];
-
-  if (topPending.length > 0) {
-    lines.push('');
-    lines.push('\u26A0\uFE0F *Hospitals Needing Update*');
-    topPending.forEach(function(h, i) {
-      lines.push((i+1) + '. ' + h.name + ' \u2014 ' + h.pending + ' pending');
-    });
-  }
-
-  lines.push('');
-  lines.push('_Shravan Sanjeevini \u00B7 NPPCD Karnataka_');
 
   var msg = lines.join(NL);
   var encoded = encodeURIComponent(msg);

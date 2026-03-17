@@ -156,6 +156,7 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
     <div class="tab" onclick="showTab('atrisk')">⚠️ At-Risk Cases</div>
     <div class="tab" onclick="showTab('fy')">📅 FY Progress</div>
     <div class="tab" onclick="showTab('distyr')">🗂️ District × Year</div>
+    <div class="tab" onclick="showTab('quarterly')">&#128197; Monthly / Quarterly</div>
   </div>
 
   <div class="content">
@@ -292,6 +293,32 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
     </div>
 
   </div>
+    <!-- MONTHLY / QUARTERLY -->
+    <div class="report-section" id="sec-quarterly">
+      <div class="stat-grid" id="qtr-stats"></div>
+      <div class="table-wrap" style="margin-bottom:16px">
+        <div class="table-header">
+          <span class="table-title">Surgeries &#8212; Quarterly Summary (State Level)</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-quarterly','quarterly_surgeries')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-quarterly">
+          <thead><tr><th>FY</th><th>Q1 (Apr-Jun)</th><th>Q2 (Jul-Sep)</th><th>Q3 (Oct-Dec)</th><th>Q4 (Jan-Mar)</th><th>Total</th></tr></thead>
+          <tbody id="tbody-quarterly"></tbody>
+        </table></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Surgeries &#8212; Month-wise Detail</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-monthly','monthly_surgeries')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-monthly">
+          <thead id="thead-monthly"><tr><th>Month</th></tr></thead>
+          <tbody id="tbody-monthly"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <script type="module">
@@ -419,6 +446,7 @@ function showTab(name) {
   document.getElementById('sec-'+name).classList.add('active');
   // Re-render distyr when that tab becomes visible
   if (name === 'distyr') { renderDistYr(); }
+  if (name === 'quarterly') { renderQuarterly(); }
   // Re-init sorting for newly visible table
   initSortable();
 }
@@ -449,6 +477,7 @@ function renderAll() {
   renderRehab();
   renderAtRisk();
   renderFY();
+  renderQuarterly();
   // Re-attach sort listeners after all tables are re-rendered
   setTimeout(initSortable, 0);
 }
@@ -707,6 +736,130 @@ function sortTable(tableId, col) {
 function initSortable() {
   ['tbl-district','tbl-hospital','tbl-financial','tbl-package',
    'tbl-rehab','tbl-atrisk','tbl-fy','tbl-distyr'].forEach(makeSortable);
+}
+
+
+// ── MONTHLY / QUARTERLY SURGERIES ────────────────────────────────────────────
+function renderQuarterly() {
+  var cases = FILTERED_CASES;
+
+  var MONTHS = ['April','May','June','July','August','September',
+                'October','November','December','January','February','March'];
+  var MONTH_NOS = [4,5,6,7,8,9,10,11,12,1,2,3]; // FY order
+
+  // Parse surgery date from a case
+  function getSurgDate(c) {
+    var d = c.surgAdmit || c.surgDate || '';
+    if (!d) return null;
+    var d1 = new Date(d);
+    if (!isNaN(d1)) return d1;
+    // dd-Mon-yyyy
+    var m1 = String(d).match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+    if (m1) {
+      var mn={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+      return new Date(parseInt(m1[3]), mn[m1[2].toLowerCase()]-1, parseInt(m1[1]));
+    }
+    return null;
+  }
+
+  function getFYQuarter(date) {
+    if (!date) return null;
+    var m = date.getMonth()+1; // 1-12
+    var y = date.getFullYear();
+    // FY runs Apr-Mar; FY label = year of April
+    var fyYear = m >= 4 ? y : y-1;
+    var fy = fyYear+'-'+(fyYear+1).toString().slice(2);
+    var q = m>=4&&m<=6?'Q1': m>=7&&m<=9?'Q2': m>=10&&m<=12?'Q3':'Q4';
+    return { fy: fy, q: q, month: m, year: y };
+  }
+
+  // Build maps
+  var qMap = {}; // fy -> {Q1,Q2,Q3,Q4}
+  var mMap = {}; // "Apr 2022" -> count  -- keyed by fy+month for ordering
+
+  // Collect all FYs from data
+  var fySet = new Set();
+
+  cases.forEach(function(c) {
+    var d = getSurgDate(c);
+    if (!d) return;
+    var info = getFYQuarter(d);
+    if (!info) return;
+    fySet.add(info.fy);
+
+    if (!qMap[info.fy]) qMap[info.fy] = {Q1:0,Q2:0,Q3:0,Q4:0};
+    qMap[info.fy][info.q]++;
+
+    var key = info.fy + '|' + info.month;
+    if (!mMap[key]) mMap[key] = {fy:info.fy, month:info.month, year:info.year, count:0};
+    mMap[key].count++;
+  });
+
+  var allFYs = [...fySet].sort().reverse();
+
+  // ── STATS ────────────────────────────────────────────────────────────────
+  var total = cases.filter(function(c){ return !!getSurgDate(c); }).length;
+  var noDate = cases.filter(function(c){ return !getSurgDate(c); }).length;
+  var latestFY = allFYs[0]||'—';
+  var latestTotal = qMap[latestFY] ? Object.values(qMap[latestFY]).reduce(function(s,v){return s+v;},0) : 0;
+  document.getElementById('qtr-stats').innerHTML =
+    statCard(total, 'Surgeries with Date', 'var(--green-mid)') +
+    statCard(noDate, 'No Date Recorded', 'var(--amber-mid)') +
+    statCard(allFYs.length, 'Financial Years', 'var(--purple-mid)') +
+    statCard(latestTotal, 'Surgeries in '+latestFY, 'var(--blue-mid)');
+
+  // ── QUARTERLY TABLE ───────────────────────────────────────────────────────
+  var qRows = allFYs.map(function(fy) {
+    var v = qMap[fy]||{Q1:0,Q2:0,Q3:0,Q4:0};
+    var tot = v.Q1+v.Q2+v.Q3+v.Q4;
+    function qCell(n) {
+      return '<td style="text-align:center;font-weight:'+(n>0?'600':'400')+';color:'+(n>0?'var(--text)':'var(--text-light)')+'">'+
+        (n>0?n:'—')+'</td>';
+    }
+    return '<tr><td><strong>'+fy+'</strong></td>'+qCell(v.Q1)+qCell(v.Q2)+qCell(v.Q3)+qCell(v.Q4)+
+      '<td style="text-align:center;font-weight:700">'+tot+'</td></tr>';
+  }).join('');
+  document.getElementById('tbody-quarterly').innerHTML = qRows ||
+    '<tr><td colspan="6" class="empty">No surgery dates recorded</td></tr>';
+
+  // ── MONTHLY TABLE — rows = FY months, columns = FY ───────────────────────
+  // Header: Month | FY1 | FY2 | FY3 ...
+  var thead = '<tr><th>Month</th>'+allFYs.map(function(fy){
+    return '<th style="text-align:center">'+fy+'</th>';
+  }).join('')+'<th style="text-align:center">All Years</th></tr>';
+  document.getElementById('thead-monthly').innerHTML = thead;
+
+  // Row order: Apr, May, Jun ... Mar (FY month order)
+  var MONTH_NAMES = {4:'April',5:'May',6:'June',7:'July',8:'August',9:'September',
+                     10:'October',11:'November',12:'December',1:'January',2:'February',3:'March'};
+  var FY_MONTH_ORDER = [4,5,6,7,8,9,10,11,12,1,2,3];
+
+  // Find max for colour coding
+  var allCounts = Object.values(mMap).map(function(v){return v.count;});
+  var maxCount = Math.max.apply(null, allCounts)||1;
+
+  function mCell(n) {
+    if (!n) return '<td style="text-align:center;color:var(--text-light)">—</td>';
+    var pct = Math.round(n/maxCount*100);
+    var bg = pct>=80?'background:#e1f5ee;color:#0a3d2e':pct>=50?'background:#faeeda;color:#8a5a0a':'';
+    return '<td style="text-align:center;font-weight:600;'+bg+'">'+n+'</td>';
+  }
+
+  var mRows = FY_MONTH_ORDER.map(function(mo) {
+    var rowTotal = 0;
+    var cells = allFYs.map(function(fy) {
+      var key = fy+'|'+mo;
+      var n = mMap[key] ? mMap[key].count : 0;
+      rowTotal += n;
+      return mCell(n);
+    }).join('');
+    return '<tr><td><strong>'+MONTH_NAMES[mo]+'</strong></td>'+cells+mCell(rowTotal)+'</tr>';
+  }).join('');
+
+  document.getElementById('tbody-monthly').innerHTML = mRows;
+
+  makeSortable('tbl-quarterly');
+  makeSortable('tbl-monthly');
 }
 
 // ── DISTRICT × YEAR GRID ──────────────────────────────────────────────────────

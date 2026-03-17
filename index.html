@@ -1595,12 +1595,10 @@ function goBackToRoles() { showScreen('login'); }
 // HOME
 // ══════════════════════════════════════════
 
-// Helper: has hospital submitted surgery details?
-// True if explicitly submitted OR legacy case already has surgery dates filled
+// Helper: has hospital submitted surgery details through the app?
+// Only counts explicit app submission — seed data surgery dates do NOT count
 function isHospitalUpdated(c) {
-  return c.hospSubmitted === true ||
-    (c.surgAdmit && c.surgAdmit.trim() !== '' &&
-     c.surgDisch  && c.surgDisch.trim()  !== '');
+  return c.hospSubmitted === true;
 }
 
 function filterCasesByUser(cases) {

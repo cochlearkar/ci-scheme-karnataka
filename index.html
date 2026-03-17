@@ -15,7 +15,7 @@
 import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword,
          updatePassword, reauthenticateWithCredential,
-         EmailAuthProvider }                      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+         EmailAuthProvider, onAuthStateChanged }  from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
 import { getFirestore, collection, getDocs,
          doc, updateDoc, addDoc,
          serverTimestamp }                        from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
@@ -39,7 +39,58 @@ window._fbAuth = _auth;
 window._fbDb   = _db;
 window._fbFns  = { signInWithEmailAndPassword, updatePassword,
                    reauthenticateWithCredential, EmailAuthProvider,
+                   onAuthStateChanged,
                    collection, getDocs, doc, updateDoc, addDoc, serverTimestamp };
+
+// ── BACKGROUND AUTH CHECK ────────────────────────────────────────────────────
+// Runs automatically on every page load. If Firebase already has a valid
+// session, it restores the user and loads cases without needing a manual login.
+onAuthStateChanged(_auth, async (firebaseUser) => {
+  if (!firebaseUser) {
+    // Not signed in — stay on login screen (do nothing)
+    return;
+  }
+
+  // Already signed in — check if we already have a session loaded
+  const saved = sessionStorage.getItem('ci_user');
+  if (saved) {
+    // Session already active in this tab — window.load handler will manage it
+    return;
+  }
+
+  // Firebase has a session but this tab doesn't — restore it silently
+  try {
+    showScreen('loading', false);
+    const { collection, getDocs } = window._fbFns;
+    const snap = await getDocs(collection(_db, 'users'));
+    let profile = null;
+    snap.forEach(d => {
+      if (d.data().email === firebaseUser.email) profile = d.data();
+    });
+
+    if (!profile || profile.status !== 'active') return;
+
+    window.currentUser = {
+      status: 'ok',
+      username: profile.username,
+      role: profile.role,
+      unit: profile.unit || '',
+      district: profile.district || '',
+      zone: profile.zone || '',
+      mustChangePassword: profile.mustChangePassword || false,
+      token: firebaseUser.uid
+    };
+    window.currentRole = profile.role;
+    sessionStorage.setItem('ci_user', JSON.stringify(window.currentUser));
+
+    await loadCasesFromFirestore();
+    buildHome();
+    showScreen('home', false);
+  } catch(e) {
+    console.error('Auth restore error:', e);
+    // Silently fail — user stays on login screen
+  }
+});
 </script>
 
 <style>
@@ -426,6 +477,7 @@ body {
   animation: spin 0.7s linear infinite; display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }
 
 /* ─── SCROLLBAR ─── */
 ::-webkit-scrollbar { width: 3px; }
@@ -665,6 +717,9 @@ body {
       <div style="font-size:18px;font-weight:700;margin-bottom:4px;" id="login-card-title">Sign in</div>
       <div style="font-size:12px;color:var(--text-light);margin-bottom:28px;" id="login-card-sub">Enter your credentials to continue</div>
 
+      <div id="auth-offline-banner" style="display:none;background:#fff8e1;border:1px solid #f59e0b;border-radius:10px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:12px;">
+        📶 No internet connection — please connect to Wi-Fi or mobile data before signing in.
+      </div>
       <div id="login-err" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:16px;display:none;"></div>
 
       <div style="margin-bottom:16px;">
@@ -806,6 +861,20 @@ body {
   <div class="form-scroll" id="summary-body"></div>
   <div class="bottom-bar" id="summary-action-bar" style="display:none">
     <button class="btn-submit" id="summary-action-btn" onclick="summaryAction()">Update →</button>
+  </div>
+</div>
+
+<!-- ======== SCREEN: LOADING ======== -->
+<div class="screen hidden" id="screen-loading">
+  <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--green-dark);padding:40px 24px;text-align:center;">
+    <div style="font-size:52px;margin-bottom:24px;">🦻</div>
+    <div style="color:#fff;font-size:18px;font-weight:600;margin-bottom:8px;">Shravan Sanjeevini</div>
+    <div style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:40px;">Loading your cases...</div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+      <div style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.4);animation:pulse 1.2s ease-in-out infinite;"></div>
+      <div style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.4);animation:pulse 1.2s ease-in-out 0.2s infinite;"></div>
+      <div style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.4);animation:pulse 1.2s ease-in-out 0.4s infinite;"></div>
+    </div>
   </div>
 </div>
 
@@ -1469,10 +1538,13 @@ async function authenticateAndLogin() {
     currentRole = profile.role;
     sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
 
-    btn.innerHTML = 'Sign in →'; btn.disabled = false;
+    // Show loading screen immediately after auth
+    showScreen('loading');
 
-    // Load cases from Firestore then show home
+    // Load cases from Firestore
     await loadCasesFromFirestore();
+
+    btn.innerHTML = 'Sign in →'; btn.disabled = false;
 
     if (currentUser.mustChangePassword) {
       showScreen('setpwd');
@@ -3805,23 +3877,31 @@ async function submitNewCase() {
 // Auto-login if session stored
 // Offline banner only on login screen
 function updateOfflineBanner(){
-  const b=document.getElementById('login-offline-banner');
-  if(b) b.style.display=navigator.onLine?'none':'block';
+  const b1=document.getElementById('login-offline-banner');
+  if(b1) b1.style.display=navigator.onLine?'none':'block';
+  const b2=document.getElementById('auth-offline-banner');
+  if(b2) b2.style.display=navigator.onLine?'none':'block';
 }
 window.addEventListener('online', updateOfflineBanner);
 window.addEventListener('offline', updateOfflineBanner);
 window.addEventListener('load', async () => {
   updateOfflineBanner();
+  // Session restore for same-tab refresh (faster than onAuthStateChanged)
   const saved = sessionStorage.getItem('ci_user');
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
       currentRole = currentUser.role;
+      showScreen('loading', false);
       await loadCasesFromFirestore();
       buildHome();
       showScreen('home', false);
-    } catch(e) { sessionStorage.removeItem('ci_user'); }
+    } catch(e) {
+      sessionStorage.removeItem('ci_user');
+      // onAuthStateChanged will handle the cross-tab/fresh restore
+    }
   }
+  // If no session in sessionStorage, onAuthStateChanged handles it
 });
 </script>
 <script src="cases.js" defer></script>

@@ -298,11 +298,12 @@ async function loadData() {
     window.ALL_CASES = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
     window.FILTERED_CASES = [...window.ALL_CASES];
     populateFilters();
+    // Show content FIRST so all DOM elements exist before rendering
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
     renderAll();
     renderDistYr();
     initSortable();
-    document.getElementById('loading-screen').style.display = 'none';
-    document.getElementById('main-content').style.display = 'block';
   } catch(e) {
     console.error('Firestore load error:', e);
     showError('Could not load cases. Please go back to the app, log in, and try again. (' + e.message + ')');

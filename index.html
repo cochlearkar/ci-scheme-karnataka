@@ -1814,15 +1814,11 @@ function buildCaseList(filter = 'all') {
   chip.textContent = meta.label;
   chip.className = 'role-chip ' + meta.chip;
 
-  if (filter === 'pending-hosp') activeStatusFilter = 'Pending Update';
-  else if (filter === 'done-hosp') activeStatusFilter = 'Updated';
-  else if (filter === 'pending-hosp') activeStatusFilter = 'Pending Update';
-  else if (filter === 'done-hosp') activeStatusFilter = 'Updated';
-  else if (filter === 'risk') activeStatusFilter = 'At risk';
-  else if (filter === 'confirm') activeStatusFilter = 'Confirm';
-  else if (filter === 'hosp-pending') activeStatusFilter = 'Needs update';
+  if      (filter === 'hosp-pending') activeStatusFilter = 'Needs update';
   else if (filter === 'hosp-updated') activeStatusFilter = 'Updated';
-  else activeStatusFilter = 'All';
+  else if (filter === 'risk')         activeStatusFilter = 'At risk';
+  else if (filter === 'confirm')      activeStatusFilter = 'Confirm';
+  else                                activeStatusFilter = 'All';
 
   const filterRow = document.getElementById('filter-row');
   if (currentRole === 'hospital') {
@@ -1892,20 +1888,12 @@ function toggleAllYears(el) {
 
 function applyAllFilters() {
   let cases = filterCasesByUser(SAMPLE_CASES);
-  if (activeStatusFilter === 'Pending Update') {
+  if      (activeStatusFilter === 'Needs update') {
     cases = cases.filter(c => !isHospitalUpdated(c));
   } else if (activeStatusFilter === 'Updated') {
-    cases = cases.filter(c => isHospitalUpdated(c));
-  } else if (activeStatusFilter === 'Pending Update') {
-    cases = cases.filter(c => !isHospitalUpdated(c));
-  } else if (activeStatusFilter === 'Updated') {
-    cases = cases.filter(c => isHospitalUpdated(c));
+    cases = cases.filter(c =>  isHospitalUpdated(c));
   } else if (activeStatusFilter === 'Confirm') {
     cases = cases.filter(c => c.risk || !c.surgAdmit || c.status === 'pending');
-  } else if (activeStatusFilter === 'Needs update') {
-    cases = cases.filter(c => !isHospitalUpdated(c));
-  } else if (activeStatusFilter === 'Updated') {
-    cases = cases.filter(c => isHospitalUpdated(c));
   } else if (activeStatusFilter === 'On track') {
     cases = cases.filter(c => !c.risk && c.status !== 'pending');
   } else if (activeStatusFilter === 'At risk') {

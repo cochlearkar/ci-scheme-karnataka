@@ -1778,7 +1778,7 @@ function buildHome() {
   html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">${currentRole === 'district' ? 'By district' : 'By ' + meta.orgLabel.toLowerCase()}</div></div>`;
   html += `<div class="action-card" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">🔔</div><div class="action-title">Alerts</div><div class="action-desc">${risks.length} need attention</div></div>`;
   if (currentRole === 'state') {
-    html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none" onclick="window.open('dashboard.html','_blank')"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">Programme Dashboard</div><div class="action-desc" style="color:rgba(255,255,255,.7)">District · Hospital · Trends</div></div>`;
+    html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none" onclick="window.open('reports.html','_blank')"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">Programme Reports</div><div class="action-desc" style="color:rgba(255,255,255,.7)">District · Hospital · Financial · FY</div></div>`;
   } else {
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
   }

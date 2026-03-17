@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reports — Shravan Sanjeevini</title>
+<style>
+:root {
+  --green-dark: #0a3d2e;
+  --green: #1a6b4a;
+  --green-mid: #1D9E75;
+  --green-light: #E1F5EE;
+  --green-border: #9FE1CB;
+  --blue: #1a4a7a;
+  --blue-mid: #378ADD;
+  --blue-light: #E6F1FB;
+  --amber: #8a5a0a;
+  --amber-mid: #EF9F27;
+  --amber-light: #FAEEDA;
+  --red: #A32D2D;
+  --red-light: #FCEBEB;
+  --purple: #4a2a7a;
+  --purple-mid: #7F77DD;
+  --purple-light: #EEEDFE;
+  --gray: #f5f3ef;
+  --gray-mid: #e0ddd6;
+  --text: #1a1612;
+  --text-mid: #4a453f;
+  --text-light: #8a8278;
+  --surface: #fffcf8;
+  --border: #e8e4dc;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray); color: var(--text); font-size: 14px; min-height: 100vh; }
+
+/* ── HEADER ── */
+.header { background: var(--green-dark); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo { font-size: 22px; }
+.header-title { color: #fff; font-size: 16px; font-weight: 600; }
+.header-sub { color: rgba(255,255,255,.5); font-size: 11px; margin-top: 1px; }
+.back-link { color: rgba(255,255,255,.7); font-size: 12px; text-decoration: none; background: rgba(255,255,255,.1); padding: 6px 12px; border-radius: 8px; }
+.back-link:hover { background: rgba(255,255,255,.2); }
+
+/* ── LOADING ── */
+#loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 16px; }
+.loader { width: 40px; height: 40px; border: 3px solid var(--green-light); border-top-color: var(--green-mid); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading-screen p { color: var(--text-light); font-size: 13px; }
+
+/* ── FILTERS ── */
+.filters-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.filter-group { display: flex; align-items: center; gap: 6px; }
+.filter-label { font-size: 11px; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: .04em; }
+.filter-select { font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-family: inherit; cursor: pointer; }
+.filter-select:focus { outline: none; border-color: var(--green-mid); }
+.filter-btn { font-size: 12px; padding: 6px 14px; background: var(--green-dark); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: 500; }
+.filter-btn:hover { opacity: .9; }
+
+/* ── TABS ── */
+.tabs { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; padding: 0 20px; gap: 0; }
+.tab { padding: 12px 16px; font-size: 12px; font-weight: 500; color: var(--text-light); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: all .15s; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--green-dark); border-bottom-color: var(--green-dark); font-weight: 600; }
+
+/* ── CONTENT ── */
+.content { padding: 20px; max-width: 1000px; margin: 0 auto; }
+.report-section { display: none; }
+.report-section.active { display: block; }
+
+/* ── STAT CARDS ── */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.stat-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 14px; }
+.stat-num { font-size: 24px; font-weight: 700; }
+.stat-label { font-size: 10px; color: var(--text-light); text-transform: uppercase; letter-spacing: .05em; margin-top: 3px; }
+
+/* ── TABLE ── */
+.table-wrap { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+.table-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+.table-title { font-size: 13px; font-weight: 600; }
+.dl-btn { font-size: 11px; padding: 5px 12px; background: var(--green-dark); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th { background: var(--green-dark); color: #fff; padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 0.5px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:nth-child(even) td { background: #fafaf8; }
+tr:hover td { background: var(--green-light); }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+.pill-red { background: var(--red-light); color: var(--red); }
+.pill-green { background: var(--green-light); color: var(--green); }
+.pill-amber { background: var(--amber-light); color: var(--amber); }
+.pill-blue { background: var(--blue-light); color: var(--blue); }
+
+/* ── PROGRESS BAR ── */
+.prog-wrap { background: var(--gray-mid); border-radius: 3px; height: 6px; min-width: 60px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 3px; }
+
+/* ── EMPTY ── */
+.empty { text-align: center; padding: 40px; color: var(--text-light); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">🦻</div>
+    <div>
+      <div class="header-title">Shravan Sanjeevini — Reports</div>
+      <div class="header-sub">Karnataka Cochlear Implant Programme · State Team</div>
+    </div>
+  </div>
+  <a href="index.html" class="back-link">← Back to App</a>
+</div>
+
+<div id="loading-screen">
+  <div class="loader"></div>
+  <p>Loading cases from Firestore...</p>
+</div>
+
+<div id="main-content" style="display:none">
+
+  <div class="filters-bar">
+    <div class="filter-group">
+      <span class="filter-label">FY</span>
+      <select class="filter-select" id="f-fy"><option value="">All Years</option></select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Zone</span>
+      <select class="filter-select" id="f-zone"><option value="">All Zones</option></select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">District</span>
+      <select class="filter-select" id="f-district"><option value="">All Districts</option></select>
+    </div>
+    <button class="filter-btn" onclick="applyFilters()">Apply</button>
+    <button class="filter-btn" onclick="resetFilters()" style="background:var(--gray-mid);color:var(--text)">Reset</button>
+    <span id="filter-count" style="font-size:11px;color:var(--text-light);margin-left:4px"></span>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('district')">📍 District Summary</div>
+    <div class="tab" onclick="showTab('hospital')">🏥 Hospital Performance</div>
+    <div class="tab" onclick="showTab('financial')">💰 Financial Summary</div>
+    <div class="tab" onclick="showTab('rehab')">🎧 Rehab Activity</div>
+    <div class="tab" onclick="showTab('atrisk')">⚠️ At-Risk Cases</div>
+    <div class="tab" onclick="showTab('fy')">📅 FY Progress</div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── DISTRICT SUMMARY ── -->
+    <div class="report-section active" id="sec-district">
+      <div class="stat-grid" id="dist-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">District-wise Case Summary</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-district','district_summary')">⬇ Download CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-district">
+          <thead><tr><th>District</th><th>Zone</th><th>Total</th><th>Surgery Done</th><th>Rehab 1</th><th>Rehab 2</th><th>Completed</th><th>At Risk</th><th>Progress</th></tr></thead>
+          <tbody id="tbody-district"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ── HOSPITAL PERFORMANCE ── -->
+    <div class="report-section" id="sec-hospital">
+      <div class="stat-grid" id="hosp-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Hospital-wise Performance</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-hospital','hospital_performance')">⬇ Download CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-hospital">
+          <thead><tr><th>Hospital</th><th>District</th><th>Type</th><th>Total Cases</th><th>Surgery Updated</th><th>Pending Update</th><th>Claims Paid</th><th>Net Amount (₹)</th></tr></thead>
+          <tbody id="tbody-hospital"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ── FINANCIAL SUMMARY ── -->
+    <div class="report-section" id="sec-financial">
+      <div class="stat-grid" id="fin-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Financial Summary by FY</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-financial','financial_summary')">⬇ Download CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-financial">
+          <thead><tr><th>Financial Year</th><th>Cases</th><th>Surgery Paid</th><th>Surgery Amt (₹)</th><th>Rehab1 Paid</th><th>Rehab1 Amt (₹)</th><th>Rehab2 Paid</th><th>Rehab2 Amt (₹)</th><th>Total Paid (₹)</th></tr></thead>
+          <tbody id="tbody-financial"></tbody>
+        </table></div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px">
+        <div class="table-header">
+          <span class="table-title">Financial Summary by Package Type</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-package','package_summary')">⬇ Download CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-package">
+          <thead><tr><th>Package</th><th>Cases</th><th>Total Surgery Amt (₹)</th><th>Avg per Case (₹)</th></tr></thead>
+          <tbody id="tbody-package"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ── REHAB ACTIVITY ── -->
+    <div class="report-section" id="sec-rehab">
+      <div class="stat-grid" id="rehab-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Rehab Centre Activity</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-rehab','rehab_activity')">⬇ Download CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-rehab">
+          <thead><tr><th>Rehab Centre</th><th>Cases Assigned</th><th>Sessions Started</th><th>Not Started</th><th>Total Sessions Logged</th><th>Avg Sessions / Case</th><th>Completed (Rehab2 Paid)</th></tr></thead>
+          <tbody id="tbody-rehab"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ── AT-RISK CASES ── -->
+    <div class="report-section" id="sec-atrisk">
+      <div class="stat-grid" id="risk-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">At-Risk Cases — No contact in 45+ days</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-atrisk','at_risk_cases')">⬇ Download CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-atrisk">
+          <thead><tr><th>Card No.</th><th>Name</th><th>District</th><th>Hospital</th><th>Journey Stage</th><th>Last Contact</th><th>Days Since Contact</th><th>Mobile</th></tr></thead>
+          <tbody id="tbody-atrisk"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ── FY PROGRESS ── -->
+    <div class="report-section" id="sec-fy">
+      <div class="stat-grid" id="fy-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Year-on-Year Programme Progress</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-fy','fy_progress')">⬇ Download CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-fy">
+          <thead><tr><th>Financial Year</th><th>Enrolled</th><th>Pre-auth Only</th><th>Surgery Done</th><th>Rehab 1 Done</th><th>Rehab 2 Done</th><th>Fully Completed</th><th>At Risk</th><th>Completion %</th></tr></thead>
+          <tbody id="tbody-fy"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp }           from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI",
+  authDomain:        "shravan-sanjeevini.firebaseapp.com",
+  projectId:         "shravan-sanjeevini",
+  storageBucket:     "shravan-sanjeevini.firebasestorage.app",
+  messagingSenderId: "130742586600",
+  appId:             "1:130742586600:web:1618bb56710c6fbbcc8d5d"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// Load all cases
+const snap = await getDocs(collection(db, 'cases'));
+window.ALL_CASES = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
+window.FILTERED_CASES = [...window.ALL_CASES];
+
+// Populate filters
+populateFilters();
+renderAll();
+
+document.getElementById('loading-screen').style.display = 'none';
+document.getElementById('main-content').style.display = 'block';
+</script>
+
+<script>
+var ALL_CASES = [];
+var FILTERED_CASES = [];
+var AT_RISK_DAYS = 45;
+
+// ── FILTERS ──────────────────────────────────────────────────────────────────
+function populateFilters() {
+  var fys = [...new Set(ALL_CASES.map(c=>c.fy).filter(Boolean))].sort().reverse();
+  var zones = [...new Set(ALL_CASES.map(c=>c.zone).filter(Boolean))].sort();
+  var districts = [...new Set(ALL_CASES.map(c=>c.district).filter(Boolean))].sort();
+  fys.forEach(v=>{ var o=document.createElement('option'); o.value=v; o.textContent=v; document.getElementById('f-fy').appendChild(o); });
+  zones.forEach(v=>{ var o=document.createElement('option'); o.value=v; o.textContent=v; document.getElementById('f-zone').appendChild(o); });
+  districts.forEach(v=>{ var o=document.createElement('option'); o.value=v; o.textContent=v; document.getElementById('f-district').appendChild(o); });
+}
+
+function applyFilters() {
+  var fy = document.getElementById('f-fy').value;
+  var zone = document.getElementById('f-zone').value;
+  var dist = document.getElementById('f-district').value;
+  FILTERED_CASES = ALL_CASES.filter(c =>
+    (!fy   || c.fy === fy) &&
+    (!zone || (c.zone||'').toUpperCase() === zone.toUpperCase()) &&
+    (!dist || (c.district||'').toUpperCase() === dist.toUpperCase())
+  );
+  var count = FILTERED_CASES.length;
+  document.getElementById('filter-count').textContent = count < ALL_CASES.length ? 'Showing '+count+' of '+ALL_CASES.length+' cases' : '';
+  renderAll();
+}
+
+function resetFilters() {
+  document.getElementById('f-fy').value = '';
+  document.getElementById('f-zone').value = '';
+  document.getElementById('f-district').value = '';
+  FILTERED_CASES = [...ALL_CASES];
+  document.getElementById('filter-count').textContent = '';
+  renderAll();
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.report-section').forEach(s => s.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('sec-'+name).classList.add('active');
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function fmtNum(n) { return Number(n||0).toLocaleString('en-IN'); }
+function pct(a,b) { return b>0 ? Math.round((a/b)*100)+'%' : '0%'; }
+function progBar(a,b) {
+  var p = b>0 ? Math.round((a/b)*100) : 0;
+  var col = p===100?'var(--green-mid)':p>50?'var(--amber-mid)':'var(--red)';
+  return '<div class="prog-wrap"><div class="prog-fill" style="width:'+p+'%;background:'+col+'"></div></div><span style="font-size:10px;color:var(--text-light);margin-left:4px">'+p+'%</span>';
+}
+function daysSince(dateStr) {
+  if (!dateStr || dateStr === 'Not recorded') return 9999;
+  var d = new Date(dateStr);
+  if (isNaN(d)) return 9999;
+  return Math.floor((Date.now() - d) / 86400000);
+}
+function statCard(num, label, color) {
+  return '<div class="stat-card"><div class="stat-num" style="color:'+color+'">'+num+'</div><div class="stat-label">'+label+'</div></div>';
+}
+
+// ── RENDER ALL ────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderDistrict();
+  renderHospital();
+  renderFinancial();
+  renderRehab();
+  renderAtRisk();
+  renderFY();
+}
+
+// ── 1. DISTRICT SUMMARY ───────────────────────────────────────────────────────
+function renderDistrict() {
+  var cases = FILTERED_CASES;
+  var map = {};
+  cases.forEach(function(c) {
+    var d = c.district||'Unknown';
+    if (!map[d]) map[d] = {zone:c.zone||'',total:0,surg:0,r1:0,r2:0,paid:0,risk:0};
+    map[d].total++;
+    if (c.surgAdmit||c.hospSubmitted) map[d].surg++;
+    if (c.r1Admit||c.r1Status) map[d].r1++;
+    if (c.r2Admit||c.r2Status) map[d].r2++;
+    if (c.status==='paid') map[d].paid++;
+    if (c.risk) map[d].risk++;
+  });
+  var entries = Object.entries(map).sort(function(a,b){return b[1].total-a[1].total;});
+  var totalRisk = cases.filter(function(c){return c.risk;}).length;
+  var totalPaid = cases.filter(function(c){return c.status==='paid';}).length;
+  document.getElementById('dist-stats').innerHTML =
+    statCard(cases.length,'Total Cases','var(--text)') +
+    statCard([...new Set(cases.map(function(c){return c.district;}))].filter(Boolean).length,'Districts','var(--blue-mid)') +
+    statCard(totalPaid,'Completed','var(--green-mid)') +
+    statCard(totalRisk,'At Risk','var(--red)');
+  var rows = entries.map(function(e){
+    var d=e[0],v=e[1];
+    return '<tr><td><strong>'+d+'</strong></td><td>'+v.zone+'</td><td>'+v.total+'</td><td>'+v.surg+'</td><td>'+v.r1+'</td><td>'+v.r2+'</td><td>'+v.paid+'</td><td>'+(v.risk>0?'<span class="pill pill-red">'+v.risk+'</span>':'0')+'</td><td>'+progBar(v.paid,v.total)+'</td></tr>';
+  }).join('');
+  document.getElementById('tbody-district').innerHTML = rows || '<tr><td colspan="9" class="empty">No data</td></tr>';
+}
+
+// ── 2. HOSPITAL PERFORMANCE ───────────────────────────────────────────────────
+function renderHospital() {
+  var cases = FILTERED_CASES;
+  var map = {};
+  cases.forEach(function(c) {
+    var h = c.hospital||'Unknown';
+    if (!map[h]) map[h] = {dist:c.hospDist||c.district||'',type:c.hospType||'',total:0,updated:0,paid:0,net:0};
+    map[h].total++;
+    if (c.hospSubmitted||c.surgAdmit) map[h].updated++;
+    if (c.surgStatus==='CLAIMS PAID') map[h].paid++;
+    map[h].net += Number(c.surgNet||0)+Number(c.r1Net||0)+Number(c.r2Net||0);
+  });
+  var entries = Object.entries(map).sort(function(a,b){return b[1].total-a[1].total;});
+  var totalUpdated = cases.filter(function(c){return c.hospSubmitted||c.surgAdmit;}).length;
+  var totalNet = cases.reduce(function(s,c){return s+Number(c.totalNet||0);},0);
+  document.getElementById('hosp-stats').innerHTML =
+    statCard(Object.keys(map).length,'Hospitals','var(--blue-mid)') +
+    statCard(totalUpdated,'Surgery Updated','var(--green-mid)') +
+    statCard(cases.length-totalUpdated,'Pending Update','var(--red)') +
+    statCard('₹'+fmtNum(totalNet),'Total Net Paid','var(--amber-mid)');
+  var rows = entries.map(function(e){
+    var h=e[0],v=e[1];
+    var pending = v.total-v.updated;
+    return '<tr><td><strong>'+h+'</strong></td><td>'+v.dist+'</td><td>'+v.type+'</td><td>'+v.total+'</td>'
+      +'<td><span class="pill pill-green">'+v.updated+'</span></td>'
+      +'<td>'+(pending>0?'<span class="pill pill-red">'+pending+'</span>':'<span class="pill pill-green">0</span>')+'</td>'
+      +'<td>'+v.paid+'</td><td>₹'+fmtNum(v.net)+'</td></tr>';
+  }).join('');
+  document.getElementById('tbody-hospital').innerHTML = rows || '<tr><td colspan="8" class="empty">No data</td></tr>';
+}
+
+// ── 3. FINANCIAL SUMMARY ──────────────────────────────────────────────────────
+function renderFinancial() {
+  var cases = FILTERED_CASES;
+  // By FY
+  var fyMap = {};
+  cases.forEach(function(c) {
+    var fy = c.fy||'Unknown';
+    if (!fyMap[fy]) fyMap[fy] = {cases:0,s_count:0,s_amt:0,r1_count:0,r1_amt:0,r2_count:0,r2_amt:0,total:0};
+    fyMap[fy].cases++;
+    if (c.surgStatus==='CLAIMS PAID'){fyMap[fy].s_count++;fyMap[fy].s_amt+=Number(c.surgNet||0);}
+    if (c.r1Status==='CLAIMS PAID'){fyMap[fy].r1_count++;fyMap[fy].r1_amt+=Number(c.r1Net||0);}
+    if (c.r2Status==='CLAIMS PAID'){fyMap[fy].r2_count++;fyMap[fy].r2_amt+=Number(c.r2Net||0);}
+    fyMap[fy].total += Number(c.totalNet||0);
+  });
+  var fyEntries = Object.entries(fyMap).sort(function(a,b){return b[0].localeCompare(a[0]);});
+  var grandTotal = cases.reduce(function(s,c){return s+Number(c.totalNet||0);},0);
+  document.getElementById('fin-stats').innerHTML =
+    statCard(cases.length,'Total Cases','var(--text)') +
+    statCard(cases.filter(function(c){return c.surgStatus==='CLAIMS PAID';}).length,'Surgery Claims Paid','var(--green-mid)') +
+    statCard(cases.filter(function(c){return c.r1Status==='CLAIMS PAID';}).length,'Rehab1 Claims Paid','var(--blue-mid)') +
+    statCard('₹'+fmtNum(grandTotal),'Grand Total Paid','var(--amber-mid)');
+  var fyRows = fyEntries.map(function(e){
+    var fy=e[0],v=e[1];
+    return '<tr><td><strong>'+fy+'</strong></td><td>'+v.cases+'</td><td>'+v.s_count+'</td><td>₹'+fmtNum(v.s_amt)+'</td><td>'+v.r1_count+'</td><td>₹'+fmtNum(v.r1_amt)+'</td><td>'+v.r2_count+'</td><td>₹'+fmtNum(v.r2_amt)+'</td><td><strong>₹'+fmtNum(v.total)+'</strong></td></tr>';
+  }).join('');
+  document.getElementById('tbody-financial').innerHTML = fyRows || '<tr><td colspan="9" class="empty">No data</td></tr>';
+  // By package
+  var pkgMap = {};
+  cases.forEach(function(c){
+    var p=c.surgPkg||'Unknown';
+    if(!pkgMap[p]) pkgMap[p]={cases:0,amt:0};
+    pkgMap[p].cases++;
+    pkgMap[p].amt+=Number(c.surgNet||0);
+  });
+  var pkgRows = Object.entries(pkgMap).sort(function(a,b){return b[1].cases-a[1].cases;}).map(function(e){
+    var p=e[0],v=e[1];
+    var avg=v.cases>0?Math.round(v.amt/v.cases):0;
+    return '<tr><td><strong>'+p+'</strong></td><td>'+v.cases+'</td><td>₹'+fmtNum(v.amt)+'</td><td>₹'+fmtNum(avg)+'</td></tr>';
+  }).join('');
+  document.getElementById('tbody-package').innerHTML = pkgRows || '<tr><td colspan="4" class="empty">No data</td></tr>';
+}
+
+// ── 4. REHAB ACTIVITY ─────────────────────────────────────────────────────────
+function renderRehab() {
+  var cases = FILTERED_CASES;
+  var map = {};
+  cases.forEach(function(c){
+    if (!c.rehabCentre) return;
+    var r=c.rehabCentre;
+    if(!map[r]) map[r]={total:0,started:0,sessions:0,completed:0};
+    map[r].total++;
+    if ((c.sessions||0)>0) map[r].started++;
+    map[r].sessions += Number(c.sessions||0);
+    if (c.status==='paid') map[r].completed++;
+  });
+  var entries = Object.entries(map).sort(function(a,b){return b[1].total-a[1].total;});
+  var totalAssigned = Object.values(map).reduce(function(s,v){return s+v.total;},0);
+  var totalSessions = Object.values(map).reduce(function(s,v){return s+v.sessions;},0);
+  document.getElementById('rehab-stats').innerHTML =
+    statCard(Object.keys(map).length,'Rehab Centres','var(--blue-mid)') +
+    statCard(totalAssigned,'Cases Assigned','var(--text)') +
+    statCard(totalSessions,'Total Sessions Logged','var(--green-mid)') +
+    statCard(cases.filter(function(c){return !c.rehabCentre;}).length,'No Centre Assigned','var(--amber-mid)');
+  var rows = entries.map(function(e){
+    var r=e[0],v=e[1];
+    var notStarted=v.total-v.started;
+    var avg=v.started>0?(v.sessions/v.started).toFixed(1):0;
+    return '<tr><td><strong>'+r+'</strong></td><td>'+v.total+'</td>'
+      +'<td><span class="pill pill-green">'+v.started+'</span></td>'
+      +'<td>'+(notStarted>0?'<span class="pill pill-amber">'+notStarted+'</span>':'0')+'</td>'
+      +'<td>'+v.sessions+'</td><td>'+avg+'</td>'
+      +'<td>'+v.completed+'</td></tr>';
+  }).join('');
+  document.getElementById('tbody-rehab').innerHTML = rows || '<tr><td colspan="7" class="empty">No data — cases need a Rehab Centre assigned</td></tr>';
+}
+
+// ── 5. AT-RISK CASES ──────────────────────────────────────────────────────────
+function renderAtRisk() {
+  var cases = FILTERED_CASES;
+  var today = Date.now();
+  var atRisk = cases.filter(function(c){
+    if (c.status==='paid') return false;
+    return daysSince(c.lastContact) >= AT_RISK_DAYS;
+  }).sort(function(a,b){ return daysSince(b.lastContact)-daysSince(a.lastContact); });
+
+  var critical = atRisk.filter(function(c){return daysSince(c.lastContact)>=90;}).length;
+  var high = atRisk.filter(function(c){var d=daysSince(c.lastContact);return d>=45&&d<90;}).length;
+
+  document.getElementById('risk-stats').innerHTML =
+    statCard(atRisk.length,'At-Risk Cases','var(--red)') +
+    statCard(critical,'Critical (90+ days)','var(--red)') +
+    statCard(high,'High (45-89 days)','var(--amber-mid)') +
+    statCard(cases.filter(function(c){return c.status==='paid';}).length,'Completed (excluded)','var(--green-mid)');
+
+  var rows = atRisk.map(function(c){
+    var days = daysSince(c.lastContact);
+    var daysStr = days>=9000?'Never recorded':''+days+' days ago';
+    var pill = days>=90?'pill-red':days>=45?'pill-amber':'pill-blue';
+    var mob = (c.mobile||'').replace(/\.0$/,'').replace(/[^0-9+]/g,'');
+    return '<tr>'
+      +'<td style="font-size:11px;color:var(--text-light)">'+c.id+'</td>'
+      +'<td><strong>'+c.name+'</strong></td>'
+      +'<td>'+c.district+'</td>'
+      +'<td style="font-size:11px">'+c.hospital+'</td>'
+      +'<td><span class="pill pill-blue">'+(c.phase||c.journey||c.status)+'</span></td>'
+      +'<td style="font-size:11px">'+(c.lastContact||'—')+'</td>'
+      +'<td><span class="pill '+pill+'">'+daysStr+'</span></td>'
+      +'<td>'+(mob?'<a href="tel:'+mob+'" style="color:var(--blue-mid);font-weight:600">'+mob+'</a>':'—')+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('tbody-atrisk').innerHTML = rows || '<tr><td colspan="8" class="empty">No at-risk cases — all cases have recent contact ✓</td></tr>';
+}
+
+// ── 6. FY PROGRESS ────────────────────────────────────────────────────────────
+function renderFY() {
+  var cases = FILTERED_CASES;
+  var map = {};
+  cases.forEach(function(c){
+    var fy=c.fy||'Unknown';
+    if(!map[fy]) map[fy]={total:0,preauth:0,surg:0,r1:0,r2:0,paid:0,risk:0};
+    map[fy].total++;
+    if(c.status==='pending'||(!c.surgAdmit&&!c.hospSubmitted)) map[fy].preauth++;
+    if(c.surgAdmit||c.hospSubmitted) map[fy].surg++;
+    if(c.r1Admit||c.r1Status) map[fy].r1++;
+    if(c.r2Admit||c.r2Status) map[fy].r2++;
+    if(c.status==='paid') map[fy].paid++;
+    if(c.risk) map[fy].risk++;
+  });
+  var entries = Object.entries(map).sort(function(a,b){return b[0].localeCompare(a[0]);});
+  document.getElementById('fy-stats').innerHTML =
+    statCard(Object.keys(map).length,'Financial Years','var(--purple-mid)') +
+    statCard(cases.length,'Total Enrolled','var(--text)') +
+    statCard(cases.filter(function(c){return c.status==='paid';}).length,'Fully Completed','var(--green-mid)') +
+    statCard(Math.round(cases.filter(function(c){return c.status==='paid';}).length/Math.max(cases.length,1)*100)+'%','Overall Completion','var(--blue-mid)');
+  var rows = entries.map(function(e){
+    var fy=e[0],v=e[1];
+    return '<tr><td><strong>'+fy+'</strong></td><td>'+v.total+'</td><td>'+v.preauth+'</td><td>'+v.surg+'</td><td>'+v.r1+'</td><td>'+v.r2+'</td>'
+      +'<td><span class="pill pill-green">'+v.paid+'</span></td>'
+      +'<td>'+(v.risk>0?'<span class="pill pill-red">'+v.risk+'</span>':'0')+'</td>'
+      +'<td>'+progBar(v.paid,v.total)+'</td></tr>';
+  }).join('');
+  document.getElementById('tbody-fy').innerHTML = rows || '<tr><td colspan="9" class="empty">No data</td></tr>';
+}
+
+// ── CSV DOWNLOAD ──────────────────────────────────────────────────────────────
+function downloadCSV(tableId, filename) {
+  var table = document.getElementById(tableId);
+  if (!table) return;
+  var rows = [];
+  table.querySelectorAll('tr').forEach(function(tr) {
+    var cols = [];
+    tr.querySelectorAll('th,td').forEach(function(td) {
+      var text = td.innerText.replace(/\n/g,' ').replace(/,/g,' ').trim();
+      cols.push('"'+text+'"');
+    });
+    rows.push(cols.join(','));
+  });
+  var csv = rows.join('\n');
+  var blob = new Blob([csv], {type:'text/csv'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename+'_'+new Date().toISOString().substring(0,10)+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

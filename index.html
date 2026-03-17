@@ -3773,141 +3773,94 @@ function roCell(label, val) {
 }
 
 function buildHospitalReadOnly(cas) {
-  // Date formatter — "05 March 2025"
   function fmtDate(d) {
     if (!d) return '—';
-    var months = ['January','February','March','April','May','June',
-                  'July','August','September','October','November','December'];
-    var parts = String(d).split(/[-/]/);
-    if (parts.length === 3) {
-      var y = parts[0].length === 4 ? parts[0] : parts[2];
-      var m = parts[0].length === 4 ? parseInt(parts[1])-1 : parseInt(parts[1])-1;
-      var day = parts[0].length === 4 ? parts[2] : parts[0];
-      // Handle dd-Mon-yyyy format e.g. "12-Nov-2022"
-      if (isNaN(parseInt(parts[1]))) {
-        var mNames = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-        m = mNames[parts[1]] !== undefined ? mNames[parts[1]] : 0;
-        day = parts[0]; y = parts[2];
-      }
-      return String(parseInt(day)).padStart(2,'0') + ' ' + months[m] + ' ' + y;
+    var months=['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+    var s = String(d);
+    // dd-Mon-yyyy e.g. "12-Nov-2022"
+    var m1 = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+    if (m1) {
+      var mn={'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,'jul':6,'aug':7,'sep':8,'oct':9,'nov':10,'dec':11};
+      var mi = mn[m1[2].toLowerCase()];
+      return String(parseInt(m1[1])).padStart(2,'0')+' '+months[mi]+' '+m1[3];
     }
+    // yyyy-mm-dd
+    var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m2) return String(parseInt(m2[3])).padStart(2,'0')+' '+months[parseInt(m2[2])-1]+' '+m2[1];
     return d;
   }
-
   var mob = cleanMob(cas.mobile||'');
-
-  // Section builder helpers
-  function sfield(label, value, source) {
-    // source: 'sast' = teal, 'hosp' = green, 'both' = default
-    var dotColor = source==='sast' ? '#1D9E75' : source==='hosp' ? '#378ADD' : 'var(--gray-dark)';
-    if (!value) return '';
-    return '<div style="display:flex;align-items:flex-start;padding:6px 0;border-bottom:0.5px solid var(--border);gap:8px">'
-      +'<div style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';margin-top:5px;flex-shrink:0"></div>'
-      +'<div style="flex:1;display:flex;justify-content:space-between;align-items:flex-start;gap:6px">'
-      +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;min-width:38%">'+label+'</span>'
-      +'<span style="font-size:12px;font-weight:500;color:var(--text);text-align:right">'+value+'</span>'
-      +'</div></div>';
-  }
-  function sfieldLink(label, value) {
-    if (!value) return '';
-    return '<div style="display:flex;align-items:flex-start;padding:6px 0;border-bottom:0.5px solid var(--border);gap:8px">'
-      +'<div style="width:6px;height:6px;border-radius:50%;background:#1D9E75;margin-top:5px;flex-shrink:0"></div>'
-      +'<div style="flex:1;display:flex;justify-content:space-between;align-items:flex-start;gap:6px">'
-      +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;min-width:38%">'+label+'</span>'
-      +'<a href="tel:'+value+'" style="font-size:12px;font-weight:600;color:var(--blue-mid);text-align:right">&#128222; '+value+'</a>'
-      +'</div></div>';
-  }
 
   document.getElementById('hu-body').innerHTML =
 
     // ── LOCKED BANNER ──────────────────────────────────────────────────────
     '<div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:12px 16px;margin:16px 16px 0;display:flex;gap:10px;align-items:center">'
-    +'<span style="font-size:20px">&#9989;</span>'
-    +'<div><div style="font-size:13px;font-weight:600;color:var(--green-dark)">Surgery details submitted &amp; locked</div>'
-    +'<div style="font-size:11px;color:var(--green);margin-top:1px">By '+(cas.hospSubmittedBy||'hospital')+' &nbsp;&#183;&nbsp; '+fmtDate(cas.hospSubmittedAt?cas.hospSubmittedAt.substring(0,10):null)+'</div>'
+    +'<span style="font-size:18px">&#9989;</span>'
+    +'<div><div style="font-size:13px;font-weight:600;color:var(--green-dark)">Submitted &amp; locked</div>'
+    +'<div style="font-size:11px;color:var(--green)">By '+(cas.hospSubmittedBy||'hospital')+' &nbsp;·&nbsp; '+fmtDate(cas.hospSubmittedAt?cas.hospSubmittedAt.substring(0,10):null)+'</div>'
     +'</div></div>'
 
-    // ── COLOUR LEGEND ──────────────────────────────────────────────────────
-    +'<div style="display:flex;gap:16px;padding:10px 16px;font-size:11px;color:var(--text-light)">'
-    +'<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1D9E75;margin-right:4px"></span>From SAST</span>'
-    +'<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#378ADD;margin-right:4px"></span>Hospital submitted</span>'
+    // ── PATIENT INFO CARD (same green card as before submission) ───────────
+    +'<div style="margin:12px 16px 0;background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128203; Patient Information</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
+    +piRow('SAST Ref',   cas.surgRefNo||cas.tpa||'—')
+    +piRow('FY',         cas.fy||'—')
+    +piRow('Name',       cas.name||'—')
+    +piRow('Gender',     cas.gender||'—')
+    +piRow('Caste',      cas.caste||'—')
+    +piRow('Village',    cas.village||'—')
+    +piRow('Taluk',      cas.taluk||'—')
+    +piRow('District',   cas.district||'—')
+    +piRow('Hospital',   cas.hospital||'—')
+    +piRow('Doctor',     cas.doctor||'—')
     +'</div>'
+    // Mobile row
+    +'<div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--green-border);display:flex;justify-content:space-between;align-items:center">'
+    +'<div style="font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase">Mobile</div>'
+    +(mob
+      ? '<a href="tel:'+mob+'" style="font-size:13px;font-weight:600;color:var(--green-dark)">&#128222; '+mob+'</a>'
+      : '<span style="font-size:12px;color:var(--amber)">Not recorded</span>')
+    +'</div></div>'
 
     // ── JOURNEY INFOGRAPHIC ────────────────────────────────────────────────
-    +'<div style="margin:0 16px 14px;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px">'
+    +'<div style="margin:12px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Programme Journey</div>'
     +buildJourneyInfographic(cas)+'</div>'
 
-    // ── COMPACT ALL-IN-ONE CARD ────────────────────────────────────────────
-    +'<div style="margin:0 16px;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px;overflow:hidden">'
+    // ── HOSPITAL SUBMITTED DETAILS (compact 2-col grid) ────────────────────
+    +'<div style="margin:12px 16px 0;background:var(--blue-light);border:1px solid #B5D4F4;border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#127973; Surgery &amp; Device Details</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
+    +piRowBlue('DOB',        fmtDate(cas.dob))
+    +piRowBlue('Res. Dist',  cas.resDistrict||cas.resDist||'—')
+    +piRowBlue('Admission',  fmtDate(cas.surgAdmit))
+    +piRowBlue('Surgery',    fmtDate(cas.surgDate))
+    +piRowBlue('Discharge',  fmtDate(cas.surgDisch))
+    +piRowBlue('Switch-on',  fmtDate(cas.switchOn))
+    +piRowBlue('Side',       cas.side||'—')
+    +piRowBlue('Mentor',     cas.mentorSurgeon||'—')
+    +piRowBlue('Mfr',        cas.manufacturer||'—')
+    +piRowBlue('Serial No.', cas.serialNo||'—')
+    +'</div>'
+    +(cas.rehabCentre
+      ? '<div style="margin-top:8px;padding-top:8px;border-top:0.5px solid #B5D4F4;font-size:11px;color:var(--blue)"><span style="font-weight:600">Rehab Centre: </span>'+cas.rehabCentre+'</div>'
+      : '')
+    +((cas.hospRemarks||cas.remarks)
+      ? '<div style="margin-top:6px;font-size:11px;color:var(--blue-mid)"><span style="font-weight:600">Remarks: </span>'+(cas.hospRemarks||cas.remarks)+'</div>'
+      : '')
+    +'</div>'
 
-    // Patient identity — SAST (teal dots)
-    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin-bottom:6px">Patient</div>'
-    +sfield('Name',       cas.name,            'sast')
-    +sfield('Gender',     cas.gender,           'sast')
-    +sfield('DOB',        fmtDate(cas.dob),     'hosp')
-    +sfield('Age at surgery', cas.age,          'sast')
-    +sfield('Caste',      cas.caste,            'sast')
-    +(mob ? sfieldLink('Mobile', mob) : sfield('Mobile','Not recorded','sast'))
-    +sfield('Village',    cas.village,          'sast')
-    +sfield('Taluk',      cas.taluk,            'sast')
-    +sfield('District',   cas.district,         'sast')
-    +sfield('Res. District', cas.resDistrict||cas.resDist, 'hosp')
-    +sfield('FY',         cas.fy,               'sast')
-    +sfield('Scheme',     cas.scheme,           'sast')
-    +sfield('TPA ID',     cas.tpa,              'sast')
+    +'<div style="padding:16px 16px 40px">'
+    +'<button onclick="goBack()" style="width:100%;padding:13px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;">&#8592; Back to Cases</button>'
+    +'</div>';
+}
 
-    // Hospital — SAST (teal dots)
-    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Hospital &amp; SAST</div>'
-    +sfield('Hospital',   cas.hospital,         'sast')
-    +sfield('Hosp. Dist', cas.hospDist,         'sast')
-    +sfield('Hosp. Type', cas.hospType,         'sast')
-    +sfield('Treating Dr',cas.doctor,           'sast')
-    +sfield('SAST Ref',   cas.surgRefNo,        'sast')
-    +sfield('Pre-auth',   cas.surgStatus,       'sast')
-    +sfield('Package',    cas.surgPkg,          'sast')
-    +(cas.surgNet ? sfield('Surgery paid','&#8377;'+Number(cas.surgNet).toLocaleString('en-IN'),'sast') : '')
-
-    // Surgery details — hospital submitted (blue dots)
-    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Surgery Details</div>'
-    +sfield('Admission',  fmtDate(cas.surgAdmit), 'hosp')
-    +sfield('Surgery',    fmtDate(cas.surgDate),  'hosp')
-    +sfield('Discharge',  fmtDate(cas.surgDisch), 'hosp')
-    +sfield('Switch-on',  fmtDate(cas.switchOn),  'hosp')
-    +sfield('Side',       cas.side,               'hosp')
-    +sfield('Mentor Surgeon', cas.mentorSurgeon,  'hosp')
-    +sfield('Rehab Centre', cas.rehabCentre,      'hosp')
-
-    // Device — hospital submitted (blue dots)
-    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Device</div>'
-    +sfield('Manufacturer', cas.manufacturer,    'hosp')
-    +sfield('Model',        cas.model,           'hosp')
-    +sfield('Serial No.',   cas.serialNo,        'hosp')
-
-    // Rehab claims — SAST (teal dots)
-    +((cas.r1RefNo||cas.r1Admit) ?
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Rehab 1 (2002GP)</div>'
-      +sfield('Ref No.',      cas.r1RefNo,        'sast')
-      +sfield('Preauth',      fmtDate(cas.r1Admit),'sast')
-      +sfield('Status',       cas.r1Status,       'sast')
-      +(cas.r1Net ? sfield('Net paid','&#8377;'+Number(cas.r1Net).toLocaleString('en-IN'),'sast') : '')
-    : '')
-    +((cas.r2RefNo||cas.r2Admit) ?
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Rehab 2 (2003GP)</div>'
-      +sfield('Ref No.',      cas.r2RefNo,        'sast')
-      +sfield('Preauth',      fmtDate(cas.r2Admit),'sast')
-      +sfield('Status',       cas.r2Status,       'sast')
-      +(cas.r2Net ? sfield('Net paid','&#8377;'+Number(cas.r2Net).toLocaleString('en-IN'),'sast') : '')
-    : '')
-
-    // Remarks
-    +((cas.hospRemarks||cas.remarks) ?
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Remarks</div>'
-      +'<div style="font-size:12px;color:var(--text-mid);padding:4px 0">'+(cas.hospRemarks||cas.remarks)+'</div>'
-    : '')
-
-    +'</div>'  // end card
-
-    +'<div style="padding:16px 16px 40px"><button onclick="goBack()" style="width:100%;padding:13px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;">&#8592; Back to Cases</button></div>';
+// piRow variant for blue card
+function piRowBlue(label, value) {
+  return '<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+label+'</div>'
+    +'<div style="color:var(--blue-mid);font-weight:500;font-size:12px;margin-top:1px">'+(value||'—')+'</div></div>';
 }
 
 

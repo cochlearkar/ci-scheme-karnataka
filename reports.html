@@ -296,26 +296,48 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
     <!-- MONTHLY / QUARTERLY -->
     <div class="report-section" id="sec-quarterly">
       <div class="stat-grid" id="qtr-stats"></div>
-      <div class="table-wrap" style="margin-bottom:16px">
-        <div class="table-header">
-          <span class="table-title">Surgeries &#8212; Quarterly Summary (State Level)</span>
-          <button class="dl-btn" onclick="downloadCSV('tbl-quarterly','quarterly_surgeries')">&#11015; CSV</button>
-        </div>
-        <div style="overflow-x:auto"><table id="tbl-quarterly">
-          <thead><tr><th>FY</th><th>Q1 (Apr-Jun)</th><th>Q2 (Jul-Sep)</th><th>Q3 (Oct-Dec)</th><th>Q4 (Jan-Mar)</th><th>Total</th></tr></thead>
-          <tbody id="tbody-quarterly"></tbody>
-        </table></div>
-      </div>
+
+      <!-- Single toggleable table -->
       <div class="table-wrap">
         <div class="table-header">
-          <span class="table-title">Surgeries &#8212; Month-wise Detail</span>
-          <button class="dl-btn" onclick="downloadCSV('tbl-monthly','monthly_surgeries')">&#11015; CSV</button>
+          <span class="table-title" id="qtr-table-title">Surgeries by Period</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <!-- Toggle buttons -->
+            <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12px">
+              <button id="btn-monthly" onclick="setQtrView('monthly')"
+                style="padding:5px 14px;border:none;background:var(--green-dark);color:#fff;cursor:pointer;font-family:inherit;font-weight:600">Monthly</button>
+              <button id="btn-quarterly" onclick="setQtrView('quarterly')"
+                style="padding:5px 14px;border:none;background:transparent;color:var(--text-mid);cursor:pointer;font-family:inherit">Quarterly</button>
+            </div>
+            <button class="dl-btn" onclick="downloadCSV('tbl-period','period_surgeries')">&#11015; CSV</button>
+          </div>
         </div>
-        <div style="overflow-x:auto"><table id="tbl-monthly">
-          <thead id="thead-monthly"><tr><th>Month</th></tr></thead>
-          <tbody id="tbody-monthly"></tbody>
+        <div style="overflow-x:auto"><table id="tbl-period">
+          <thead id="thead-period"><tr><th>Period</th></tr></thead>
+          <tbody id="tbody-period"></tbody>
         </table></div>
       </div>
+
+      <!-- Drill-down panel -->
+      <div id="drilldown-panel" style="display:none;margin-top:16px">
+        <div class="table-wrap">
+          <div class="table-header">
+            <div style="display:flex;align-items:center;gap:10px">
+              <button onclick="closeDrilldown()" style="background:var(--gray);border:0.5px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">&#8592; Back</button>
+              <span class="table-title" id="drilldown-title">Cases</span>
+            </div>
+            <button class="dl-btn" onclick="downloadCSV('tbl-drilldown','drilldown_cases')">&#11015; CSV</button>
+          </div>
+          <div style="overflow-x:auto"><table id="tbl-drilldown">
+            <thead><tr>
+              <th>Card No.</th><th>Name</th><th>Gender</th><th>District</th><th>Hospital</th>
+              <th>Admission Date</th><th>Surgery Date</th><th>Package</th><th>Status</th>
+            </tr></thead>
+            <tbody id="tbody-drilldown"></tbody>
+          </table></div>
+        </div>
+      </div>
+
     </div>
 
   </div>
@@ -401,7 +423,7 @@ var ALL_CASES = [];
 var FILTERED_CASES = [];
 var AT_RISK_DAYS = 45;
 
-// ── FILTERS ──────────────────────────────────────────────────────────────────
+// -- FILTERS ------------------------------------------------------------------
 function populateFilters() {
   var fys = [...new Set(ALL_CASES.map(c=>c.fy).filter(Boolean))].sort().reverse();
   var zones = [...new Set(ALL_CASES.map(c=>c.zone).filter(Boolean))].sort();
@@ -438,7 +460,7 @@ function resetFilters() {
   initSortable();
 }
 
-// ── TABS ──────────────────────────────────────────────────────────────────────
+// -- TABS ----------------------------------------------------------------------
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.report-section').forEach(s => s.classList.remove('active'));
@@ -451,7 +473,7 @@ function showTab(name) {
   initSortable();
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
+// -- HELPERS -------------------------------------------------------------------
 function fmtNum(n) { return Number(n||0).toLocaleString('en-IN'); }
 function pct(a,b) { return b>0 ? Math.round((a/b)*100)+'%' : '0%'; }
 function progBar(a,b) {
@@ -469,7 +491,7 @@ function statCard(num, label, color) {
   return '<div class="stat-card"><div class="stat-num" style="color:'+color+'">'+num+'</div><div class="stat-label">'+label+'</div></div>';
 }
 
-// ── RENDER ALL ────────────────────────────────────────────────────────────────
+// -- RENDER ALL ----------------------------------------------------------------
 function renderAll() {
   renderDistrict();
   renderHospital();
@@ -482,7 +504,7 @@ function renderAll() {
   setTimeout(initSortable, 0);
 }
 
-// ── 1. DISTRICT SUMMARY ───────────────────────────────────────────────────────
+// -- 1. DISTRICT SUMMARY -------------------------------------------------------
 function renderDistrict() {
   var cases = FILTERED_CASES;
   var map = {};
@@ -511,7 +533,7 @@ function renderDistrict() {
   document.getElementById('tbody-district').innerHTML = rows || '<tr><td colspan="9" class="empty">No data</td></tr>';
 }
 
-// ── 2. HOSPITAL PERFORMANCE ───────────────────────────────────────────────────
+// -- 2. HOSPITAL PERFORMANCE ---------------------------------------------------
 function renderHospital() {
   var cases = FILTERED_CASES;
   var map = {};
@@ -542,7 +564,7 @@ function renderHospital() {
   document.getElementById('tbody-hospital').innerHTML = rows || '<tr><td colspan="8" class="empty">No data</td></tr>';
 }
 
-// ── 3. FINANCIAL SUMMARY ──────────────────────────────────────────────────────
+// -- 3. FINANCIAL SUMMARY ------------------------------------------------------
 function renderFinancial() {
   var cases = FILTERED_CASES;
   // By FY
@@ -584,7 +606,7 @@ function renderFinancial() {
   document.getElementById('tbody-package').innerHTML = pkgRows || '<tr><td colspan="4" class="empty">No data</td></tr>';
 }
 
-// ── 4. REHAB ACTIVITY ─────────────────────────────────────────────────────────
+// -- 4. REHAB ACTIVITY ---------------------------------------------------------
 function renderRehab() {
   var cases = FILTERED_CASES;
   var map = {};
@@ -618,7 +640,7 @@ function renderRehab() {
   document.getElementById('tbody-rehab').innerHTML = rows || '<tr><td colspan="7" class="empty">No data — cases need a Rehab Centre assigned</td></tr>';
 }
 
-// ── 5. AT-RISK CASES ──────────────────────────────────────────────────────────
+// -- 5. AT-RISK CASES ----------------------------------------------------------
 function renderAtRisk() {
   var cases = FILTERED_CASES;
   var today = Date.now();
@@ -655,7 +677,7 @@ function renderAtRisk() {
   document.getElementById('tbody-atrisk').innerHTML = rows || '<tr><td colspan="8" class="empty">No at-risk cases — all cases have recent contact ✓</td></tr>';
 }
 
-// ── 6. FY PROGRESS ────────────────────────────────────────────────────────────
+// -- 6. FY PROGRESS ------------------------------------------------------------
 function renderFY() {
   var cases = FILTERED_CASES;
   var map = {};
@@ -686,7 +708,7 @@ function renderFY() {
   document.getElementById('tbody-fy').innerHTML = rows || '<tr><td colspan="9" class="empty">No data</td></tr>';
 }
 
-// ── TABLE SORTING ────────────────────────────────────────────────────────────
+// -- TABLE SORTING ------------------------------------------------------------
 var _sortState = {}; // tableId -> {col, dir}
 
 function makeSortable(tableId) {
@@ -739,130 +761,192 @@ function initSortable() {
 }
 
 
-// ── MONTHLY / QUARTERLY SURGERIES ────────────────────────────────────────────
+// -- MONTHLY / QUARTERLY SURGERIES ---------------------------------------------
+var _qtrView = 'monthly'; // 'monthly' or 'quarterly'
+var _qtrData = {}; // pre-parsed data for drilldown
+
+function setQtrView(mode) {
+  _qtrView = mode;
+  document.getElementById('btn-monthly').style.background   = mode==='monthly'   ? 'var(--green-dark)' : 'transparent';
+  document.getElementById('btn-monthly').style.color        = mode==='monthly'   ? '#fff' : 'var(--text-mid)';
+  document.getElementById('btn-quarterly').style.background = mode==='quarterly' ? 'var(--green-dark)' : 'transparent';
+  document.getElementById('btn-quarterly').style.color      = mode==='quarterly' ? '#fff' : 'var(--text-mid)';
+  renderPeriodTable();
+  closeDrilldown();
+}
+
+function parseSurgDate(c) {
+  var d = c.surgAdmit || c.surgDate || '';
+  if (!d) return null;
+  var d1 = new Date(d);
+  if (!isNaN(d1)) return d1;
+  var m1 = String(d).match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (m1) {
+    var mn={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+    return new Date(parseInt(m1[3]), mn[m1[2].toLowerCase()]-1, parseInt(m1[1]));
+  }
+  return null;
+}
+
+function getFYPeriod(date) {
+  var m = date.getMonth()+1;
+  var y = date.getFullYear();
+  var fyYear = m>=4 ? y : y-1;
+  var fy = fyYear+'-'+(fyYear+1).toString().slice(2);
+  var q = m>=4&&m<=6?'Q1':m>=7&&m<=9?'Q2':m>=10&&m<=12?'Q3':'Q4';
+  var MNAMES = {1:'Jan',2:'Feb',3:'Mar',4:'Apr',5:'May',6:'Jun',
+                7:'Jul',8:'Aug',9:'Sep',10:'Oct',11:'Nov',12:'Dec'};
+  return {fy:fy, q:q, month:m, monthName:MNAMES[m]};
+}
+
 function renderQuarterly() {
   var cases = FILTERED_CASES;
-
-  var MONTHS = ['April','May','June','July','August','September',
-                'October','November','December','January','February','March'];
-  var MONTH_NOS = [4,5,6,7,8,9,10,11,12,1,2,3]; // FY order
-
-  // Parse surgery date from a case
-  function getSurgDate(c) {
-    var d = c.surgAdmit || c.surgDate || '';
-    if (!d) return null;
-    var d1 = new Date(d);
-    if (!isNaN(d1)) return d1;
-    // dd-Mon-yyyy
-    var m1 = String(d).match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-    if (m1) {
-      var mn={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-      return new Date(parseInt(m1[3]), mn[m1[2].toLowerCase()]-1, parseInt(m1[1]));
-    }
-    return null;
-  }
-
-  function getFYQuarter(date) {
-    if (!date) return null;
-    var m = date.getMonth()+1; // 1-12
-    var y = date.getFullYear();
-    // FY runs Apr-Mar; FY label = year of April
-    var fyYear = m >= 4 ? y : y-1;
-    var fy = fyYear+'-'+(fyYear+1).toString().slice(2);
-    var q = m>=4&&m<=6?'Q1': m>=7&&m<=9?'Q2': m>=10&&m<=12?'Q3':'Q4';
-    return { fy: fy, q: q, month: m, year: y };
-  }
-
-  // Build maps
-  var qMap = {}; // fy -> {Q1,Q2,Q3,Q4}
-  var mMap = {}; // "Apr 2022" -> count  -- keyed by fy+month for ordering
-
-  // Collect all FYs from data
+  // Build data store keyed by fy|period -> [cases]
+  _qtrData = {};
   var fySet = new Set();
-
   cases.forEach(function(c) {
-    var d = getSurgDate(c);
+    var d = parseSurgDate(c);
     if (!d) return;
-    var info = getFYQuarter(d);
-    if (!info) return;
+    var info = getFYPeriod(d);
     fySet.add(info.fy);
-
-    if (!qMap[info.fy]) qMap[info.fy] = {Q1:0,Q2:0,Q3:0,Q4:0};
-    qMap[info.fy][info.q]++;
-
-    var key = info.fy + '|' + info.month;
-    if (!mMap[key]) mMap[key] = {fy:info.fy, month:info.month, year:info.year, count:0};
-    mMap[key].count++;
+    // monthly key
+    var mKey = info.fy+'|'+info.monthName;
+    if (!_qtrData[mKey]) _qtrData[mKey] = [];
+    _qtrData[mKey].push(c);
+    // quarterly key
+    var qKey = info.fy+'|'+info.q;
+    if (!_qtrData[qKey]) _qtrData[qKey] = [];
+    _qtrData[qKey].push(c);
   });
 
   var allFYs = [...fySet].sort().reverse();
+  var total = cases.filter(function(c){return !!parseSurgDate(c);}).length;
+  var noDate = cases.filter(function(c){return !parseSurgDate(c);}).length;
 
-  // ── STATS ────────────────────────────────────────────────────────────────
-  var total = cases.filter(function(c){ return !!getSurgDate(c); }).length;
-  var noDate = cases.filter(function(c){ return !getSurgDate(c); }).length;
-  var latestFY = allFYs[0]||'—';
-  var latestTotal = qMap[latestFY] ? Object.values(qMap[latestFY]).reduce(function(s,v){return s+v;},0) : 0;
   document.getElementById('qtr-stats').innerHTML =
-    statCard(total, 'Surgeries with Date', 'var(--green-mid)') +
-    statCard(noDate, 'No Date Recorded', 'var(--amber-mid)') +
+    statCard(total,    'Surgeries with Date',  'var(--green-mid)') +
+    statCard(noDate,   'No Date Recorded',     'var(--amber-mid)') +
     statCard(allFYs.length, 'Financial Years', 'var(--purple-mid)') +
-    statCard(latestTotal, 'Surgeries in '+latestFY, 'var(--blue-mid)');
+    statCard(cases.length,  'Total Cases',     'var(--text)');
 
-  // ── QUARTERLY TABLE ───────────────────────────────────────────────────────
-  var qRows = allFYs.map(function(fy) {
-    var v = qMap[fy]||{Q1:0,Q2:0,Q3:0,Q4:0};
-    var tot = v.Q1+v.Q2+v.Q3+v.Q4;
-    function qCell(n) {
-      return '<td style="text-align:center;font-weight:'+(n>0?'600':'400')+';color:'+(n>0?'var(--text)':'var(--text-light)')+'">'+
-        (n>0?n:'—')+'</td>';
-    }
-    return '<tr><td><strong>'+fy+'</strong></td>'+qCell(v.Q1)+qCell(v.Q2)+qCell(v.Q3)+qCell(v.Q4)+
-      '<td style="text-align:center;font-weight:700">'+tot+'</td></tr>';
-  }).join('');
-  document.getElementById('tbody-quarterly').innerHTML = qRows ||
-    '<tr><td colspan="6" class="empty">No surgery dates recorded</td></tr>';
-
-  // ── MONTHLY TABLE — rows = FY months, columns = FY ───────────────────────
-  // Header: Month | FY1 | FY2 | FY3 ...
-  var thead = '<tr><th>Month</th>'+allFYs.map(function(fy){
-    return '<th style="text-align:center">'+fy+'</th>';
-  }).join('')+'<th style="text-align:center">All Years</th></tr>';
-  document.getElementById('thead-monthly').innerHTML = thead;
-
-  // Row order: Apr, May, Jun ... Mar (FY month order)
-  var MONTH_NAMES = {4:'April',5:'May',6:'June',7:'July',8:'August',9:'September',
-                     10:'October',11:'November',12:'December',1:'January',2:'February',3:'March'};
-  var FY_MONTH_ORDER = [4,5,6,7,8,9,10,11,12,1,2,3];
-
-  // Find max for colour coding
-  var allCounts = Object.values(mMap).map(function(v){return v.count;});
-  var maxCount = Math.max.apply(null, allCounts)||1;
-
-  function mCell(n) {
-    if (!n) return '<td style="text-align:center;color:var(--text-light)">—</td>';
-    var pct = Math.round(n/maxCount*100);
-    var bg = pct>=80?'background:#e1f5ee;color:#0a3d2e':pct>=50?'background:#faeeda;color:#8a5a0a':'';
-    return '<td style="text-align:center;font-weight:600;'+bg+'">'+n+'</td>';
-  }
-
-  var mRows = FY_MONTH_ORDER.map(function(mo) {
-    var rowTotal = 0;
-    var cells = allFYs.map(function(fy) {
-      var key = fy+'|'+mo;
-      var n = mMap[key] ? mMap[key].count : 0;
-      rowTotal += n;
-      return mCell(n);
-    }).join('');
-    return '<tr><td><strong>'+MONTH_NAMES[mo]+'</strong></td>'+cells+mCell(rowTotal)+'</tr>';
-  }).join('');
-
-  document.getElementById('tbody-monthly').innerHTML = mRows;
-
-  makeSortable('tbl-quarterly');
-  makeSortable('tbl-monthly');
+  window._qtrAllFYs = allFYs;
+  renderPeriodTable();
 }
 
-// ── DISTRICT × YEAR GRID ──────────────────────────────────────────────────────
+function renderPeriodTable() {
+  var allFYs = window._qtrAllFYs || [];
+  if (!allFYs.length) return;
+
+  var isMonthly = _qtrView === 'monthly';
+  document.getElementById('qtr-table-title').textContent =
+    isMonthly ? 'Surgeries — Month-wise (tap a cell to see cases)' 
+              : 'Surgeries — Quarter-wise (tap a cell to see cases)';
+
+  var MONTHLY_ROWS = [
+    {key:'Apr',label:'April'},   {key:'May',label:'May'},    {key:'Jun',label:'June'},
+    {key:'Jul',label:'July'},    {key:'Aug',label:'August'}, {key:'Sep',label:'September'},
+    {key:'Oct',label:'October'}, {key:'Nov',label:'November'},{key:'Dec',label:'December'},
+    {key:'Jan',label:'January'}, {key:'Feb',label:'February'},{key:'Mar',label:'March'}
+  ];
+  var QUARTERLY_ROWS = [
+    {key:'Q1',label:'Q1  Apr – Jun'},
+    {key:'Q2',label:'Q2  Jul – Sep'},
+    {key:'Q3',label:'Q3  Oct – Dec'},
+    {key:'Q4',label:'Q4  Jan – Mar'}
+  ];
+  var rows = isMonthly ? MONTHLY_ROWS : QUARTERLY_ROWS;
+
+  // Header
+  var hdr = '<tr><th>'+(isMonthly?'Month':'Quarter')+'</th>'+
+    allFYs.map(function(fy){return '<th style="text-align:center;cursor:pointer">'+fy+'</th>';}).join('')+
+    '<th style="text-align:center">Total</th></tr>';
+  document.getElementById('thead-period').innerHTML = hdr;
+
+  // Find max for colour coding
+  var allCounts = [];
+  rows.forEach(function(r){
+    allFYs.forEach(function(fy){
+      var k = fy+'|'+r.key;
+      allCounts.push(_qtrData[k] ? _qtrData[k].length : 0);
+    });
+  });
+  var maxVal = Math.max.apply(null,allCounts)||1;
+
+  function cell(fy, key, count) {
+    if (!count) return '<td style="text-align:center;color:var(--text-light)">&mdash;</td>';
+    var pct = Math.round(count/maxVal*100);
+    var bg = pct>=75?'background:#e1f5ee;color:#0a3d2e': pct>=40?'background:#faeeda;color:#8a5a0a':'';
+    var dataKey = fy+'|'+key;
+    var label   = fy+' '+key;
+    return '<td style="text-align:center;font-weight:600;cursor:pointer;'+bg+
+      '" onclick="drillDown(\'' + dataKey + '\',\'' + label + '\')" '+
+      'title="Click to see cases">'+count+'</td>';
+  }
+
+
+  var bodyRows = rows.map(function(r){
+    var rowTotal = 0;
+    var cells = allFYs.map(function(fy){
+      var k = fy+'|'+r.key;
+      var n = _qtrData[k] ? _qtrData[k].length : 0;
+      rowTotal += n;
+      return cell(fy, r.key, n);
+    }).join('');
+    var totalCell = rowTotal>0
+      ? '<td style="text-align:center;font-weight:700">'+rowTotal+'</td>'
+      : '<td style="text-align:center;color:var(--text-light)">—</td>';
+    return '<tr><td><strong>'+r.label+'</strong></td>'+cells+totalCell+'</tr>';
+  }).join('');
+
+  document.getElementById('tbody-period').innerHTML = bodyRows;
+  makeSortable('tbl-period');
+}
+
+function drillDown(dataKey, label) {
+  var cases = _qtrData[dataKey] || [];
+  document.getElementById('drilldown-title').textContent =
+    label + '  —  ' + cases.length + ' surgery case' + (cases.length!==1?'s':'');
+
+  var MONTHS = {1:'January',2:'February',3:'March',4:'April',5:'May',6:'June',
+                7:'July',8:'August',9:'September',10:'October',11:'November',12:'December'};
+
+  function fmtD(d) {
+    if (!d) return '—';
+    var dt = new Date(d);
+    if (!isNaN(dt)) return String(dt.getDate()).padStart(2,'0')+' '+MONTHS[dt.getMonth()+1]+' '+dt.getFullYear();
+    var m = String(d).match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+    if (m) return String(parseInt(m[1])).padStart(2,'0')+' '+m[2]+' '+m[3];
+    return d;
+  }
+
+  var rows = cases.map(function(c){
+    return '<tr>'
+      +'<td style="font-size:11px;color:var(--text-light)">'+c.id+'</td>'
+      +'<td><strong>'+c.name+'</strong></td>'
+      +'<td>'+c.gender+'</td>'
+      +'<td>'+c.district+'</td>'
+      +'<td style="font-size:11px">'+c.hospital+'</td>'
+      +'<td>'+fmtD(c.surgAdmit)+'</td>'
+      +'<td>'+fmtD(c.surgDate)+'</td>'
+      +'<td>'+c.surgPkg+'</td>'
+      +'<td><span class="pill '+(c.surgStatus==='CLAIMS PAID'?'pill-green':'pill-amber')+'">'+
+        (c.surgStatus||'—')+'</span></td>'
+      +'</tr>';
+  }).join('');
+
+  document.getElementById('tbody-drilldown').innerHTML = rows ||
+    '<tr><td colspan="9" class="empty">No cases</td></tr>';
+  document.getElementById('drilldown-panel').style.display = 'block';
+  document.getElementById('drilldown-panel').scrollIntoView({behavior:'smooth',block:'start'});
+  makeSortable('tbl-drilldown');
+}
+
+function closeDrilldown() {
+  document.getElementById('drilldown-panel').style.display = 'none';
+}
+
+
+// -- DISTRICT × YEAR GRID ------------------------------------------------------
 function renderDistYr() {
   var cases = FILTERED_CASES;
   var el = document.getElementById('distyr-metric');
@@ -951,7 +1035,7 @@ function renderDistYr() {
   makeSortable('tbl-distyr');
 }
 
-// ── CSV DOWNLOAD ──────────────────────────────────────────────────────────────
+// -- CSV DOWNLOAD --------------------------------------------------------------
 function downloadCSV(tableId, filename) {
   var table = document.getElementById(tableId);
   if (!table) return;

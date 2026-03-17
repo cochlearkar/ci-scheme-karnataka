@@ -260,6 +260,37 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
       </div>
     </div>
 
+
+    <!-- ── DISTRICT × YEAR GRID ── -->
+    <div class="report-section" id="sec-distyr">
+      <div class="stat-grid" id="distyr-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">District Performance — Year on Year</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="distyr-metric" onchange="renderDistYr()" class="filter-select" style="font-size:11px">
+              <option value="total">Cases Enrolled</option>
+              <option value="surg">Surgery Done</option>
+              <option value="r1">Rehab 1 Done</option>
+              <option value="r2">Rehab 2 Done</option>
+              <option value="paid">Completed</option>
+              <option value="risk">At Risk</option>
+              <option value="pct">Completion %</option>
+            </select>
+            <button class="dl-btn" onclick="downloadCSV('tbl-distyr','district_year_comparison')">&#11015; CSV</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-distyr" class="dygrid">
+          <thead id="thead-distyr"><tr><th>District</th></tr></thead>
+          <tbody id="tbody-distyr"></tbody>
+        </table></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-light);margin-top:8px;padding:0 4px">
+        &#128161; Tip: Change the metric above to compare Surgery Done, Completed, or At-Risk counts across years and districts.
+        Cells are colour-coded: dark green = high, amber = medium, red = at-risk.
+      </div>
+    </div>
+
   </div>
 </div>
 

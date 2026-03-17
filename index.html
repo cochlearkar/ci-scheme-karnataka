@@ -3692,30 +3692,100 @@ function roCell(label, val) {
 }
 
 function buildHospitalReadOnly(cas) {
+  function roRow(label, value, link) {
+    if (!value) return '';
+    var val = link ? '<a href="tel:'+value+'" style="color:var(--blue-mid);font-weight:600">'+value+'</a>' : value;
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid var(--border)">'
+      +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;width:45%">'+label+'</span>'
+      +'<span style="font-size:13px;font-weight:500;color:var(--text-mid);text-align:right;flex:1">'+val+'</span></div>';
+  }
+  var mob = cleanMob(cas.mobile||'');
+
   document.getElementById('hu-body').innerHTML =
-    '<div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:14px 16px;margin:16px 16px 0;display:flex;gap:10px">' +
-    '<div style="font-size:20px">&#9989;</div><div>' +
-    '<div style="font-size:13px;font-weight:600;color:var(--green-dark)">Surgery details submitted &amp; locked</div>' +
-    '<div style="font-size:11px;color:var(--green);margin-top:2px">By '+(cas.hospSubmittedBy||'&mdash;')+' on '+(cas.hospSubmittedAt?cas.hospSubmittedAt.substring(0,10):'&mdash;')+'</div>' +
-    '</div></div>' +
-    '<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
-    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128202; Programme Journey</div>'
-    +buildJourneyInfographic(cas)
-    +'</div>' +
-    '<div class="form-section" style="margin-top:16px"><div class="form-section-title">&#128118; Patient</div><div class="pic-grid">' +
-    roCell('Name',cas.name)+roCell('Gender',cas.gender)+roCell('Date of Birth',cas.dob)+roCell('Age at Surgery',cas.age)+
-    roCell('District',cas.district)+roCell('Residential District',cas.resDist)+roCell('Taluk',cas.taluk)+roCell('Mobile',cas.mobile)+
-    '</div></div>' +
-    '<div class="form-section"><div class="form-section-title">&#127973; Surgery Details</div><div class="pic-grid">' +
-    roCell('Admission Date',cas.surgAdmit)+roCell('Surgery Date',cas.surgDate)+roCell('Discharge Date',cas.surgDisch)+
-    roCell('Switch-on Date',cas.switchOn)+roCell('Implanted Side',cas.side)+roCell('Mentor Surgeon',cas.mentorSurgeon)+
-    roCell('Rehab Centre',cas.rehabCentre)+
-    '</div></div>' +
-    '<div class="form-section"><div class="form-section-title">&#128295; Device Details</div><div class="pic-grid">' +
-    roCell('Manufacturer',cas.manufacturer)+roCell('Model',cas.model)+roCell('Serial Number',cas.serialNo)+
-    '</div></div>' +
-    (cas.remarks?'<div class="form-section"><div class="form-section-title">&#128221; Remarks</div><div style="font-size:13px;padding:4px 0">'+cas.remarks+'</div></div>':'') +
-    '<div style="padding:16px 0 32px"><button onclick="goBack()" style="width:100%;padding:13px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;">&#8592; Back to Cases</button></div>';
+    // ── LOCKED BANNER ─────────────────────────────────────────────────────
+    '<div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:14px 16px;margin:16px 16px 0;display:flex;gap:10px">'
+    +'<div style="font-size:20px">&#9989;</div><div>'
+    +'<div style="font-size:13px;font-weight:600;color:var(--green-dark)">Surgery details submitted &amp; locked</div>'
+    +'<div style="font-size:11px;color:var(--green);margin-top:2px">By '+(cas.hospSubmittedBy||'hospital')+' on '+(cas.hospSubmittedAt?cas.hospSubmittedAt.substring(0,10):'&mdash;')+'</div>'
+    +'</div></div>'
+
+    // ── JOURNEY INFOGRAPHIC ────────────────────────────────────────────────
+    +'<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Programme Journey</div>'
+    +buildJourneyInfographic(cas)+'</div>'
+
+    // ── PATIENT INFORMATION (SAST data) ────────────────────────────────────
+    +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">&#128118; Patient Information</div>'
+    +roRow('SAST Ref / TPA ID', cas.surgRefNo||cas.tpa)
+    +roRow('FY', cas.fy)
+    +roRow('Name', cas.name)
+    +roRow('Gender', cas.gender)
+    +roRow('Age at Surgery', cas.age)
+    +roRow('Date of Birth', cas.dob)
+    +roRow('Caste / Category', cas.caste)
+    +(mob ? roRow('Mobile','&#128222; '+mob, true) : '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:11px;color:var(--text-light)">Mobile</span><span style="font-size:12px;color:var(--amber)">Not recorded</span></div>')
+    +roRow('Village', cas.village)
+    +roRow('Taluk', cas.taluk)
+    +roRow('District', cas.district)
+    +roRow('Residential District', cas.resDistrict||cas.resDist)
+    +roRow('Pincode', cas.pincode)
+    +roRow('Zone', cas.zone)
+    +'</div>'
+
+    // ── HOSPITAL & SAST CLAIM DATA ─────────────────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#127973; Hospital &amp; SAST Data</div>'
+    +roRow('Hospital', cas.hospital)
+    +roRow('Hospital District', cas.hospDist)
+    +roRow('Hospital Type', cas.hospType)
+    +roRow('Treating Doctor', cas.doctor)
+    +roRow('SAST Pre-auth Ref', cas.surgRefNo)
+    +roRow('Pre-auth Status', cas.surgStatus)
+    +roRow('Package', cas.surgPkg)
+    +(cas.surgNet ? roRow('Surgery Net Paid', '&#8377;'+Number(cas.surgNet).toLocaleString('en-IN')) : '')
+    +'</div>'
+
+    // ── SURGERY DETAILS (hospital submitted) ──────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128137; Surgery Details (Submitted by Hospital)</div>'
+    +roRow('Admission Date', cas.surgAdmit)
+    +roRow('Surgery Date', cas.surgDate)
+    +roRow('Discharge Date', cas.surgDisch)
+    +roRow('Switch-on Date', cas.switchOn)
+    +roRow('Implanted Side', cas.side)
+    +roRow('Mentor Surgeon', cas.mentorSurgeon)
+    +roRow('Recommended Rehab Centre', cas.rehabCentre)
+    +'</div>'
+
+    // ── DEVICE DETAILS ─────────────────────────────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#129955; Device Details</div>'
+    +roRow('Manufacturer', cas.manufacturer)
+    +roRow('Model', cas.model)
+    +roRow('Implanted Side', cas.side)
+    +roRow('Serial Number', cas.serialNo)
+    +'</div>'
+
+    // ── REHAB CLAIM DATA ───────────────────────────────────────────────────
+    +((cas.r1RefNo||cas.r1Admit||cas.r1Status) ?
+      '<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#127911; Rehab Part 1 (2002GP)</div>'
+      +roRow('Ref No.', cas.r1RefNo)
+      +roRow('Preauth Date', cas.r1Admit)
+      +roRow('Claim Status', cas.r1Status)
+      +(cas.r1Net ? roRow('Net Paid','&#8377;'+Number(cas.r1Net).toLocaleString('en-IN')) : '')
+      +'</div>' : '')
+
+    +((cas.r2RefNo||cas.r2Admit||cas.r2Status) ?
+      '<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#127911; Rehab Part 2 (2003GP)</div>'
+      +roRow('Ref No.', cas.r2RefNo)
+      +roRow('Preauth Date', cas.r2Admit)
+      +roRow('Claim Status', cas.r2Status)
+      +(cas.r2Net ? roRow('Net Paid','&#8377;'+Number(cas.r2Net).toLocaleString('en-IN')) : '')
+      +'</div>' : '')
+
+    // ── REMARKS ────────────────────────────────────────────────────────────
+    +((cas.hospRemarks||cas.remarks) ?
+      '<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128221; Complications / Remarks</div>'
+      +'<div style="font-size:13px;color:var(--text-mid);padding:8px 0">'+(cas.hospRemarks||cas.remarks)+'</div></div>' : '')
+
+    +'<div style="padding:16px 16px 40px"><button onclick="goBack()" style="width:100%;padding:13px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;">&#8592; Back to Cases</button></div>';
 }
 
 function buildHospitalUpdateForm(cas) {

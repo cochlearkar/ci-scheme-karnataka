@@ -1594,6 +1594,15 @@ function goBackToRoles() { showScreen('login'); }
 // ══════════════════════════════════════════
 // HOME
 // ══════════════════════════════════════════
+
+// Helper: has hospital submitted surgery details?
+// True if explicitly submitted OR legacy case already has surgery dates filled
+function isHospitalUpdated(c) {
+  return c.hospSubmitted === true ||
+    (c.surgAdmit && c.surgAdmit.trim() !== '' &&
+     c.surgDisch  && c.surgDisch.trim()  !== '');
+}
+
 function filterCasesByUser(cases) {
   if (!currentUser || currentUser.role === 'state') return cases;
   if (currentUser.role === 'hospital') {
@@ -1657,8 +1666,8 @@ function buildHome() {
   html += `<div class="section-label">Quick action</div>`;
   html += `<div class="action-grid">`;
   if (currentRole === 'hospital') {
-    const pending = allMyCases.filter(c => !c.hospSubmitted).length;
-    const updated = allMyCases.filter(c =>  c.hospSubmitted).length;
+    const pending = allMyCases.filter(c => !isHospitalUpdated(c)).length;
+    const updated = allMyCases.filter(c =>  isHospitalUpdated(c)).length;
     if (pending > 0) {
       html += `<div class="action-card primary" onclick="buildCaseList('hosp-pending');showScreen('cases')" style="background:var(--red);border-color:var(--red)"><div class="action-icon">&#128308;</div><div><div class="action-title">${pending} case${pending!==1?'s':''} need your update</div><div class="action-desc">Surgery &amp; device details not yet submitted</div></div><div class="action-arrow">&#8594;</div></div>`;
     }
@@ -1714,7 +1723,7 @@ function buildStateUpdateSummary(cases) {
     const h = c.hospital || 'Unknown Hospital';
     if (!hospMap[h]) hospMap[h] = { total:0, updated:0, pending:0 };
     hospMap[h].total++;
-    if (c.hospSubmitted) hospMap[h].updated++;
+    if (isHospitalUpdated(c)) hospMap[h].updated++;
     else hospMap[h].pending++;
   });
 
@@ -1886,19 +1895,19 @@ function toggleAllYears(el) {
 function applyAllFilters() {
   let cases = filterCasesByUser(SAMPLE_CASES);
   if (activeStatusFilter === 'Pending Update') {
-    cases = cases.filter(c => !c.hospSubmitted);
+    cases = cases.filter(c => !isHospitalUpdated(c));
   } else if (activeStatusFilter === 'Updated') {
-    cases = cases.filter(c => c.hospSubmitted === true);
+    cases = cases.filter(c => isHospitalUpdated(c));
   } else if (activeStatusFilter === 'Pending Update') {
-    cases = cases.filter(c => !c.hospSubmitted);
+    cases = cases.filter(c => !isHospitalUpdated(c));
   } else if (activeStatusFilter === 'Updated') {
-    cases = cases.filter(c => c.hospSubmitted === true);
+    cases = cases.filter(c => isHospitalUpdated(c));
   } else if (activeStatusFilter === 'Confirm') {
     cases = cases.filter(c => c.risk || !c.surgAdmit || c.status === 'pending');
   } else if (activeStatusFilter === 'Needs update') {
-    cases = cases.filter(c => !c.hospSubmitted);
+    cases = cases.filter(c => !isHospitalUpdated(c));
   } else if (activeStatusFilter === 'Updated') {
-    cases = cases.filter(c => c.hospSubmitted);
+    cases = cases.filter(c => isHospitalUpdated(c));
   } else if (activeStatusFilter === 'On track') {
     cases = cases.filter(c => !c.risk && c.status !== 'pending');
   } else if (activeStatusFilter === 'At risk') {
@@ -1939,7 +1948,7 @@ function filterCases(q) {
 function caseCardHTML(c) {
   let pillClass, pillLabel, cardBorder = '';
   if (currentRole === 'hospital') {
-    if (c.hospSubmitted) {
+    if (isHospitalUpdated(c)) {
       pillClass = 'pill-paid'; pillLabel = '&#10003; Updated';
       cardBorder = 'border-left:4px solid var(--green-mid);';
     } else {
@@ -1971,7 +1980,7 @@ function renderCaseList() {
   const banner = document.getElementById('hosp-status-banner');
   if (banner) {
     if (currentRole === 'hospital' && filteredCases.length > 0) {
-      const updated = filteredCases.filter(c => c.hospSubmitted).length;
+      const updated = filteredCases.filter(c => isHospitalUpdated(c)).length;
       const pending = filteredCases.length - updated;
       banner.style.display = 'block';
       banner.innerHTML =
@@ -3330,7 +3339,7 @@ function openCaseSummary(cas) {
   bar.style.display = 'flex';
 
   if (currentRole === 'hospital') {
-    if (cas.hospSubmitted) {
+    if (isHospitalUpdated(cas)) {
       bar.style.display = 'none';
     } else {
       btn.textContent = '✏️ Update Surgery Details →';
@@ -3379,7 +3388,7 @@ function buildSummaryHTML(c) {
     return '<div style="padding:8px 0;border-bottom:0.5px solid var(--border)"><div style="font-size:11px;color:var(--text-light);margin-bottom:3px">'+label+'</div><div style="font-size:13px;color:var(--text-mid)">'+value+'</div></div>';
   }
 
-  const hospBadge = c.hospSubmitted
+  const hospBadge = isHospitalUpdated(c)
     ? '<div style="background:var(--green-light);border:0.5px solid var(--green-border);border-radius:8px;padding:6px 12px;font-size:11px;color:var(--green);margin-bottom:12px;display:inline-flex;gap:6px;align-items:center">&#9989; Surgery details verified by hospital</div>'
     : '<div style="background:var(--amber-light);border:0.5px solid #FAC775;border-radius:8px;padding:6px 12px;font-size:11px;color:var(--amber);margin-bottom:12px;display:inline-flex;gap:6px;align-items:center">&#8987; Awaiting hospital surgery update</div>';
 
@@ -3633,7 +3642,7 @@ function openCaseFromList(caseId) {
 function openHospitalUpdate(cas) {
   document.getElementById('hu-title').textContent = cas.name || 'Update Case';
   document.getElementById('hu-sub').textContent   = 'Card: ' + cas.id;
-  if (cas.hospSubmitted) { buildHospitalReadOnly(cas); }
+  if (isHospitalUpdated(cas)) { buildHospitalReadOnly(cas); }
   else { buildHospitalUpdateForm(cas); }
   showScreen('hospupdate');
 }

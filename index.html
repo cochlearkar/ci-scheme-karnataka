@@ -1389,6 +1389,7 @@ function showScreen(name, pushHistory = true) {
 
 function goBack() {
   const prev = screenHistory.pop() || 'home';
+  if (prev === 'home') _stateHospFilter = null; // clear drill-down when going home
   showScreen(prev, false);
 }
 
@@ -1602,7 +1603,14 @@ function isHospitalUpdated(c) {
 }
 
 function filterCasesByUser(cases) {
-  if (!currentUser || currentUser.role === 'state') return cases;
+  if (!currentUser || currentUser.role === 'state') {
+    if (_stateHospFilter && _stateHospFilter.hospital) {
+      const h = _stateHospFilter.hospital.toLowerCase();
+      const filtered = cases.filter(c => (c.hospital||'').toLowerCase() === h);
+      return filtered;
+    }
+    return cases;
+  }
   if (currentUser.role === 'hospital') {
     const u = (currentUser.unit||'').toLowerCase();
     // Progressive match — try shorter keys until we find cases
@@ -1712,6 +1720,15 @@ function buildHome() {
 }
 
 // ── STATE UPDATE SUMMARY ─────────────────────────────────────────────────────
+
+function showHospitalCases(hospitalName, filter) {
+  // Temporarily override filterCasesByUser to show cases for specific hospital
+  _stateHospFilter = { hospital: hospitalName, filter: filter };
+  buildCaseList(filter === 'pending' ? 'hosp-pending' : 'hosp-updated');
+  showScreen('cases');
+}
+var _stateHospFilter = null;
+
 function buildStateUpdateSummary(cases) {
   let html = '';
 
@@ -1749,17 +1766,24 @@ function buildStateUpdateSummary(cases) {
   hospEntries.forEach(([hosp, data]) => {
     const pct = data.total > 0 ? Math.round((data.updated/data.total)*100) : 0;
     const barColor = pct === 100 ? 'var(--green-mid)' : pct > 50 ? 'var(--amber-mid)' : 'var(--red)';
-    html += `<div style="padding:10px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px" onclick="buildCaseList();showScreen('cases')">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hosp}</div>
-        <div style="height:4px;background:var(--gray-mid);border-radius:2px;margin-top:5px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;transition:width .3s"></div>
+    const safeHosp = hosp.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    html += `<div style="padding:10px 14px;border-bottom:0.5px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hosp}</div>
+          <div style="height:4px;background:var(--gray-mid);border-radius:2px;margin-top:5px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;transition:width .3s"></div>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <span style="font-size:11px;color:var(--red);font-weight:600">${data.pending} pending</span>
+          <span style="font-size:11px;color:var(--text-light);margin:0 3px">/</span>
+          <span style="font-size:11px;color:var(--green);font-weight:600">${data.updated} done</span>
         </div>
       </div>
-      <div style="text-align:right;flex-shrink:0">
-        <span style="font-size:11px;color:var(--red);font-weight:600">${data.pending} pending</span>
-        <span style="font-size:11px;color:var(--text-light);margin:0 3px">/</span>
-        <span style="font-size:11px;color:var(--green);font-weight:600">${data.updated} done</span>
+      <div style="display:flex;gap:6px">
+        ${data.pending > 0 ? `<button onclick="showHospitalCases('${safeHosp}','pending')" style="flex:1;padding:5px 8px;font-size:11px;font-weight:600;background:var(--red-light);color:var(--red);border:0.5px solid #f5c6c2;border-radius:6px;cursor:pointer">&#128308; ${data.pending} pending</button>` : ''}
+        ${data.updated > 0 ? `<button onclick="showHospitalCases('${safeHosp}','updated')" style="flex:1;padding:5px 8px;font-size:11px;font-weight:600;background:var(--green-light);color:var(--green);border:0.5px solid var(--green-border);border-radius:6px;cursor:pointer">&#9989; ${data.updated} updated</button>` : ''}
       </div>
     </div>`;
   });
@@ -3356,6 +3380,26 @@ function summaryAction() {
   }
 }
 
+
+async function saveSummaryMobile() {
+  const input = document.getElementById('summary-mobile-input');
+  if (!input || !input.value.trim()) { alert('Please enter a mobile number.'); return; }
+  const mob = input.value.trim().replace(/[^0-9+]/g,'');
+  if (mob.length < 10) { alert('Please enter a valid 10-digit mobile number.'); return; }
+  try {
+    const { doc, updateDoc } = window._fbFns;
+    await updateDoc(doc(window._fbDb, 'cases', String(selectedCase.id)), { mobile: mob });
+    const idx = SAMPLE_CASES.findIndex(c => String(c.id) === String(selectedCase.id));
+    if (idx > -1) SAMPLE_CASES[idx].mobile = mob;
+    selectedCase.mobile = mob;
+    input.value = '';
+    input.placeholder = mob;
+    alert('Mobile number updated to ' + mob);
+  } catch(e) {
+    alert('Error saving: ' + e.message);
+  }
+}
+
 function buildSummaryHTML(c) {
   const mob = cleanMob(c.mobile);
   const statusLabel = c.status==='paid'?'Complete':c.status==='risk'?'At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pre-auth / Pending':'Active';
@@ -3391,7 +3435,17 @@ function buildSummaryHTML(c) {
     +'<div class="form-section">'+sec('Patient Information','&#128118;')
     +row('TPA ID',c.tpa)+row('Gender',c.gender)+row('Age at Surgery',c.age)
     +row('Date of Birth',c.dob)+row('Caste / Category',c.caste)
-    +(mob?row('Mobile','<a href="tel:'+mob+'" style="color:var(--blue-mid)">'+mob+'</a>'):'')
+    +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border)">'
+    +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;width:45%">Mobile</span>'
+    +'<span style="font-size:13px;text-align:right;flex:1">'
+    +(mob?'<a href="tel:'+mob+'" style="color:var(--blue-mid);font-weight:600">&#128222; '+mob+'</a>':'<span style="color:var(--amber);font-size:12px">Not recorded</span>')
+    +'</span></div>'
+    +'<div style="padding:8px 0;border-bottom:0.5px solid var(--border)">'
+    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:5px">Update Mobile Number</div>'
+    +'<div style="display:flex;gap:6px">'
+    +'<input class="field-input" id="summary-mobile-input" type="tel" placeholder="'+(mob?'Update: '+mob:'Enter mobile number')+'" style="flex:1;padding:8px 10px;font-size:13px">'
+    +'<button onclick="saveSummaryMobile()" style="background:var(--green-dark);color:#fff;border:none;padding:8px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Save</button>'
+    +'</div></div>'
     +row('Village / Taluk',[c.village,c.taluk].filter(Boolean).join(' · '))
     +row('District',c.district,true)+row('Residential District',c.resDistrict||c.resDist)
     +row('Pincode',c.pincode)+row('Zone',c.zone)+row('FY',c.fy)+row('Scheme',c.scheme)+'</div>'

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Update Status — Shravan Sanjeevini</title>
+<style>
+:root {
+  --green-dark: #0a3d2e;
+  --green: #1a6b4a;
+  --green-mid: #1D9E75;
+  --green-light: #E1F5EE;
+  --green-border: #9FE1CB;
+  --amber: #8a5a0a;
+  --amber-mid: #EF9F27;
+  --amber-light: #FAEEDA;
+  --red: #A32D2D;
+  --red-light: #FCEBEB;
+  --surface: #fffcf8;
+  --border: #e8e4dc;
+  --text: #1a1612;
+  --text-mid: #4a453f;
+  --text-light: #8a8278;
+  --gray: #f5f3ef;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray); color: var(--text); min-height: 100vh; }
+
+/* ── HEADER ── */
+.header { background: var(--green-dark); padding: 20px 16px 24px; text-align: center; }
+.header-logo { font-size: 36px; margin-bottom: 10px; }
+.header-title { color: #fff; font-size: 18px; font-weight: 700; letter-spacing: -.3px; }
+.header-sub { color: rgba(255,255,255,.55); font-size: 12px; margin-top: 4px; }
+.header-date { color: rgba(255,255,255,.7); font-size: 11px; margin-top: 8px; background: rgba(255,255,255,.1); display: inline-block; padding: 4px 12px; border-radius: 20px; }
+
+/* ── LOADING ── */
+#loading { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 14px; }
+.loader { width: 36px; height: 36px; border: 3px solid var(--green-light); border-top-color: var(--green-mid); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading p { color: var(--text-light); font-size: 13px; }
+
+/* ── SUMMARY STRIP ── */
+.summary-strip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; background: var(--surface); border-bottom: 1px solid var(--border); }
+.strip-cell { padding: 14px 10px; text-align: center; border-right: 0.5px solid var(--border); }
+.strip-cell:last-child { border-right: none; }
+.strip-num { font-size: 26px; font-weight: 700; }
+.strip-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+
+/* ── PROGRESS BAR ── */
+.overall-bar { padding: 14px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-light); margin-bottom: 6px; }
+.bar-track { height: 10px; background: var(--red-light); border-radius: 5px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--green-mid), #25D366); transition: width 1s ease; }
+
+/* ── FILTER TABS ── */
+.filter-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; gap: 0; overflow-x: auto; }
+.ftab { padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--text-light); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+.ftab.active { color: var(--green-dark); border-bottom-color: var(--green-dark); font-weight: 600; }
+
+/* ── CONTENT ── */
+.content { padding: 14px 16px; max-width: 600px; margin: 0 auto; }
+.section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-light); margin: 16px 0 8px; }
+.section-label:first-child { margin-top: 4px; }
+
+/* ── HOSPITAL CARD ── */
+.hosp-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+.hosp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.dot-green  { background: var(--green-mid); }
+.dot-amber  { background: var(--amber-mid); }
+.dot-red    { background: var(--red); }
+.hosp-info { flex: 1; min-width: 0; }
+.hosp-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hosp-sub  { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.hosp-badge { flex-shrink: 0; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 8px; }
+.badge-green  { background: var(--green-light);  color: var(--green); }
+.badge-amber  { background: var(--amber-light); color: var(--amber); }
+.badge-red    { background: var(--red-light);   color: var(--red); }
+
+/* ── FOOTER ── */
+.footer { text-align: center; padding: 24px 16px; color: var(--text-light); font-size: 11px; line-height: 1.6; }
+.footer a { color: var(--green-mid); text-decoration: none; }
+
+/* ── LAST UPDATED TICKER ── */
+.ticker { text-align: center; padding: 8px; font-size: 11px; color: var(--text-light); background: var(--surface); border-top: 0.5px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">🦻</div>
+  <div class="header-title">Shravan Sanjeevini</div>
+  <div class="header-sub">Hospital Surgery Update Status · NPPCD Karnataka</div>
+  <div class="header-date" id="hdr-date">Loading...</div>
+</div>
+
+<div id="loading">
+  <div class="loader"></div>
+  <p>Loading live data...</p>
+</div>
+
+<div id="main" style="display:none">
+
+  <!-- Summary strip -->
+  <div class="summary-strip">
+    <div class="strip-cell">
+      <div class="strip-num" id="s-completed" style="color:var(--green-mid)">—</div>
+      <div class="strip-label" style="color:var(--green)">✅ Completed</div>
+    </div>
+    <div class="strip-cell">
+      <div class="strip-num" id="s-partial" style="color:var(--amber-mid)">—</div>
+      <div class="strip-label" style="color:var(--amber)">⏳ Partial</div>
+    </div>
+    <div class="strip-cell">
+      <div class="strip-num" id="s-notstarted" style="color:var(--red)">—</div>
+      <div class="strip-label" style="color:var(--red)">🔴 Not Started</div>
+    </div>
+  </div>
+
+  <!-- Overall progress bar -->
+  <div class="overall-bar">
+    <div class="bar-label">
+      <span>Overall update progress</span>
+      <span id="bar-pct">0%</span>
+    </div>
+    <div class="bar-track">
+      <div class="bar-fill" id="bar-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="filter-tabs">
+    <div class="ftab active" onclick="setFilter('all',this)">All Hospitals</div>
+    <div class="ftab" onclick="setFilter('notstarted',this)">🔴 Not Started</div>
+    <div class="ftab" onclick="setFilter('partial',this)">⏳ Partial</div>
+    <div class="ftab" onclick="setFilter('completed',this)">✅ Completed</div>
+  </div>
+
+  <div class="content" id="hosp-list"></div>
+
+  <div class="ticker" id="ticker">Last updated: —</div>
+
+  <div class="footer">
+    <strong>Shravan Sanjeevini</strong> · Karnataka Cochlear Implant Programme<br>
+    National Programme for Prevention &amp; Control of Deafness<br>
+    <a href="https://cochlearkar.github.io/ci-scheme-karnataka/">Open App</a>
+  </div>
+
+</div>
+
+<script type="module">
+import { initializeApp }           from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey:            "AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI",
+  authDomain:        "shravan-sanjeevini.firebaseapp.com",
+  projectId:         "shravan-sanjeevini",
+  storageBucket:     "shravan-sanjeevini.firebasestorage.app",
+  messagingSenderId: "130742586600",
+  appId:             "1:130742586600:web:1618bb56710c6fbbcc8d5d"
+});
+const db = getFirestore(app);
+
+try {
+  const snap = await getDocs(collection(db, 'cases'));
+  window.ALL_CASES = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
+  buildPage();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('main').style.display    = 'block';
+} catch(e) {
+  document.getElementById('loading').innerHTML =
+    '<div style="text-align:center;padding:20px">' +
+    '<div style="font-size:32px;margin-bottom:12px">⚠️</div>' +
+    '<div style="color:#A32D2D;font-weight:600">Could not load data</div>' +
+    '<div style="color:#8a8278;font-size:12px;margin-top:6px">'+e.message+'</div></div>';
+}
+</script>
+
+<script>
+var ALL_CASES   = [];
+var _hospData   = [];
+var _activeFilter = 'all';
+
+function isUpdated(c) {
+  return c.hospSubmitted === true;
+}
+
+function buildPage() {
+  var now = new Date();
+  document.getElementById('hdr-date').textContent =
+    now.toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'}) + ' · ' +
+    now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
+  document.getElementById('ticker').textContent =
+    'Live data · Last loaded: ' + now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true}).toUpperCase();
+
+  // Build hospital map
+  var map = {};
+  ALL_CASES.forEach(function(c) {
+    var h = c.hospital || 'Unknown Hospital';
+    if (!map[h]) map[h] = { name:h, district:c.hospDist||c.district||'', total:0, updated:0 };
+    map[h].total++;
+    if (isUpdated(c)) map[h].updated++;
+  });
+
+  // Classify each hospital
+  _hospData = Object.values(map).map(function(h) {
+    if (h.updated === 0)            h.status = 'notstarted';
+    else if (h.updated === h.total) h.status = 'completed';
+    else                            h.status = 'partial';
+    h.pending = h.total - h.updated;
+    h.pct = Math.round((h.updated / h.total) * 100);
+    return h;
+  }).sort(function(a,b) {
+    // Sort: not started first (by total desc), then partial, then completed
+    var order = {notstarted:0, partial:1, completed:2};
+    if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+    return b.total - a.total;
+  });
+
+  // Summary counts
+  var completed  = _hospData.filter(function(h){return h.status==='completed';}).length;
+  var partial    = _hospData.filter(function(h){return h.status==='partial';}).length;
+  var notstarted = _hospData.filter(function(h){return h.status==='notstarted';}).length;
+  var totalHosp  = _hospData.length;
+  var overallPct = totalHosp > 0 ? Math.round((completed / totalHosp) * 100) : 0;
+
+  document.getElementById('s-completed').textContent  = completed;
+  document.getElementById('s-partial').textContent    = partial;
+  document.getElementById('s-notstarted').textContent = notstarted;
+  document.getElementById('bar-pct').textContent      = overallPct + '%';
+  setTimeout(function() {
+    document.getElementById('bar-fill').style.width = overallPct + '%';
+  }, 100);
+
+  renderList();
+}
+
+function setFilter(filter, el) {
+  _activeFilter = filter;
+  document.querySelectorAll('.ftab').forEach(function(t){ t.classList.remove('active'); });
+  el.classList.add('active');
+  renderList();
+}
+
+function renderList() {
+  var filtered = _activeFilter === 'all'
+    ? _hospData
+    : _hospData.filter(function(h){ return h.status === _activeFilter; });
+
+  if (!filtered.length) {
+    document.getElementById('hosp-list').innerHTML =
+      '<div style="text-align:center;padding:40px;color:var(--text-light);font-size:13px">No hospitals in this category</div>';
+    return;
+  }
+
+  var sections = { notstarted: [], partial: [], completed: [] };
+  filtered.forEach(function(h){ sections[h.status].push(h); });
+
+  var html = '';
+
+  if (sections.notstarted.length && (_activeFilter === 'all' || _activeFilter === 'notstarted')) {
+    html += '<div class="section-label">🔴 Not Started — ' + sections.notstarted.length + ' hospitals</div>';
+    sections.notstarted.forEach(function(h) { html += hospCard(h); });
+  }
+  if (sections.partial.length && (_activeFilter === 'all' || _activeFilter === 'partial')) {
+    html += '<div class="section-label">⏳ Partially Updated — ' + sections.partial.length + ' hospitals</div>';
+    sections.partial.forEach(function(h) { html += hospCard(h); });
+  }
+  if (sections.completed.length && (_activeFilter === 'all' || _activeFilter === 'completed')) {
+    html += '<div class="section-label">✅ Fully Updated — ' + sections.completed.length + ' hospitals</div>';
+    sections.completed.forEach(function(h) { html += hospCard(h); });
+  }
+
+  document.getElementById('hosp-list').innerHTML = html;
+}
+
+function hospCard(h) {
+  var dotClass   = h.status==='completed' ? 'dot-green'  : h.status==='partial' ? 'dot-amber'  : 'dot-red';
+  var badgeClass = h.status==='completed' ? 'badge-green' : h.status==='partial' ? 'badge-amber' : 'badge-red';
+  var badgeText  = h.status==='completed' ? '✓ All updated'
+    : h.status==='partial'    ? h.updated+'/'+h.total+' updated'
+    : h.pending+' pending';
+
+  var barHtml = '';
+  if (h.status === 'partial') {
+    barHtml = '<div style="height:3px;background:var(--amber-light);border-radius:2px;margin-top:5px;overflow:hidden">'
+      +'<div style="height:100%;width:'+h.pct+'%;background:var(--amber-mid);border-radius:2px"></div></div>';
+  }
+
+  return '<div class="hosp-card">'
+    +'<div class="hosp-dot '+dotClass+'"></div>'
+    +'<div class="hosp-info">'
+    +'<div class="hosp-name">'+h.name+'</div>'
+    +'<div class="hosp-sub">'+h.district+(h.district?' · ':'')+h.total+' case'+( h.total!==1?'s':'')+'</div>'
+    +barHtml
+    +'</div>'
+    +'<div class="hosp-badge '+badgeClass+'">'+badgeText+'</div>'
+    +'</div>';
+}
+</script>
+</body>
+</html>

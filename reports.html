@@ -97,6 +97,17 @@ tr:hover td { background: var(--green-light); }
 
 /* ── EMPTY ── */
 .empty { text-align: center; padding: 40px; color: var(--text-light); font-size: 13px; }
+
+/* ── SORT ── */
+th { cursor: pointer; user-select: none; }
+th:hover { background: #1a5c44; }
+th.sort-asc::after  { content: ' ▲'; font-size: 9px; opacity: .8; }
+th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
+
+/* ── DISTRICT YEAR GRID ── */
+.dygrid th, .dygrid td { white-space: nowrap; }
+.dygrid td.fy-cell { text-align: center; font-size: 11px; padding: 6px 8px; }
+.dygrid td.dist-cell { font-weight: 600; font-size: 12px; min-width: 140px; }
 </style>
 </head>
 <body>
@@ -144,6 +155,7 @@ tr:hover td { background: var(--green-light); }
     <div class="tab" onclick="showTab('rehab')">🎧 Rehab Activity</div>
     <div class="tab" onclick="showTab('atrisk')">⚠️ At-Risk Cases</div>
     <div class="tab" onclick="showTab('fy')">📅 FY Progress</div>
+    <div class="tab" onclick="showTab('distyr')">🗂️ District × Year</div>
   </div>
 
   <div class="content">
@@ -275,6 +287,8 @@ window.FILTERED_CASES = [...window.ALL_CASES];
 // Populate filters
 populateFilters();
 renderAll();
+renderDistYr();
+initSortable();
 
 document.getElementById('loading-screen').style.display = 'none';
 document.getElementById('main-content').style.display = 'block';
@@ -307,6 +321,8 @@ function applyFilters() {
   var count = FILTERED_CASES.length;
   document.getElementById('filter-count').textContent = count < ALL_CASES.length ? 'Showing '+count+' of '+ALL_CASES.length+' cases' : '';
   renderAll();
+  renderDistYr();
+  initSortable();
 }
 
 function resetFilters() {
@@ -316,6 +332,8 @@ function resetFilters() {
   FILTERED_CASES = [...ALL_CASES];
   document.getElementById('filter-count').textContent = '';
   renderAll();
+  renderDistYr();
+  initSortable();
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
@@ -556,6 +574,140 @@ function renderFY() {
       +'<td>'+progBar(v.paid,v.total)+'</td></tr>';
   }).join('');
   document.getElementById('tbody-fy').innerHTML = rows || '<tr><td colspan="9" class="empty">No data</td></tr>';
+}
+
+// ── TABLE SORTING ────────────────────────────────────────────────────────────
+var _sortState = {}; // tableId -> {col, dir}
+
+function makeSortable(tableId) {
+  var table = document.getElementById(tableId);
+  if (!table) return;
+  var ths = table.querySelectorAll('thead th');
+  ths.forEach(function(th, i) {
+    th.addEventListener('click', function() {
+      sortTable(tableId, i);
+    });
+  });
+}
+
+function sortTable(tableId, col) {
+  var table = document.getElementById(tableId);
+  var tbody = table.querySelector('tbody');
+  var rows = Array.from(tbody.querySelectorAll('tr'));
+  var state = _sortState[tableId] || {col:-1, dir:1};
+  var dir = (state.col === col) ? -state.dir : 1;
+  _sortState[tableId] = {col:col, dir:dir};
+
+  // Update header indicators
+  table.querySelectorAll('thead th').forEach(function(th, i) {
+    th.classList.remove('sort-asc','sort-desc');
+    if (i === col) th.classList.add(dir === 1 ? 'sort-asc' : 'sort-desc');
+  });
+
+  rows.sort(function(a, b) {
+    var aText = (a.cells[col] ? a.cells[col].innerText : '').trim();
+    var bText = (b.cells[col] ? b.cells[col].innerText : '').trim();
+    // Try numeric
+    var aNum = parseFloat(aText.replace(/[₹,%\s,]/g,''));
+    var bNum = parseFloat(bText.replace(/[₹,%\s,]/g,''));
+    if (!isNaN(aNum) && !isNaN(bNum)) return (aNum - bNum) * dir;
+    return aText.localeCompare(bText) * dir;
+  });
+  rows.forEach(function(r) { tbody.appendChild(r); });
+}
+
+// Make all tables sortable after render
+function initSortable() {
+  ['tbl-district','tbl-hospital','tbl-financial','tbl-package',
+   'tbl-rehab','tbl-atrisk','tbl-fy','tbl-distyr'].forEach(makeSortable);
+}
+
+// ── DISTRICT × YEAR GRID ──────────────────────────────────────────────────────
+function renderDistYr() {
+  var cases = FILTERED_CASES;
+  var metric = document.getElementById('distyr-metric').value;
+
+  // Collect all unique FYs sorted
+  var allFYs = [...new Set(cases.map(function(c){return c.fy;}).filter(Boolean))].sort();
+  var allDistricts = [...new Set(cases.map(function(c){return c.district;}).filter(Boolean))].sort();
+
+  // Build map: district -> fy -> counts
+  var map = {};
+  allDistricts.forEach(function(d) {
+    map[d] = {};
+    allFYs.forEach(function(fy) { map[d][fy] = {total:0,surg:0,r1:0,r2:0,paid:0,risk:0}; });
+  });
+  cases.forEach(function(c) {
+    var d = c.district||'Unknown';
+    var fy = c.fy||'Unknown';
+    if (!map[d]) map[d] = {};
+    if (!map[d][fy]) map[d][fy] = {total:0,surg:0,r1:0,r2:0,paid:0,risk:0};
+    map[d][fy].total++;
+    if (c.surgAdmit||c.hospSubmitted) map[d][fy].surg++;
+    if (c.r1Admit||c.r1Status) map[d][fy].r1++;
+    if (c.r2Admit||c.r2Status) map[d][fy].r2++;
+    if (c.status==='paid') map[d][fy].paid++;
+    if (c.risk) map[d][fy].risk++;
+  });
+
+  // District totals for sorting
+  var distTotals = {};
+  allDistricts.forEach(function(d) {
+    distTotals[d] = allFYs.reduce(function(s,fy){ return s+(map[d][fy]?map[d][fy].total:0); },0);
+  });
+  var sortedDistricts = allDistricts.slice().sort(function(a,b){ return distTotals[b]-distTotals[a]; });
+
+  // Header
+  var headerCells = '<th class="dist-cell">District</th>' +
+    allFYs.map(function(fy){ return '<th style="text-align:center">'+fy+'</th>'; }).join('') +
+    '<th style="text-align:center">Total</th>';
+  document.getElementById('thead-distyr').innerHTML = '<tr>'+headerCells+'</tr>';
+
+  // Body
+  function getVal(v) {
+    if (!v) return 0;
+    if (metric==='pct') return v.total>0?Math.round(v.paid/v.total*100):0;
+    return v[metric]||0;
+  }
+  function cellStyle(val, max) {
+    if (val===0) return 'color:var(--text-light)';
+    var intensity = max>0 ? Math.round((val/max)*100) : 0;
+    if (metric==='risk') return 'background:#fff0f0;color:var(--red);font-weight:600';
+    if (intensity>=80) return 'background:#e1f5ee;color:#0a3d2e;font-weight:600';
+    if (intensity>=40) return 'background:#faeeda;color:#8a5a0a';
+    return '';
+  }
+
+  // Find max value across all cells for intensity scaling
+  var allVals = [];
+  sortedDistricts.forEach(function(d){
+    allFYs.forEach(function(fy){ allVals.push(getVal(map[d][fy])); });
+  });
+  var maxVal = Math.max.apply(null, allVals) || 1;
+
+  var rows = sortedDistricts.map(function(d) {
+    var total = allFYs.reduce(function(s,fy){ return s+getVal(map[d][fy]); },0);
+    if (distTotals[d]===0) return ''; // skip empty districts
+    var cells = allFYs.map(function(fy) {
+      var v = getVal(map[d][fy]);
+      var style = cellStyle(v, maxVal);
+      var display = metric==='pct' ? (v>0?v+'%':'—') : (v>0?v:'—');
+      return '<td class="fy-cell" style="'+style+'">'+display+'</td>';
+    }).join('');
+    var totalDisplay = metric==='pct' ? '' : '<td class="fy-cell" style="font-weight:700">'+total+'</td>';
+    return '<tr><td class="dist-cell">'+d+'</td>'+cells+totalDisplay+'</tr>';
+  }).filter(Boolean).join('');
+
+  document.getElementById('tbody-distyr').innerHTML = rows || '<tr><td colspan="'+(allFYs.length+2)+'" class="empty">No data</td></tr>';
+
+  // Stats
+  document.getElementById('distyr-stats').innerHTML =
+    statCard(allFYs.length, 'Financial Years', 'var(--purple-mid)') +
+    statCard(sortedDistricts.length, 'Districts', 'var(--blue-mid)') +
+    statCard(cases.length, 'Total Cases', 'var(--text)') +
+    statCard(allFYs[allFYs.length-1]||'—', 'Latest FY', 'var(--green-mid)');
+
+  makeSortable('tbl-distyr');
 }
 
 // ── CSV DOWNLOAD ──────────────────────────────────────────────────────────────

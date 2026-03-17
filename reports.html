@@ -386,6 +386,10 @@ function showTab(name) {
   document.querySelectorAll('.report-section').forEach(s => s.classList.remove('active'));
   event.target.classList.add('active');
   document.getElementById('sec-'+name).classList.add('active');
+  // Re-render distyr when that tab becomes visible
+  if (name === 'distyr') { renderDistYr(); }
+  // Re-init sorting for newly visible table
+  initSortable();
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -414,6 +418,8 @@ function renderAll() {
   renderRehab();
   renderAtRisk();
   renderFY();
+  // Re-attach sort listeners after all tables are re-rendered
+  setTimeout(initSortable, 0);
 }
 
 // ── 1. DISTRICT SUMMARY ───────────────────────────────────────────────────────
@@ -626,8 +632,14 @@ var _sortState = {}; // tableId -> {col, dir}
 function makeSortable(tableId) {
   var table = document.getElementById(tableId);
   if (!table) return;
-  var ths = table.querySelectorAll('thead th');
-  ths.forEach(function(th, i) {
+  // Remove old listener by replacing thead clone
+  var thead = table.querySelector('thead');
+  if (!thead) return;
+  var newThead = thead.cloneNode(true);
+  thead.parentNode.replaceChild(newThead, thead);
+  // Attach fresh listeners
+  newThead.querySelectorAll('th').forEach(function(th, i) {
+    th.style.cursor = 'pointer';
     th.addEventListener('click', function() {
       sortTable(tableId, i);
     });

@@ -668,7 +668,8 @@ function initSortable() {
 // ── DISTRICT × YEAR GRID ──────────────────────────────────────────────────────
 function renderDistYr() {
   var cases = FILTERED_CASES;
-  var metric = document.getElementById('distyr-metric').value;
+  var el = document.getElementById('distyr-metric');
+  var metric = el ? el.value : 'total';
 
   // Collect all unique FYs sorted
   var allFYs = [...new Set(cases.map(function(c){return c.fy;}).filter(Boolean))].sort();

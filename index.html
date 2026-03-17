@@ -1756,6 +1756,7 @@ function buildHome() {
   // Primary action
   html += `<div class="section-label">Quick action</div>`;
   html += `<div class="action-grid">`;
+
   if (currentRole === 'hospital') {
     const pending = allMyCases.filter(c => !isHospitalUpdated(c)).length;
     const updated = allMyCases.filter(c =>  isHospitalUpdated(c)).length;
@@ -1765,24 +1766,27 @@ function buildHome() {
     if (updated > 0) {
       html += `<div class="action-card" onclick="buildCaseList('hosp-updated');showScreen('cases')"><div class="action-icon">&#9989;</div><div class="action-title">${updated} updated</div><div class="action-desc">Surgery details submitted</div></div>`;
     }
+    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All cases</div></div>`;
+    html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
+
   } else if (currentRole === 'rehab') {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Update Rehab Sessions</div><div class="action-desc">Select a case to log today's session</div></div><div class="action-arrow">→</div></div>`;
+    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All assigned cases</div></div>`;
+
   } else if (currentRole === 'district') {
-    if (currentRole !== 'state') {
-    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify & complete pending information</div></div><div class="action-arrow">→</div></div>`;
-  }
-  if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
-  } else {
+    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify &amp; complete pending information</div></div><div class="action-arrow">→</div></div>`;
+    if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
+    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">By district</div></div>`;
+    html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
+
+  } else if (currentRole === 'state') {
     html += `<div class="action-card primary" onclick="showScreen('newcase')" style="background:var(--purple);border-color:var(--purple)"><div class="action-icon">➕</div><div><div class="action-title">Add New Case</div><div class="action-desc">Enter new SAST pre-auth data</div></div><div class="action-arrow">→</div></div>`;
-  }
-  html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">${currentRole === 'district' ? 'By district' : 'By ' + meta.orgLabel.toLowerCase()}</div></div>`;
-  html += `<div class="action-card" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">🔔</div><div class="action-title">Alerts</div><div class="action-desc">${risks.length} need attention</div></div>`;
-  if (currentRole === 'state') {
+    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All cases</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none" onclick="window.open('dashboard.html','_blank')"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">Dashboard</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Charts &amp; Trends</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#0a3d2e,#1a6b4a);border:none" onclick="window.open('reports.html','_blank')"><div class="action-icon" style="font-size:22px">📋</div><div class="action-title" style="color:#fff">Reports</div><div class="action-desc" style="color:rgba(255,255,255,.7)">District · Hospital · FY · At-risk</div></div>`;
-  } else {
-    html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
+    html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#128C7E,#25D366);border:none;cursor:pointer" onclick="shareWhatsApp()"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">📤</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Share Daily Update on WhatsApp</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Tap to open WhatsApp with today's hospital summary pre-filled</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
   }
+
   html += `</div>`;
 
   // Alerts
@@ -1806,6 +1810,69 @@ function buildHome() {
 }
 
 // ── STATE UPDATE SUMMARY ─────────────────────────────────────────────────────
+
+
+// ── WHATSAPP SHARE ────────────────────────────────────────────────────────────
+function shareWhatsApp() {
+  var cases = SAMPLE_CASES;
+  var today = new Date();
+  var dateStr = today.toLocaleDateString('en-IN', {day:'2-digit', month:'long', year:'numeric'});
+  var timeStr = today.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:true}).toUpperCase();
+
+  // Hospital-wise stats
+  var hospMap = {};
+  cases.forEach(function(c) {
+    var h = c.hospital || 'Unknown';
+    if (!hospMap[h]) hospMap[h] = { total:0, updated:0 };
+    hospMap[h].total++;
+    if (isHospitalUpdated(c)) hospMap[h].updated++;
+  });
+
+  var totalHosp    = Object.keys(hospMap).length;
+  var updatedHosp  = Object.values(hospMap).filter(function(v){ return v.updated === v.total && v.total > 0; }).length;
+  var pendingHosp  = totalHosp - updatedHosp;
+  var totalCases   = cases.length;
+  var updatedCases = cases.filter(function(c){ return isHospitalUpdated(c); }).length;
+  var pendingCases = totalCases - updatedCases;
+
+  // Top 5 hospitals with most pending — sorted
+  var topPending = Object.entries(hospMap)
+    .map(function(e){ return { name:e[0], pending:e[1].total - e[1].updated }; })
+    .filter(function(h){ return h.pending > 0; })
+    .sort(function(a,b){ return b.pending - a.pending; })
+    .slice(0, 5);
+
+  var NL = '\n';
+
+  // Build message using \n escape — safe inside JS strings
+  var lines = [
+    '\uD83E\uDDB7 *Shravan Sanjeevini \u2014 Daily Update*',
+    '\uD83D\uDCC5 ' + dateStr + ' | ' + timeStr,
+    '',
+    '\uD83D\uDCCA *Overall Status*',
+    '\u2705 Cases Updated: ' + updatedCases + ' of ' + totalCases,
+    '\uD83D\uDD34 Cases Pending: ' + pendingCases,
+    '',
+    '\uD83C\uDFE5 *Hospital Submissions*',
+    '\u2705 Fully Updated: ' + updatedHosp + ' hospitals',
+    '\uD83D\uDD34 Pending Update: ' + pendingHosp + ' hospitals'
+  ];
+
+  if (topPending.length > 0) {
+    lines.push('');
+    lines.push('\u26A0\uFE0F *Hospitals Needing Update*');
+    topPending.forEach(function(h, i) {
+      lines.push((i+1) + '. ' + h.name + ' \u2014 ' + h.pending + ' pending');
+    });
+  }
+
+  lines.push('');
+  lines.push('_Shravan Sanjeevini \u00B7 NPPCD Karnataka_');
+
+  var msg = lines.join(NL);
+  var encoded = encodeURIComponent(msg);
+  window.open('https://wa.me/?text=' + encoded, '_blank');
+}
 
 function showHospitalCases(idxOrName, filter) {
   // Accept either array index (from state summary) or hospital name string

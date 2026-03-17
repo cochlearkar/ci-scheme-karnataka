@@ -12,13 +12,14 @@
 
 <!-- Firebase SDK -->
 <script type="module">
-import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { initializeApp }                               from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword,
+         signOut, onAuthStateChanged,
          updatePassword, reauthenticateWithCredential,
-         EmailAuthProvider }                      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
-import { getFirestore, collection, getDocs,
-         doc, updateDoc, addDoc,
-         serverTimestamp }                        from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+         EmailAuthProvider }                           from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, collection, getDocs, getDoc,
+         doc, setDoc, updateDoc, addDoc,
+         serverTimestamp }                             from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI",
@@ -34,12 +35,18 @@ const _app  = initializeApp(firebaseConfig);
 const _auth = getAuth(_app);
 const _db   = getFirestore(_app);
 
-// Expose to global scope for use in regular scripts below
+// Expose ALL firebase functions to global scope
 window._fbAuth = _auth;
 window._fbDb   = _db;
-window._fbFns  = { signInWithEmailAndPassword, updatePassword,
-                   reauthenticateWithCredential, EmailAuthProvider,
-                   collection, getDocs, doc, updateDoc, addDoc, serverTimestamp };
+window._fbFns  = {
+  signInWithEmailAndPassword, signOut, onAuthStateChanged,
+  updatePassword, reauthenticateWithCredential, EmailAuthProvider,
+  collection, getDocs, getDoc, doc, setDoc, updateDoc, addDoc, serverTimestamp
+};
+
+// Signal that Firebase is fully ready
+window._fbReady = true;
+document.dispatchEvent(new Event('firebase-ready'));
 </script>
 
 <style>
@@ -1448,13 +1455,15 @@ async function authenticateAndLogin() {
   btn.disabled = true;
 
   // Wait for Firebase SDK to be ready (module loads async)
-  let attempts = 0;
-  while (!window._fbFns && attempts < 20) {
-    await new Promise(r => setTimeout(r, 250));
-    attempts++;
+  if (!window._fbReady) {
+    await new Promise(resolve => {
+      if (window._fbReady) { resolve(); return; }
+      document.addEventListener('firebase-ready', resolve, { once: true });
+      setTimeout(resolve, 5000); // max 5 sec wait
+    });
   }
   if (!window._fbFns) {
-    errEl.textContent = 'App not ready. Please refresh the page and try again.';
+    errEl.textContent = 'App not ready — please refresh the page and try again.';
     errEl.style.display = 'block';
     btn.innerHTML = 'Sign in →'; btn.disabled = false;
     return;
@@ -1687,7 +1696,103 @@ function buildHome() {
     });
   }
 
+  // State team — update status summary by hospital and rehab centre
+  if (currentRole === 'state') {
+    html += buildStateUpdateSummary(SAMPLE_CASES);
+  }
+
   body.innerHTML = html;
+}
+
+// ── STATE UPDATE SUMMARY ─────────────────────────────────────────────────────
+function buildStateUpdateSummary(cases) {
+  let html = '';
+
+  // ── Hospital-wise summary ─────────────────────────────────────────────────
+  const hospMap = {};
+  cases.forEach(c => {
+    const h = c.hospital || 'Unknown Hospital';
+    if (!hospMap[h]) hospMap[h] = { total:0, updated:0, pending:0 };
+    hospMap[h].total++;
+    if (c.hospSubmitted) hospMap[h].updated++;
+    else hospMap[h].pending++;
+  });
+
+  const hospEntries = Object.entries(hospMap)
+    .sort((a,b) => b[1].pending - a[1].pending);
+
+  html += `<div class="section-label" style="margin-top:24px">Hospital — Surgery Update Status</div>`;
+  html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:4px">`;
+
+  // Summary totals row
+  const totalHospPending = hospEntries.reduce((s,[,v]) => s+v.pending, 0);
+  const totalHospUpdated = hospEntries.reduce((s,[,v]) => s+v.updated, 0);
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:0.5px solid var(--border)">
+    <div style="padding:10px 14px;text-align:center;background:var(--red-light)">
+      <div style="font-size:20px;font-weight:700;color:var(--red)">${totalHospPending}</div>
+      <div style="font-size:10px;color:var(--red);font-weight:600;text-transform:uppercase">Pending update</div>
+    </div>
+    <div style="padding:10px 14px;text-align:center;background:var(--green-light)">
+      <div style="font-size:20px;font-weight:700;color:var(--green)">${totalHospUpdated}</div>
+      <div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase">Updated ✓</div>
+    </div>
+  </div>`;
+
+  // Per-hospital rows
+  hospEntries.forEach(([hosp, data]) => {
+    const pct = data.total > 0 ? Math.round((data.updated/data.total)*100) : 0;
+    const barColor = pct === 100 ? 'var(--green-mid)' : pct > 50 ? 'var(--amber-mid)' : 'var(--red)';
+    html += `<div style="padding:10px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px" onclick="buildCaseList();showScreen('cases')">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hosp}</div>
+        <div style="height:4px;background:var(--gray-mid);border-radius:2px;margin-top:5px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;transition:width .3s"></div>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <span style="font-size:11px;color:var(--red);font-weight:600">${data.pending} pending</span>
+        <span style="font-size:11px;color:var(--text-light);margin:0 3px">/</span>
+        <span style="font-size:11px;color:var(--green);font-weight:600">${data.updated} done</span>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // ── Rehab centre wise summary ─────────────────────────────────────────────
+  const rehabMap = {};
+  cases.forEach(c => {
+    if (!c.rehabCentre) return;
+    const r = c.rehabCentre;
+    if (!rehabMap[r]) rehabMap[r] = { total:0, sessions:0, cases:[] };
+    rehabMap[r].total++;
+    rehabMap[r].sessions += (c.sessions || 0);
+    rehabMap[r].cases.push(c);
+  });
+
+  if (Object.keys(rehabMap).length > 0) {
+    html += `<div class="section-label" style="margin-top:20px">Rehab Centre — Session Activity</div>`;
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:4px">`;
+
+    Object.entries(rehabMap)
+      .sort((a,b) => b[1].total - a[1].total)
+      .forEach(([centre, data]) => {
+        const active = data.cases.filter(c => c.sessions > 0).length;
+        const notStarted = data.total - active;
+        html += `<div style="padding:10px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${centre}</div>
+            <div style="font-size:11px;color:var(--text-light);margin-top:2px">${data.total} assigned · ${data.sessions} total sessions logged</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <span style="font-size:11px;color:var(--amber);font-weight:600">${notStarted} not started</span><br>
+            <span style="font-size:11px;color:var(--green);font-weight:600">${active} active</span>
+          </div>
+        </div>`;
+      });
+    html += `</div>`;
+  }
+
+  return html;
 }
 
 // ══════════════════════════════════════════
@@ -3881,6 +3986,16 @@ window.addEventListener('online', updateOfflineBanner);
 window.addEventListener('offline', updateOfflineBanner);
 window.addEventListener('load', async () => {
   updateOfflineBanner();
+
+  // Wait for Firebase to be ready before restoring session
+  if (!window._fbReady) {
+    await new Promise(resolve => {
+      if (window._fbReady) { resolve(); return; }
+      document.addEventListener('firebase-ready', resolve, { once: true });
+      setTimeout(resolve, 5000);
+    });
+  }
+
   const saved = sessionStorage.getItem('ci_user');
   if (saved) {
     try {

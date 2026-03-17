@@ -1099,6 +1099,10 @@ let filteredCases = [...SAMPLE_CASES];
 let selectedYears = ['all']; // 'all' means show all years
 let activeStatusFilter = 'All';
 let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
+// Fixed hospital totals — calculated once when entering cases screen
+let _hospTotalPending = 0;
+let _hospTotalUpdated = 0;
+let _hospTotalAll     = 0;
 let _stateHospFilter = null;
 
 // ══════════════════════════════════════════
@@ -1925,6 +1929,14 @@ function buildCaseList(filter = 'all') {
   else if (filter === 'confirm')      activeStatusFilter = 'Confirm';
   else                                activeStatusFilter = 'All';
 
+  // Lock hospital totals NOW — once per cases screen entry
+  if (currentRole === 'hospital') {
+    const _allMine = filterCasesByUser(SAMPLE_CASES);
+    _hospTotalUpdated = _allMine.filter(c => isHospitalUpdated(c)).length;
+    _hospTotalPending = _allMine.length - _hospTotalUpdated;
+    _hospTotalAll     = _allMine.length;
+  }
+
   const filterRow = document.getElementById('filter-row');
   if (currentRole === 'hospital') {
     filterRow.innerHTML = ['All','Needs update','Updated'].map(f =>
@@ -2068,20 +2080,22 @@ function renderCaseList() {
   document.getElementById('case-count').textContent = `Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''}`;
 
   // Hospital pending/updated summary banner
+  // Always use ALL cases for this hospital — not the filtered subset
   const banner = document.getElementById('hosp-status-banner');
   if (banner) {
-    if (currentRole === 'hospital' && filteredCases.length > 0) {
-      const updated = filteredCases.filter(c => isHospitalUpdated(c)).length;
-      const pending = filteredCases.length - updated;
+    if (currentRole === 'hospital') {
       banner.style.display = 'block';
+      // Always use locked totals — never recalculate on tab switch
       banner.innerHTML =
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
         '<div style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px;text-align:center">' +
-        '<div style="font-size:22px;font-weight:700;color:var(--red)">'+pending+'</div>' +
-        '<div style="font-size:10px;color:var(--red);margin-top:2px;font-weight:600">PENDING UPDATE</div></div>' +
+        '<div style="font-size:22px;font-weight:700;color:var(--red)">' + _hospTotalPending + '</div>' +
+        '<div style="font-size:10px;color:var(--red);margin-top:2px;font-weight:600">PENDING UPDATE</div>' +
+        '<div style="font-size:9px;color:var(--red);opacity:0.7">of ' + _hospTotalAll + ' total</div></div>' +
         '<div style="background:var(--green-light);border:0.5px solid var(--green-border);border-radius:10px;padding:10px;text-align:center">' +
-        '<div style="font-size:22px;font-weight:700;color:var(--green)">'+updated+'</div>' +
-        '<div style="font-size:10px;color:var(--green);margin-top:2px;font-weight:600">UPDATED ✓</div></div>' +
+        '<div style="font-size:22px;font-weight:700;color:var(--green)">' + _hospTotalUpdated + '</div>' +
+        '<div style="font-size:10px;color:var(--green);margin-top:2px;font-weight:600">UPDATED ✓</div>' +
+        '<div style="font-size:9px;color:var(--green);opacity:0.7">of ' + _hospTotalAll + ' total</div></div>' +
         '</div>';
     } else {
       banner.style.display = 'none';

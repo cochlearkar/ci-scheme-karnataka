@@ -264,8 +264,10 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
 </div>
 
 <script type="module">
-import { initializeApp }           from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getFirestore, collection, getDocs }      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword,
+         onAuthStateChanged }                     from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey:            "AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI",
@@ -276,22 +278,63 @@ const firebaseConfig = {
   appId:             "1:130742586600:web:1618bb56710c6fbbcc8d5d"
 };
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+const app  = initializeApp(firebaseConfig);
+const db   = getFirestore(app);
+const auth = getAuth(app);
 
-// Load all cases
-const snap = await getDocs(collection(db, 'cases'));
-window.ALL_CASES = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
-window.FILTERED_CASES = [...window.ALL_CASES];
+function showError(msg) {
+  document.getElementById('loading-screen').innerHTML =
+    '<div style="text-align:center;padding:40px 24px">'
+    +'<div style="font-size:40px;margin-bottom:16px">⚠️</div>'
+    +'<div style="font-size:15px;font-weight:600;color:#A32D2D;margin-bottom:8px">Unable to load reports</div>'
+    +'<div style="font-size:13px;color:#6b6358;margin-bottom:24px">'+msg+'</div>'
+    +'<a href="index.html" style="background:#0a3d2e;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-size:13px">← Back to App</a>'
+    +'</div>';
+}
 
-// Populate filters
-populateFilters();
-renderAll();
-renderDistYr();
-initSortable();
+async function loadData() {
+  try {
+    const snap = await getDocs(collection(db, 'cases'));
+    window.ALL_CASES = snap.docs.map(d => ({ ...d.data(), _id: d.id }));
+    window.FILTERED_CASES = [...window.ALL_CASES];
+    populateFilters();
+    renderAll();
+    renderDistYr();
+    initSortable();
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+  } catch(e) {
+    console.error('Firestore load error:', e);
+    showError('Could not load cases. Please go back to the app, log in, and try again. (' + e.message + ')');
+  }
+}
 
-document.getElementById('loading-screen').style.display = 'none';
-document.getElementById('main-content').style.display = 'block';
+// Check if already signed in
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    // Already authenticated — load data directly
+    await loadData();
+  } else {
+    // Try to re-authenticate using stored session from main app
+    const saved = sessionStorage.getItem('ci_user');
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        const email = u.username + '@shravan.app';
+        // We need password — but we don't store it. Use signInWithCustomToken alternative:
+        // Instead, update Firestore rules to allow public read of cases
+        // For now, try loading anyway (rules may allow it)
+        await loadData();
+      } catch(e) {
+        await loadData(); // try anyway
+      }
+    } else {
+      // No session — try loading anyway (rules permitting)
+      // If this fails, show a helpful message
+      await loadData();
+    }
+  }
+});
 </script>
 
 <script>

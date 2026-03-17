@@ -1099,6 +1099,7 @@ let filteredCases = [...SAMPLE_CASES];
 let selectedYears = ['all']; // 'all' means show all years
 let activeStatusFilter = 'All';
 let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
+let _stateHospFilter = null;
 
 // ══════════════════════════════════════════
 // NAVIGATION
@@ -1371,6 +1372,38 @@ function buildPatientCard(cas, role) {
 }
 
 
+
+// Format date as '05 March 2025'
+function fmtDate(d) {
+  if (!d) return '—';
+  var dt = new Date(d);
+  if (isNaN(dt.getTime())) return d; // return as-is if not parseable
+  return dt.toLocaleDateString('en-IN', { day:'2-digit', month:'long', year:'numeric' });
+}
+
+
+// Format date as '05 March 2025'
+function fmtDate(d) {
+  if (!d) return '';
+  var months = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+  var dt;
+  // Handle DD-Mon-YYYY format (e.g. 12-Nov-2022)
+  if (typeof d === 'string' && d.match(/^\d{2}-[A-Za-z]{3}-\d{4}$/)) {
+    var parts = d.split('-');
+    var monIdx = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(parts[1]);
+    if (monIdx > -1) dt = new Date(parts[2], monIdx, parseInt(parts[0]));
+  }
+  // Handle YYYY-MM-DD format
+  if (!dt && typeof d === 'string' && d.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    var p = d.split('-');
+    dt = new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2]));
+  }
+  if (!dt) dt = new Date(d);
+  if (isNaN(dt.getTime())) return d; // return original if can't parse
+  return String(dt.getDate()).padStart(2,'0') + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+}
+
 function cleanMob(m) {
   return String(m||'').replace(/\.0$/, '').replace(/[^0-9+]/g, '').trim();
 }
@@ -1389,7 +1422,7 @@ function showScreen(name, pushHistory = true) {
 
 function goBack() {
   const prev = screenHistory.pop() || 'home';
-  if (prev === 'home') _stateHospFilter = null; // clear drill-down when going home
+  _stateHospFilter = null;
   showScreen(prev, false);
 }
 
@@ -1602,6 +1635,53 @@ function isHospitalUpdated(c) {
   return c.hospSubmitted === true;
 }
 
+
+// Format date as '05 March 2025'
+function fmtDate(d) {
+  if (!d) return '';
+  // Handle formats: DD-Mon-YYYY, YYYY-MM-DD, DD/MM/YYYY
+  var months = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+  var dt;
+  // Try YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
+    var parts = d.substring(0,10).split('-');
+    return parseInt(parts[2]) + ' ' + months[parseInt(parts[1])-1] + ' ' + parts[0];
+  }
+  // Try DD-Mon-YYYY (e.g. 12-Nov-2022)
+  if (/^\d{2}-[A-Za-z]{3}-\d{4}/.test(d)) {
+    var p = d.split('-');
+    var mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var mi = mo.indexOf(p[1]);
+    return parseInt(p[0]) + ' ' + (mi>-1?months[mi]:p[1]) + ' ' + p[2];
+  }
+  // Fallback - try native Date
+  try {
+    dt = new Date(d);
+    if (!isNaN(dt)) return dt.getDate() + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+  } catch(e) {}
+  return d;
+}
+
+
+// Format date as '05 March 2025'
+function fmtDate(d) {
+  if (!d || d === 'Not recorded' || d === '—') return d || '';
+  var months = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+  var dt;
+  // Handle DD-Mon-YYYY format e.g. "12-Nov-2022"
+  if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(d)) {
+    var parts = d.split('-');
+    var monMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    dt = new Date(parseInt(parts[2]), monMap[parts[1]], parseInt(parts[0]));
+  } else {
+    dt = new Date(d);
+  }
+  if (isNaN(dt.getTime())) return d;
+  return ('0'+dt.getDate()).slice(-2) + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+}
+
 function filterCasesByUser(cases) {
   if (!currentUser || currentUser.role === 'state') {
     if (_stateHospFilter && _stateHospFilter.hospital) {
@@ -1636,6 +1716,7 @@ function filterCasesByUser(cases) {
 }
 
 function buildHome() {
+  _stateHospFilter = null; // clear any hospital drill-down filter
   // Cases already loaded into SAMPLE_CASES by loadCasesFromFirestore() at login
   // Fallback to cases.js if Firestore hasn't loaded yet
   if (SAMPLE_CASES.length === 0 && typeof PRELOADED_CASES_DATA !== 'undefined') {
@@ -1721,20 +1802,23 @@ function buildHome() {
 
 // ── STATE UPDATE SUMMARY ─────────────────────────────────────────────────────
 
-function showHospitalCases(hospitalName, filter) {
-  // Temporarily override filterCasesByUser to show cases for specific hospital
+function showHospitalCases(idxOrName, filter) {
+  // Accept either array index (from state summary) or hospital name string
+  const hospitalName = (typeof idxOrName === 'number' && window._stateHospList)
+    ? window._stateHospList[idxOrName]
+    : idxOrName;
   _stateHospFilter = { hospital: hospitalName, filter: filter };
-  buildCaseList(filter === 'pending' ? 'hosp-pending' : 'hosp-updated');
+  const listFilter = filter === 'pending' ? 'hosp-pending' : 'hosp-updated';
+  buildCaseList(listFilter);
   showScreen('cases');
 }
-var _stateHospFilter = null;
 
 function buildStateUpdateSummary(cases) {
   let html = '';
 
-  // ── Hospital-wise summary ─────────────────────────────────────────────────
+  // ── Hospital-wise summary ──────────────────────────────────────────────────
   const hospMap = {};
-  cases.forEach(c => {
+  cases.forEach(function(c) {
     const h = c.hospital || 'Unknown Hospital';
     if (!hospMap[h]) hospMap[h] = { total:0, updated:0, pending:0 };
     hospMap[h].total++;
@@ -1743,51 +1827,48 @@ function buildStateUpdateSummary(cases) {
   });
 
   const hospEntries = Object.entries(hospMap)
-    .sort((a,b) => b[1].pending - a[1].pending);
+    .sort(function(a,b){ return b[1].pending - a[1].pending; });
 
-  html += `<div class="section-label" style="margin-top:24px">Hospital — Surgery Update Status</div>`;
-  html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:4px">`;
+  const totalHospPending = hospEntries.reduce(function(s,e){ return s+e[1].pending; }, 0);
+  const totalHospUpdated = hospEntries.reduce(function(s,e){ return s+e[1].updated; }, 0);
 
-  // Summary totals row
-  const totalHospPending = hospEntries.reduce((s,[,v]) => s+v.pending, 0);
-  const totalHospUpdated = hospEntries.reduce((s,[,v]) => s+v.updated, 0);
-  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:0.5px solid var(--border)">
-    <div style="padding:10px 14px;text-align:center;background:var(--red-light)">
-      <div style="font-size:20px;font-weight:700;color:var(--red)">${totalHospPending}</div>
-      <div style="font-size:10px;color:var(--red);font-weight:600;text-transform:uppercase">Pending update</div>
-    </div>
-    <div style="padding:10px 14px;text-align:center;background:var(--green-light)">
-      <div style="font-size:20px;font-weight:700;color:var(--green)">${totalHospUpdated}</div>
-      <div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase">Updated ✓</div>
-    </div>
-  </div>`;
+  html += '<div class="section-label" style="margin-top:24px">Hospital — Surgery Update Status</div>';
+  html += '<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:4px">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:0.5px solid var(--border)">'
+    + '<div style="padding:10px 14px;text-align:center;background:var(--red-light)">'
+    + '<div style="font-size:20px;font-weight:700;color:var(--red)">'+totalHospPending+'</div>'
+    + '<div style="font-size:10px;color:var(--red);font-weight:600;text-transform:uppercase">Pending update</div></div>'
+    + '<div style="padding:10px 14px;text-align:center;background:var(--green-light)">'
+    + '<div style="font-size:20px;font-weight:700;color:var(--green)">'+totalHospUpdated+'</div>'
+    + '<div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase">Updated &#10003;</div></div>'
+    + '</div>';
 
-  // Per-hospital rows
-  hospEntries.forEach(([hosp, data]) => {
+  // Store hospital names in a lookup array so onclick can use index safely
+  window._stateHospList = [];
+  hospEntries.forEach(function(entry) {
+    const hosp = entry[0];
+    const data = entry[1];
+    const idx  = window._stateHospList.length;
+    window._stateHospList.push(hosp);
     const pct = data.total > 0 ? Math.round((data.updated/data.total)*100) : 0;
     const barColor = pct === 100 ? 'var(--green-mid)' : pct > 50 ? 'var(--amber-mid)' : 'var(--red)';
-    const safeHosp = hosp.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    html += `<div style="padding:10px 14px;border-bottom:0.5px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hosp}</div>
-          <div style="height:4px;background:var(--gray-mid);border-radius:2px;margin-top:5px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;transition:width .3s"></div>
-          </div>
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <span style="font-size:11px;color:var(--red);font-weight:600">${data.pending} pending</span>
-          <span style="font-size:11px;color:var(--text-light);margin:0 3px">/</span>
-          <span style="font-size:11px;color:var(--green);font-weight:600">${data.updated} done</span>
-        </div>
-      </div>
-      <div style="display:flex;gap:6px">
-        ${data.pending > 0 ? `<button onclick="showHospitalCases('${safeHosp}','pending')" style="flex:1;padding:5px 8px;font-size:11px;font-weight:600;background:var(--red-light);color:var(--red);border:0.5px solid #f5c6c2;border-radius:6px;cursor:pointer">&#128308; ${data.pending} pending</button>` : ''}
-        ${data.updated > 0 ? `<button onclick="showHospitalCases('${safeHosp}','updated')" style="flex:1;padding:5px 8px;font-size:11px;font-weight:600;background:var(--green-light);color:var(--green);border:0.5px solid var(--green-border);border-radius:6px;cursor:pointer">&#9989; ${data.updated} updated</button>` : ''}
-      </div>
-    </div>`;
+    html += '<div style="padding:10px 14px;border-bottom:0.5px solid var(--border)">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+hosp+'</div>'
+      + '<div style="height:4px;background:var(--gray-mid);border-radius:2px;margin-top:5px;overflow:hidden">'
+      + '<div style="height:100%;width:'+pct+'%;background:'+barColor+';border-radius:2px"></div></div></div>'
+      + '<div style="text-align:right;flex-shrink:0">'
+      + '<span style="font-size:11px;color:var(--red);font-weight:600">'+data.pending+' pending</span>'
+      + '<span style="font-size:11px;color:var(--text-light);margin:0 3px">/</span>'
+      + '<span style="font-size:11px;color:var(--green);font-weight:600">'+data.updated+' done</span>'
+      + '</div></div>'
+      + '<div style="display:flex;gap:6px">'
+      + (data.pending > 0 ? '<button onclick="showHospitalCases('+idx+',&quot;pending&quot;)" style="flex:1;padding:5px 8px;font-size:11px;font-weight:600;background:var(--red-light);color:var(--red);border:0.5px solid #f5c6c2;border-radius:6px;cursor:pointer">&#128308; '+data.pending+' pending</button>' : '')
+      + (data.updated > 0 ? '<button onclick="showHospitalCases('+idx+',&quot;updated&quot;)" style="flex:1;padding:5px 8px;font-size:11px;font-weight:600;background:var(--green-light);color:var(--green);border:0.5px solid var(--green-border);border-radius:6px;cursor:pointer">&#9989; '+data.updated+' updated</button>' : '')
+      + '</div></div>';
   });
-  html += `</div>`;
+  html += '</div>';
 
   // ── Rehab centre wise summary ─────────────────────────────────────────────
   const rehabMap = {};
@@ -3434,7 +3515,7 @@ function buildSummaryHTML(c) {
     +hospBadge
     +'<div class="form-section">'+sec('Patient Information','&#128118;')
     +row('TPA ID',c.tpa)+row('Gender',c.gender)+row('Age at Surgery',c.age)
-    +row('Date of Birth',c.dob)+row('Caste / Category',c.caste)
+    +row('Date of Birth',fmtDate(c.dob))+row('Caste / Category',c.caste)
     +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border)">'
     +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;width:45%">Mobile</span>'
     +'<span style="font-size:13px;text-align:right;flex:1">'
@@ -3452,9 +3533,9 @@ function buildSummaryHTML(c) {
     +'<div class="form-section">'+sec('Hospital & Surgery','&#127973;')
     +row('Hospital',c.hospital,true)+row('Hospital District',c.hospDist)
     +row('Hospital Type',c.hospType)+row('Treating Doctor',c.doctor)
-    +row('Mentor Surgeon',c.mentorSurgeon)+row('Admission Date',c.surgAdmit)
-    +row('Surgery Date',c.surgDate)+row('Discharge Date',c.surgDisch)
-    +row('Switch-on Date',c.switchOn)+row('SAST Ref No.',c.surgRefNo)
+    +row('Mentor Surgeon',c.mentorSurgeon)+row('Admission Date',fmtDate(c.surgAdmit))
+    +row('Surgery Date',fmtDate(c.surgDate))+row('Discharge Date',fmtDate(c.surgDisch))
+    +row('Switch-on Date',fmtDate(c.switchOn))+row('SAST Ref No.',c.surgRefNo)
     +row('Pre-auth Status',c.surgStatus)+row('Package',c.surgPkg)
     +(c.surgNet?row('Surgery Net Paid','&#8377;'+Number(c.surgNet).toLocaleString('en-IN'),true):'')
     +rowFull('Complications / Remarks',c.hospRemarks||c.remarks)+'</div>'
@@ -3463,10 +3544,10 @@ function buildSummaryHTML(c) {
     +row('Implanted Side',c.side)+row('Serial Number',c.serialNo)
     +row('Recommended Rehab',c.rehabCentre)+'</div>':'')
     +((c.r1RefNo||c.r1Admit||c.r1Status)?'<div class="form-section">'+sec('Rehab Part 1 (2002GP)','&#127911;')
-    +row('Ref No.',c.r1RefNo)+row('Preauth Date',c.r1Admit)+row('Claim Status',c.r1Status)
+    +row('Ref No.',c.r1RefNo)+row('Preauth Date',fmtDate(c.r1Admit))+row('Claim Status',c.r1Status)
     +(c.r1Net?row('Net Paid','&#8377;'+Number(c.r1Net).toLocaleString('en-IN'),true):'')+'</div>':'')
     +((c.r2RefNo||c.r2Admit||c.r2Status)?'<div class="form-section">'+sec('Rehab Part 2 (2003GP)','&#127911;')
-    +row('Ref No.',c.r2RefNo)+row('Preauth Date',c.r2Admit)+row('Claim Status',c.r2Status)
+    +row('Ref No.',c.r2RefNo)+row('Preauth Date',fmtDate(c.r2Admit))+row('Claim Status',c.r2Status)
     +(c.r2Net?row('Net Paid','&#8377;'+Number(c.r2Net).toLocaleString('en-IN'),true):'')+'</div>':'')
     +(c.sessions>0?'<div class="form-section">'+sec('Rehab Sessions','&#128202;')
     +row('Sessions Completed',c.sessions+' / '+(c.totalSessions||54))
@@ -3692,101 +3773,143 @@ function roCell(label, val) {
 }
 
 function buildHospitalReadOnly(cas) {
-  function roRow(label, value, link) {
-    if (!value) return '';
-    var val = link ? '<a href="tel:'+value+'" style="color:var(--blue-mid);font-weight:600">'+value+'</a>' : value;
-    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid var(--border)">'
-      +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;width:45%">'+label+'</span>'
-      +'<span style="font-size:13px;font-weight:500;color:var(--text-mid);text-align:right;flex:1">'+val+'</span></div>';
+  // Date formatter — "05 March 2025"
+  function fmtDate(d) {
+    if (!d) return '—';
+    var months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+    var parts = String(d).split(/[-/]/);
+    if (parts.length === 3) {
+      var y = parts[0].length === 4 ? parts[0] : parts[2];
+      var m = parts[0].length === 4 ? parseInt(parts[1])-1 : parseInt(parts[1])-1;
+      var day = parts[0].length === 4 ? parts[2] : parts[0];
+      // Handle dd-Mon-yyyy format e.g. "12-Nov-2022"
+      if (isNaN(parseInt(parts[1]))) {
+        var mNames = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+        m = mNames[parts[1]] !== undefined ? mNames[parts[1]] : 0;
+        day = parts[0]; y = parts[2];
+      }
+      return String(parseInt(day)).padStart(2,'0') + ' ' + months[m] + ' ' + y;
+    }
+    return d;
   }
+
   var mob = cleanMob(cas.mobile||'');
 
+  // Section builder helpers
+  function sfield(label, value, source) {
+    // source: 'sast' = teal, 'hosp' = green, 'both' = default
+    var dotColor = source==='sast' ? '#1D9E75' : source==='hosp' ? '#378ADD' : 'var(--gray-dark)';
+    if (!value) return '';
+    return '<div style="display:flex;align-items:flex-start;padding:6px 0;border-bottom:0.5px solid var(--border);gap:8px">'
+      +'<div style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';margin-top:5px;flex-shrink:0"></div>'
+      +'<div style="flex:1;display:flex;justify-content:space-between;align-items:flex-start;gap:6px">'
+      +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;min-width:38%">'+label+'</span>'
+      +'<span style="font-size:12px;font-weight:500;color:var(--text);text-align:right">'+value+'</span>'
+      +'</div></div>';
+  }
+  function sfieldLink(label, value) {
+    if (!value) return '';
+    return '<div style="display:flex;align-items:flex-start;padding:6px 0;border-bottom:0.5px solid var(--border);gap:8px">'
+      +'<div style="width:6px;height:6px;border-radius:50%;background:#1D9E75;margin-top:5px;flex-shrink:0"></div>'
+      +'<div style="flex:1;display:flex;justify-content:space-between;align-items:flex-start;gap:6px">'
+      +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;min-width:38%">'+label+'</span>'
+      +'<a href="tel:'+value+'" style="font-size:12px;font-weight:600;color:var(--blue-mid);text-align:right">&#128222; '+value+'</a>'
+      +'</div></div>';
+  }
+
   document.getElementById('hu-body').innerHTML =
-    // ── LOCKED BANNER ─────────────────────────────────────────────────────
-    '<div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:14px 16px;margin:16px 16px 0;display:flex;gap:10px">'
-    +'<div style="font-size:20px">&#9989;</div><div>'
-    +'<div style="font-size:13px;font-weight:600;color:var(--green-dark)">Surgery details submitted &amp; locked</div>'
-    +'<div style="font-size:11px;color:var(--green);margin-top:2px">By '+(cas.hospSubmittedBy||'hospital')+' on '+(cas.hospSubmittedAt?cas.hospSubmittedAt.substring(0,10):'&mdash;')+'</div>'
+
+    // ── LOCKED BANNER ──────────────────────────────────────────────────────
+    '<div style="background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:12px 16px;margin:16px 16px 0;display:flex;gap:10px;align-items:center">'
+    +'<span style="font-size:20px">&#9989;</span>'
+    +'<div><div style="font-size:13px;font-weight:600;color:var(--green-dark)">Surgery details submitted &amp; locked</div>'
+    +'<div style="font-size:11px;color:var(--green);margin-top:1px">By '+(cas.hospSubmittedBy||'hospital')+' &nbsp;&#183;&nbsp; '+fmtDate(cas.hospSubmittedAt?cas.hospSubmittedAt.substring(0,10):null)+'</div>'
     +'</div></div>'
 
+    // ── COLOUR LEGEND ──────────────────────────────────────────────────────
+    +'<div style="display:flex;gap:16px;padding:10px 16px;font-size:11px;color:var(--text-light)">'
+    +'<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1D9E75;margin-right:4px"></span>From SAST</span>'
+    +'<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#378ADD;margin-right:4px"></span>Hospital submitted</span>'
+    +'</div>'
+
     // ── JOURNEY INFOGRAPHIC ────────────────────────────────────────────────
-    +'<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
-    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Programme Journey</div>'
+    +'<div style="margin:0 16px 14px;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px">'
     +buildJourneyInfographic(cas)+'</div>'
 
-    // ── PATIENT INFORMATION (SAST data) ────────────────────────────────────
-    +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">&#128118; Patient Information</div>'
-    +roRow('SAST Ref / TPA ID', cas.surgRefNo||cas.tpa)
-    +roRow('FY', cas.fy)
-    +roRow('Name', cas.name)
-    +roRow('Gender', cas.gender)
-    +roRow('Age at Surgery', cas.age)
-    +roRow('Date of Birth', cas.dob)
-    +roRow('Caste / Category', cas.caste)
-    +(mob ? roRow('Mobile','&#128222; '+mob, true) : '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:11px;color:var(--text-light)">Mobile</span><span style="font-size:12px;color:var(--amber)">Not recorded</span></div>')
-    +roRow('Village', cas.village)
-    +roRow('Taluk', cas.taluk)
-    +roRow('District', cas.district)
-    +roRow('Residential District', cas.resDistrict||cas.resDist)
-    +roRow('Pincode', cas.pincode)
-    +roRow('Zone', cas.zone)
-    +'</div>'
+    // ── COMPACT ALL-IN-ONE CARD ────────────────────────────────────────────
+    +'<div style="margin:0 16px;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px;overflow:hidden">'
 
-    // ── HOSPITAL & SAST CLAIM DATA ─────────────────────────────────────────
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#127973; Hospital &amp; SAST Data</div>'
-    +roRow('Hospital', cas.hospital)
-    +roRow('Hospital District', cas.hospDist)
-    +roRow('Hospital Type', cas.hospType)
-    +roRow('Treating Doctor', cas.doctor)
-    +roRow('SAST Pre-auth Ref', cas.surgRefNo)
-    +roRow('Pre-auth Status', cas.surgStatus)
-    +roRow('Package', cas.surgPkg)
-    +(cas.surgNet ? roRow('Surgery Net Paid', '&#8377;'+Number(cas.surgNet).toLocaleString('en-IN')) : '')
-    +'</div>'
+    // Patient identity — SAST (teal dots)
+    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin-bottom:6px">Patient</div>'
+    +sfield('Name',       cas.name,            'sast')
+    +sfield('Gender',     cas.gender,           'sast')
+    +sfield('DOB',        fmtDate(cas.dob),     'hosp')
+    +sfield('Age at surgery', cas.age,          'sast')
+    +sfield('Caste',      cas.caste,            'sast')
+    +(mob ? sfieldLink('Mobile', mob) : sfield('Mobile','Not recorded','sast'))
+    +sfield('Village',    cas.village,          'sast')
+    +sfield('Taluk',      cas.taluk,            'sast')
+    +sfield('District',   cas.district,         'sast')
+    +sfield('Res. District', cas.resDistrict||cas.resDist, 'hosp')
+    +sfield('FY',         cas.fy,               'sast')
+    +sfield('Scheme',     cas.scheme,           'sast')
+    +sfield('TPA ID',     cas.tpa,              'sast')
 
-    // ── SURGERY DETAILS (hospital submitted) ──────────────────────────────
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128137; Surgery Details (Submitted by Hospital)</div>'
-    +roRow('Admission Date', cas.surgAdmit)
-    +roRow('Surgery Date', cas.surgDate)
-    +roRow('Discharge Date', cas.surgDisch)
-    +roRow('Switch-on Date', cas.switchOn)
-    +roRow('Implanted Side', cas.side)
-    +roRow('Mentor Surgeon', cas.mentorSurgeon)
-    +roRow('Recommended Rehab Centre', cas.rehabCentre)
-    +'</div>'
+    // Hospital — SAST (teal dots)
+    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Hospital &amp; SAST</div>'
+    +sfield('Hospital',   cas.hospital,         'sast')
+    +sfield('Hosp. Dist', cas.hospDist,         'sast')
+    +sfield('Hosp. Type', cas.hospType,         'sast')
+    +sfield('Treating Dr',cas.doctor,           'sast')
+    +sfield('SAST Ref',   cas.surgRefNo,        'sast')
+    +sfield('Pre-auth',   cas.surgStatus,       'sast')
+    +sfield('Package',    cas.surgPkg,          'sast')
+    +(cas.surgNet ? sfield('Surgery paid','&#8377;'+Number(cas.surgNet).toLocaleString('en-IN'),'sast') : '')
 
-    // ── DEVICE DETAILS ─────────────────────────────────────────────────────
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#129955; Device Details</div>'
-    +roRow('Manufacturer', cas.manufacturer)
-    +roRow('Model', cas.model)
-    +roRow('Implanted Side', cas.side)
-    +roRow('Serial Number', cas.serialNo)
-    +'</div>'
+    // Surgery details — hospital submitted (blue dots)
+    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Surgery Details</div>'
+    +sfield('Admission',  fmtDate(cas.surgAdmit), 'hosp')
+    +sfield('Surgery',    fmtDate(cas.surgDate),  'hosp')
+    +sfield('Discharge',  fmtDate(cas.surgDisch), 'hosp')
+    +sfield('Switch-on',  fmtDate(cas.switchOn),  'hosp')
+    +sfield('Side',       cas.side,               'hosp')
+    +sfield('Mentor Surgeon', cas.mentorSurgeon,  'hosp')
+    +sfield('Rehab Centre', cas.rehabCentre,      'hosp')
 
-    // ── REHAB CLAIM DATA ───────────────────────────────────────────────────
-    +((cas.r1RefNo||cas.r1Admit||cas.r1Status) ?
-      '<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#127911; Rehab Part 1 (2002GP)</div>'
-      +roRow('Ref No.', cas.r1RefNo)
-      +roRow('Preauth Date', cas.r1Admit)
-      +roRow('Claim Status', cas.r1Status)
-      +(cas.r1Net ? roRow('Net Paid','&#8377;'+Number(cas.r1Net).toLocaleString('en-IN')) : '')
-      +'</div>' : '')
+    // Device — hospital submitted (blue dots)
+    +'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Device</div>'
+    +sfield('Manufacturer', cas.manufacturer,    'hosp')
+    +sfield('Model',        cas.model,           'hosp')
+    +sfield('Serial No.',   cas.serialNo,        'hosp')
 
-    +((cas.r2RefNo||cas.r2Admit||cas.r2Status) ?
-      '<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#127911; Rehab Part 2 (2003GP)</div>'
-      +roRow('Ref No.', cas.r2RefNo)
-      +roRow('Preauth Date', cas.r2Admit)
-      +roRow('Claim Status', cas.r2Status)
-      +(cas.r2Net ? roRow('Net Paid','&#8377;'+Number(cas.r2Net).toLocaleString('en-IN')) : '')
-      +'</div>' : '')
+    // Rehab claims — SAST (teal dots)
+    +((cas.r1RefNo||cas.r1Admit) ?
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Rehab 1 (2002GP)</div>'
+      +sfield('Ref No.',      cas.r1RefNo,        'sast')
+      +sfield('Preauth',      fmtDate(cas.r1Admit),'sast')
+      +sfield('Status',       cas.r1Status,       'sast')
+      +(cas.r1Net ? sfield('Net paid','&#8377;'+Number(cas.r1Net).toLocaleString('en-IN'),'sast') : '')
+    : '')
+    +((cas.r2RefNo||cas.r2Admit) ?
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Rehab 2 (2003GP)</div>'
+      +sfield('Ref No.',      cas.r2RefNo,        'sast')
+      +sfield('Preauth',      fmtDate(cas.r2Admit),'sast')
+      +sfield('Status',       cas.r2Status,       'sast')
+      +(cas.r2Net ? sfield('Net paid','&#8377;'+Number(cas.r2Net).toLocaleString('en-IN'),'sast') : '')
+    : '')
 
-    // ── REMARKS ────────────────────────────────────────────────────────────
+    // Remarks
     +((cas.hospRemarks||cas.remarks) ?
-      '<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128221; Complications / Remarks</div>'
-      +'<div style="font-size:13px;color:var(--text-mid);padding:8px 0">'+(cas.hospRemarks||cas.remarks)+'</div></div>' : '')
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-light);margin:12px 0 6px">Remarks</div>'
+      +'<div style="font-size:12px;color:var(--text-mid);padding:4px 0">'+(cas.hospRemarks||cas.remarks)+'</div>'
+    : '')
+
+    +'</div>'  // end card
 
     +'<div style="padding:16px 16px 40px"><button onclick="goBack()" style="width:100%;padding:13px;background:var(--green-dark);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;">&#8592; Back to Cases</button></div>';
 }
+
 
 function buildHospitalUpdateForm(cas) {
   const mOpts = MENTOR_SURGEONS.map(m=>'<option value="'+m+'">'+m+'</option>').join('');
@@ -3807,23 +3930,26 @@ function buildHospitalUpdateForm(cas) {
 
     // ── PATIENT INFO CARD ─────────────────────────────────────────────
     +'<div style="margin:14px 16px 0;background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:14px 16px">'
-    +'<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128203; Patient Information</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
-    +piRow('SAST Ref',    cas.surgRefNo||cas.tpa||'&mdash;')
-    +piRow('FY',          cas.fy||'&mdash;')
-    +piRow('Name',        cas.name||'&mdash;')
-    +piRow('Gender',      cas.gender||'&mdash;')
-    +piRow('Caste',       cas.caste||'&mdash;')
-    +piRow('Village',     cas.village||'&mdash;')
-    +piRow('Taluk',       cas.taluk||'&mdash;')
-    +piRow('District',    cas.district||'&mdash;')
-    +piRow('Hospital',    cas.hospital||'&mdash;')
-    +piRow('Doctor',      cas.doctor||'&mdash;')
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'
+    +'<div>'
+    +'<div style="font-size:15px;font-weight:700;color:var(--green-dark)">'+(cas.name||'Patient')+'</div>'
+    +'<div style="font-size:11px;color:var(--green);margin-top:2px">'+(cas.gender||'')+(cas.age?' · '+cas.age:'')+(cas.caste?' · '+cas.caste:'')+'</div>'
     +'</div>'
-    // Mobile update field inside the card
-    +'<div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--green-border)">'
-    +'<div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:5px">&#128222; Update Mobile Number</div>'
-    +'<input class="field-input" id="hu-mobile" type="tel" placeholder="'+(mob||'Add / correct mobile number')+'" style="font-size:13px;padding:8px 10px;width:100%;background:#fff">'
+    +'<div style="text-align:right">'
+    +'<div style="font-size:9px;color:var(--green);font-weight:600;text-transform:uppercase">Card No.</div>'
+    +'<div style="font-size:13px;font-weight:700;color:var(--green-dark)">'+(cas.id||'')+'</div>'
+    +'</div></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;font-size:11px;margin-bottom:10px">'
+    +piRow('SAST Ref', cas.surgRefNo||cas.tpa||'—')
+    +piRow('FY', cas.fy||'—')
+    +piRow('Village', cas.village||'—')
+    +piRow('Taluk', cas.taluk||'—')
+    +piRow('District', cas.district||'—')
+    +piRow('Doctor', cas.doctor||'—')
+    +'</div>'
+    +'<div style="padding-top:8px;border-top:0.5px solid var(--green-border)">'
+    +'<div style="font-size:10px;font-weight:600;color:var(--green);margin-bottom:4px">&#128222; Mobile'+(mob?' — currently: '+mob:'')+'</div>'
+    +'<input class="field-input" id="hu-mobile" type="tel" placeholder="'+(mob?'Update: '+mob:'Add mobile number')+'" style="font-size:13px;padding:7px 10px;width:100%;background:#fff">'
     +'</div></div>'
 
     // ── JOURNEY INFOGRAPHIC ──────────────────────────────────────────────
@@ -3882,6 +4008,11 @@ function buildHospitalUpdateForm(cas) {
 function piRow(label, value) {
   return '<div><div style="color:var(--green);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+label+'</div>'
     +'<div style="color:var(--green-dark);font-weight:500;font-size:12px;margin-top:1px">'+value+'</div></div>';
+}
+function piRowG(label, value) {
+  if (!value || value === 'undefined') return '';
+  return '<div><div style="font-size:10px;color:var(--green);font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+label+'</div>'
+    +'<div style="font-size:12px;font-weight:600;color:var(--green-dark);margin-top:1px">'+value+'</div></div>';
 }
 
 

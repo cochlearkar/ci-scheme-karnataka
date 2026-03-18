@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seed New Rehab Users</title>
+<style>
+  body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+  .card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  h2 { font-size: 18px; margin-bottom: 6px; color: #0a3d2e; }
+  p { font-size: 13px; color: #666; margin-bottom: 20px; }
+  .user-row { background: #f0f9f5; border: 1px solid #9FE1CB; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; font-size: 13px; }
+  .user-row strong { display: block; font-size: 14px; color: #0a3d2e; margin-bottom: 4px; }
+  .user-row span { color: #555; }
+  button { width: 100%; padding: 14px; background: #0a3d2e; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 16px; font-family: inherit; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #log { margin-top: 16px; font-size: 12px; font-family: monospace; background: #1a1a1a; color: #4ade80; padding: 14px; border-radius: 8px; min-height: 60px; white-space: pre-wrap; display: none; }
+  .warn { background: #fff8e1; border: 1px solid #f59e0b; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #92400e; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🦻 Seed New Rehab Users</h2>
+  <p>Creates Firebase Auth accounts and Firestore user profiles for two new rehab centres.</p>
+
+  <div class="warn">⚠️ Run this only once. Running again will try to create duplicate accounts and show errors for existing ones — that's safe to ignore.</div>
+
+  <div class="user-row">
+    <strong>Dr.S.R.Chandrasekhar Institute of Speech and Hearing</strong>
+    <span>Username: r_srcs_bengaluru &nbsp;·&nbsp; Password: CIScheme@2025 &nbsp;·&nbsp; Role: rehab</span>
+  </div>
+  <div class="user-row">
+    <strong>Sri Sathya Sai Sarala Memorial Hospital</strong>
+    <span>Username: r_sssm_bengaluru &nbsp;·&nbsp; Password: CIScheme@2025 &nbsp;·&nbsp; Role: rehab</span>
+  </div>
+  <div class="user-row">
+    <strong>Manasa Cochlear Implant and ENT Center, Bengaluru</strong>
+    <span>Username: r_manasa_bengaluru &nbsp;·&nbsp; Password: CIScheme@2025 &nbsp;·&nbsp; Role: rehab</span>
+  </div>
+
+  <button id="seed-btn" onclick="seedUsers()">Create Users in Firebase</button>
+  <div id="log"></div>
+</div>
+
+<script type="module">
+import { initializeApp }                    from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword,
+         signInWithEmailAndPassword }       from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, doc, setDoc }        from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const app  = initializeApp({
+  apiKey:            "AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI",
+  authDomain:        "shravan-sanjeevini.firebaseapp.com",
+  projectId:         "shravan-sanjeevini",
+  storageBucket:     "shravan-sanjeevini.firebasestorage.app",
+  messagingSenderId: "130742586600",
+  appId:             "1:130742586600:web:1618bb56710c6fbbcc8d5d"
+});
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+const NEW_USERS = [
+  {
+    username:  'r_srcs_bengaluru',
+    password:  'CIScheme@2025',
+    role:      'rehab',
+    unit:      'Dr.S.R.Chandrasekhar Institute of Speech and Hearing',
+    district:  'BENGALURU',
+    zone:      'Bengaluru',
+    status:    'active',
+    mustChangePassword: false
+  },
+  {
+    username:  'r_sssm_bengaluru',
+    password:  'CIScheme@2025',
+    role:      'rehab',
+    unit:      'Sri Sathya Sai Sarala Memorial Hospital',
+    district:  'BENGALURU',
+    zone:      'Bengaluru',
+    status:    'active',
+    mustChangePassword: false
+  },
+  {
+    username:  'r_manasa_bengaluru',
+    password:  'CIScheme@2025',
+    role:      'rehab',
+    unit:      'Manasa Cochlear Implant and ENT Center, Bengaluru',
+    district:  'BENGALURU',
+    zone:      'Bengaluru',
+    status:    'active',
+    mustChangePassword: false
+  }
+];
+
+window.seedUsers = async function() {
+  const btn = document.getElementById('seed-btn');
+  const log = document.getElementById('log');
+  btn.disabled = true;
+  log.style.display = 'block';
+  log.textContent = 'Starting...\n';
+
+  function print(msg) { log.textContent += msg + '\n'; }
+
+  // First sign in as admin to have write permissions
+  try {
+    await signInWithEmailAndPassword(auth, 'ci_admin@shravan.app', 'CIAdmin@2024');
+    print('✓ Signed in as admin');
+  } catch(e) {
+    // Try alternate admin
+    try {
+      await signInWithEmailAndPassword(auth, 'cochlearkar@shravan.app', 'Shravan@2024');
+      print('✓ Signed in as cochlearkar');
+    } catch(e2) {
+      print('✗ Could not sign in as admin: ' + e2.message);
+      print('  Please sign in to the main app first, then run this tool.');
+      btn.disabled = false;
+      return;
+    }
+  }
+
+  for (const u of NEW_USERS) {
+    print('\nCreating: ' + u.username + ' ...');
+    const email = u.username + '@shravan.app';
+    try {
+      // Create Firebase Auth account
+      const cred = await createUserWithEmailAndPassword(auth, email, u.password);
+      print('  ✓ Auth account created — UID: ' + cred.user.uid);
+
+      // Save profile to Firestore users collection
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        username:           u.username,
+        email:              email,
+        role:               u.role,
+        unit:               u.unit,
+        district:           u.district,
+        zone:               u.zone,
+        status:             u.status,
+        mustChangePassword: u.mustChangePassword,
+        createdAt:          new Date().toISOString()
+      });
+      print('  ✓ Firestore profile saved');
+      print('  ✓ ' + u.username + ' ready to use');
+    } catch(e) {
+      if (e.code === 'auth/email-already-in-use') {
+        print('  ⚠ Auth account already exists — skipping creation');
+        print('  ✓ ' + u.username + ' already in system');
+      } else {
+        print('  ✗ Error: ' + e.message);
+      }
+    }
+  }
+
+  print('\n\nAll done! Summary:');
+  print('─────────────────────────────────');
+  NEW_USERS.forEach(u => {
+    print('Username: ' + u.username);
+    print('Password: ' + u.password);
+    print('Centre:   ' + u.unit);
+    print('');
+  });
+  print('Share credentials with the respective centres.');
+  btn.textContent = '✓ Done';
+};
+</script>
+</body>
+</html>

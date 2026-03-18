@@ -817,7 +817,26 @@ body {
   <div class="form-scroll" id="summary-body"></div>
   <div class="bottom-bar" id="summary-action-bar" style="display:none">
     <button class="btn-submit" id="summary-action-btn" onclick="summaryAction()">Update →</button>
+    <button class="btn-submit" id="summary-extra-btn" onclick="openOutcomeAssessment(selectedCase)"
+      style="display:none;background:#4a2a7a;margin-top:8px;font-size:13px">
+      &#127919; Full Outcome Assessment
+    </button>
   </div>
+</div>
+
+<!-- ======== SCREEN: RESOURCES ======== -->
+<div class="screen hidden" id="screen-resources">
+  <div class="app-header" style="background:var(--green-dark)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff">📚 Resources</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.6)">Guidelines, rates &amp; forms</div>
+      </div>
+    </div>
+    <div class="role-chip" id="res-chip">State</div>
+  </div>
+  <div class="form-scroll" id="res-body"></div>
 </div>
 
 <!-- ======== SCREEN: LOADING ======== -->
@@ -847,6 +866,36 @@ body {
     <div class="role-chip chip-rehab">Rehab</div>
   </div>
   <div class="form-scroll" id="rs-body"></div>
+</div>
+
+<!-- ======== SCREEN: DISTRICT FOLLOW-UP ======== -->
+<div class="screen hidden" id="screen-distfollow">
+  <div class="app-header" style="background:var(--amber-mid)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.3);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff" id="df-title">Follow-up</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.75)" id="df-sub">Telephonic outcome follow-up</div>
+      </div>
+    </div>
+    <div class="role-chip" style="background:rgba(255,255,255,0.2);color:#fff;border:none">&#128205; District</div>
+  </div>
+  <div class="form-scroll" id="df-body"></div>
+</div>
+
+<!-- ======== SCREEN: OUTCOME ASSESSMENT ======== -->
+<div class="screen hidden" id="screen-outcome">
+  <div class="app-header" style="background:#4a2a7a">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.3);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff" id="oa-title">Outcome Assessment</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.7)" id="oa-sub">Structured evaluation</div>
+      </div>
+    </div>
+    <div class="role-chip" style="background:rgba(255,255,255,0.2);color:#fff;border:none">&#127919; Assessment</div>
+  </div>
+  <div class="form-scroll" id="oa-body"></div>
 </div>
 
 <!-- ══════════════════ SCREEN: HOSPITAL UPDATE ══════════════════ -->
@@ -1768,16 +1817,19 @@ function buildHome() {
     }
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All cases</div></div>`;
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
+    html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'rehab') {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Update Rehab Sessions</div><div class="action-desc">Select a case to log today's session</div></div><div class="action-arrow">→</div></div>`;
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All assigned cases</div></div>`;
+    html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'district') {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify &amp; complete pending information</div></div><div class="action-arrow">→</div></div>`;
     if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">By district</div></div>`;
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
+    html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · District checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'state') {
     html += `<div class="action-card primary" onclick="showScreen('newcase')" style="background:var(--purple);border-color:var(--purple)"><div class="action-icon">➕</div><div><div class="action-title">Add New Case</div><div class="action-desc">Enter new SAST pre-auth data</div></div><div class="action-arrow">→</div></div>`;
@@ -1785,6 +1837,7 @@ function buildHome() {
     html += `<div class="action-card" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none" onclick="window.open('dashboard.html','_blank')"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">Dashboard</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Charts &amp; Trends</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#0a3d2e,#1a6b4a);border:none" onclick="window.open('reports.html','_blank')"><div class="action-icon" style="font-size:22px">📋</div><div class="action-title" style="color:#fff">Reports</div><div class="action-desc" style="color:rgba(255,255,255,.7)">District · Hospital · FY · At-risk</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#128C7E,#25D366);border:none;cursor:pointer" onclick="shareWhatsApp()"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">📤</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Share Daily Update on WhatsApp</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Tap to open WhatsApp with today's hospital summary pre-filled</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
+    html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">All guidelines · Rates · Checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
   }
 
   html += `</div>`;
@@ -1811,6 +1864,148 @@ function buildHome() {
 
 // ── STATE UPDATE SUMMARY ─────────────────────────────────────────────────────
 
+
+
+// ── RESOURCES ────────────────────────────────────────────────────────────────
+// To update links: replace the url values with your Google Drive share links
+// Google Drive share URL format: https://drive.google.com/file/d/FILE_ID/view
+const RESOURCES = [
+  {
+    id: 'guidelines',
+    title: 'Programme Guidelines',
+    desc: 'NPPCD Karnataka Cochlear Implant Programme — operational guidelines',
+    icon: '📋',
+    url: '',  // ← Paste Google Drive link here
+    roles: ['hospital','rehab','district','state'],
+    tag: 'PDF'
+  },
+  {
+    id: 'rates',
+    title: 'Package Rates & Tariff',
+    desc: 'SAST package rates for surgery, device and rehabilitation claims',
+    icon: '💰',
+    url: '',  // ← Paste Google Drive link here
+    roles: ['hospital','rehab','district','state'],
+    tag: 'PDF'
+  },
+  {
+    id: 'hosp-checklist',
+    title: 'Hospital Claim Checklist',
+    desc: 'Documents required for surgery pre-authorisation and claim submission',
+    icon: '🏥',
+    url: '',  // ← Paste Google Drive link here
+    roles: ['hospital','state'],
+    tag: 'PDF'
+  },
+  {
+    id: 'rehab-checklist',
+    title: 'Rehab Claim Checklist',
+    desc: 'Documents required for Part 1 and Part 2 rehabilitation claim submission',
+    icon: '🎧',
+    url: '',  // ← Paste Google Drive link here
+    roles: ['rehab','state'],
+    tag: 'PDF'
+  },
+  {
+    id: 'district-checklist',
+    title: 'District Officer Checklist',
+    desc: 'Field verification and follow-up checklist for district programme officers',
+    icon: '📍',
+    url: '',  // ← Paste Google Drive link here
+    roles: ['district','state'],
+    tag: 'PDF'
+  },
+  {
+    id: 'annexure-a',
+    title: 'Annexure A — Patient Consent Form',
+    desc: 'Blank template for patient/guardian consent for cochlear implantation',
+    icon: '📄',
+    url: '',  // ← Paste Google Drive link here
+    roles: ['hospital','state'],
+    tag: 'Form'
+  },
+  {
+    id: 'annexure-b',
+    title: 'Annexure B — Audiological Assessment',
+    desc: 'Pre-surgery audiological assessment report template',
+    icon: '📄',
+    url: '',  // ← Paste Google Drive link here
+    roles: ['hospital','state'],
+    tag: 'Form'
+  },
+  {
+    id: 'annexure-c',
+    title: 'Annexure C — Rehab Progress Report',
+    desc: 'Monthly rehabilitation progress report template for AVT sessions',
+    icon: '📄',
+    url: '',  // ← Paste Google Drive link here
+    roles: ['rehab','state'],
+    tag: 'Form'
+  }
+];
+
+function openResources() {
+  var meta = ROLE_META[currentRole];
+  var chip = document.getElementById('res-chip');
+  chip.textContent = meta.label;
+  chip.className = 'role-chip ' + meta.chip;
+
+  // Filter docs for this role
+  var docs = RESOURCES.filter(function(d) {
+    return d.roles.indexOf(currentRole) > -1;
+  });
+
+  // Group by category
+  var groups = {
+    'Guidelines & Rates': docs.filter(function(d){ return ['guidelines','rates'].indexOf(d.id) > -1; }),
+    'Checklists': docs.filter(function(d){ return d.id.indexOf('checklist') > -1; }),
+    'Annexure Forms': docs.filter(function(d){ return d.id.indexOf('annexure') > -1; })
+  };
+
+  var html = '<div style="padding:16px">';
+
+  // Info banner
+  html += '<div style="background:var(--blue-light);border:0.5px solid #B5D4F4;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--blue);margin-bottom:16px">'
+    +'&#128161; Tap any document to open it. To update a document link, contact the state programme office.</div>';
+
+  Object.entries(groups).forEach(function(entry) {
+    var groupName = entry[0], items = entry[1];
+    if (!items.length) return;
+
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-light);margin:16px 0 8px">'+groupName+'</div>';
+
+    items.forEach(function(doc) {
+      var hasLink = doc.url && doc.url.trim() !== '';
+      var tagColor = doc.tag === 'Form' ? 'var(--purple-mid)' : 'var(--blue-mid)';
+      var tagBg    = doc.tag === 'Form' ? 'var(--purple-light)' : 'var(--blue-light)';
+
+      html += '<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;'
+        +(hasLink ? 'cursor:pointer' : 'opacity:0.6')
+        +'" '+(hasLink ? 'onclick="openDoc(\'' + doc.id + '\')"' : '')+'>'
+        +'<div style="font-size:28px;flex-shrink:0">'+doc.icon+'</div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:600;color:var(--text)">'
+        +doc.title
+        +'<span style="font-size:9px;font-weight:700;background:'+tagBg+';color:'+tagColor+';padding:2px 6px;border-radius:6px;margin-left:6px">'+doc.tag+'</span>'
+        +'</div>'
+        +'<div style="font-size:11px;color:var(--text-light);margin-top:3px">'+doc.desc+'</div>'
+        +(!hasLink ? '<div style="font-size:10px;color:var(--amber);margin-top:4px">⏳ Link not yet added</div>' : '')
+        +'</div>'
+        +(hasLink ? '<div style="color:var(--green-mid);font-size:18px;flex-shrink:0">&#8594;</div>' : '')
+        +'</div>';
+    });
+  });
+
+  html += '</div>';
+  document.getElementById('res-body').innerHTML = html;
+  showScreen('resources');
+}
+
+function openDoc(docId) {
+  var doc = RESOURCES.find(function(d){ return d.id === docId; });
+  if (!doc || !doc.url) return;
+  window.open(doc.url, '_blank');
+}
 
 // ── WHATSAPP SHARE ────────────────────────────────────────────────────────────
 function shareWhatsApp() {
@@ -3515,6 +3710,10 @@ function openCaseSummary(cas) {
     btn.textContent = '✏️ Update Claim Details →';
     btn.className = 'btn-submit state';
   }
+  // Show outcome assessment button for district role
+  const extraBtn = document.getElementById('summary-extra-btn');
+  if (extraBtn) extraBtn.style.display = (currentRole === 'district') ? 'block' : 'none';
+  document.getElementById('summary-action-bar').style.display = 'block';
   showScreen('casesummary');
 }
 
@@ -3524,6 +3723,8 @@ function summaryAction() {
     openHospitalUpdate(cas);
   } else if (currentRole === 'rehab') {
     openRehabSession(cas);
+  } else if (currentRole === 'district') {
+    openDistrictFollowup(cas);
   } else {
     buildForm(cas);
     showScreen('form');
@@ -3814,6 +4015,614 @@ async function submitRehabSession() {
   }
 }
 
+
+
+// ══════════════════════════════════════════════════════════════
+// OUTCOME ASSESSMENT (IT-MAIS/MAIS + CAP + SIR + PEACH + Milestone)
+// ══════════════════════════════════════════════════════════════
+
+function openOutcomeAssessment(cas) {
+  selectedCase = cas;
+  document.getElementById('oa-title').textContent = cas.name || 'Assessment';
+  document.getElementById('oa-sub').textContent = 'Card: ' + cas.id + '  ·  Age at surgery: ' + (cas.age||'?') + ' months';
+
+  // Determine which MAIS version based on age at surgery
+  var ageMonths = parseInt(cas.age) || 36;
+  var usesITMAIS = ageMonths <= 36;
+  var maisLabel = usesITMAIS ? 'IT-MAIS (Infant-Toddler, ≤3 years)' : 'MAIS (Meaningful Auditory Integration Scale)';
+
+  var today = new Date().toISOString().split('T')[0];
+
+  // MAIS/IT-MAIS 10 questions — scored 0-4 each (Never/Rarely/Sometimes/Often/Always)
+  var maisQuestions = [
+    'Does the child spontaneously respond to their own name in a quiet environment?',
+    'Does the child respond to their name when called from another room (without seeing you)?',
+    'Does the child spontaneously alert to environmental sounds (doorbell, phone, TV)?',
+    'Does the child recognise familiar sounds (e.g. a dog barking, a car horn)?',
+    'Does the child respond differently to speech vs. non-speech sounds?',
+    'Does the child respond to an angry or friendly voice (without seeing the speaker&#39;s face)?',
+    'Does the child spontaneously use voice in quiet situations (babbling / talking)?',
+    'Does the child use voice to get attention in a noisy environment?',
+    'Does the child produce different voice patterns for different wants (e.g. requesting vs. greeting)?',
+    'Does the child use voice rather than gesture as a primary means of communication?'
+  ];
+
+  // PEACH 10 questions — scored 0-4 (Never/Rarely/Sometimes/Often/Always)
+  var peachQuestions = [
+    'In a quiet room with no distractions, does your child understand what people say to them without lip-reading?',
+    'At a family dinner, can your child follow the conversation?',
+    'Can your child understand a familiar person talking on the phone?',
+    'Can your child understand a stranger talking to them in a quiet place?',
+    'In a noisy place (e.g. a market), can your child understand what people say?',
+    'Does your child hear you call them from another room of the house?',
+    'Does your child wake to sounds at night (e.g. their name being called, a loud noise)?',
+    'In the car, can your child follow a conversation between family members?',
+    'Can your child tell the difference between two people&#39;s voices?',
+    'Does your child enjoy listening to music, songs or stories?'
+  ];
+
+  var opts04 = function(id, q, n) {
+    return '<div class="field" style="margin-bottom:14px">'
+      +'<div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:6px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;margin-right:6px">Q'+n+'</span>'+q+'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px">'
+      +'<div class="score-btn" data-group="'+id+'" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:6px 2px;border:1px solid var(--border);border-radius:6px;font-size:10px;cursor:pointer;background:var(--surface)">0<br><span style="color:var(--text-light)">Never</span></div>'
+      +'<div class="score-btn" data-group="'+id+'" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:6px 2px;border:1px solid var(--border);border-radius:6px;font-size:10px;cursor:pointer;background:var(--surface)">1<br><span style="color:var(--text-light)">Rarely</span></div>'
+      +'<div class="score-btn" data-group="'+id+'" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:6px 2px;border:1px solid var(--border);border-radius:6px;font-size:10px;cursor:pointer;background:var(--surface)">2<br><span style="color:var(--text-light)">Sometimes</span></div>'
+      +'<div class="score-btn" data-group="'+id+'" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:6px 2px;border:1px solid var(--border);border-radius:6px;font-size:10px;cursor:pointer;background:var(--surface)">3<br><span style="color:var(--text-light)">Often</span></div>'
+      +'<div class="score-btn" data-group="'+id+'" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:6px 2px;border:1px solid var(--border);border-radius:6px;font-size:10px;cursor:pointer;background:var(--surface)">4<br><span style="color:var(--text-light)">Always</span></div>'
+      +'</div></div>';
+  };
+
+  document.getElementById('oa-body').innerHTML =
+
+    // Patient card (purple)
+    '<div style="margin:14px 16px 0;background:#EEEDFE;border:1px solid #c4b8f8;border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128118; Patient — '+cas.name+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
+    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">SAST Ref</div><div style="color:#7F77DD;font-weight:500">'+(cas.surgRefNo||cas.tpa||'—')+'</div></div>'
+    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">Age at Surgery</div><div style="color:#7F77DD;font-weight:500">'+(cas.age||'—')+' months</div></div>'
+    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">FY</div><div style="color:#7F77DD;font-weight:500">'+(cas.fy||'—')+'</div></div>'
+    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">District</div><div style="color:#7F77DD;font-weight:500">'+(cas.district||'—')+'</div></div>'
+    +'</div></div>'
+
+    // Assessment header
+    +'<div style="margin:14px 16px 0;padding:12px 14px;background:#4a2a7a;border-radius:12px">'
+    +'<div style="color:#fff;font-size:13px;font-weight:600">&#127919; Structured Outcome Assessment</div>'
+    +'<div style="color:rgba(255,255,255,.7);font-size:11px;margin-top:3px">Complete this every 6 months or at key milestones. Estimated time: 5-10 minutes.</div>'
+    +'</div>'
+
+    // Assessment date & period
+    +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">&#128197; Assessment Details</div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Assessment date <span class="req">*</span></div><input type="date" class="field-input has-value" id="oa-date" value="'+today+'"></div>'
+    +'<div class="field"><div class="field-label">Assessment period <span class="req">*</span></div>'
+    +'<select class="field-input" id="oa-period"><option value="">Select</option>'
+    +'<option>Baseline (3 months post switch-on)</option>'
+    +'<option>6 months post switch-on</option>'
+    +'<option>12 months post switch-on</option>'
+    +'<option>18 months post switch-on</option>'
+    +'<option>24 months post switch-on</option>'
+    +'<option>Annual review</option>'
+    +'</select></div></div>'
+    +'<div class="field"><div class="field-label">Assessor</div>'
+    +'<input class="field-input" id="oa-assessor" placeholder="Name of district officer" value="'+(currentUser?currentUser.username:'')+'"></div>'
+    +'</div>'
+
+    // MAIS / IT-MAIS
+    +'<div class="form-section" style="margin:0 16px">'
+    +'<div class="form-section-title">&#128266; '+maisLabel+'</div>'
+    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:12px">Score each question 0–4 based on parent report. Total score: /40. Higher = better auditory integration.</div>'
+    + maisQuestions.map(function(q,i){ return opts04('mais_q'+(i+1), q, i+1); }).join('')
+    +'<div style="background:var(--gray);border-radius:8px;padding:10px 12px;font-size:12px;margin-top:4px">'
+    +'MAIS Total: <strong id="mais-total">0</strong> / 40 &nbsp;·&nbsp; '
+    +'<span id="mais-interp" style="color:var(--text-light)">Score questions above</span></div>'
+    +'</div>'
+
+    // CAP
+    +'<div class="form-section" style="margin:0 16px">'
+    +'<div class="form-section-title">&#128203; CAP — Categories of Auditory Performance</div>'
+    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:10px">Select the highest level the child consistently achieves.</div>'
+    +'<div class="radio-group" id="oa-cap">'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-cap&quot;)"><div class="radio-dot"></div><strong>0</strong> — No awareness of environmental sounds</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-cap&quot;)"><div class="radio-dot"></div><strong>1</strong> — Awareness of environmental sounds</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-cap&quot;)"><div class="radio-dot"></div><strong>2</strong> — Responds to speech sounds (e.g. turns to voice)</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-cap&quot;)"><div class="radio-dot"></div><strong>3</strong> — Identifies environmental sounds without lip-reading</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-cap&quot;)"><div class="radio-dot"></div><strong>4</strong> — Discriminates speech sounds without lip-reading</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-cap&quot;)"><div class="radio-dot"></div><strong>5</strong> — Understands common phrases without lip-reading</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-cap&quot;)"><div class="radio-dot"></div><strong>6</strong> — Understands conversation without lip-reading</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-cap&quot;)"><div class="radio-dot"></div><strong>7</strong> — Uses telephone with a familiar speaker</div>'
+    +'</div></div>'
+
+    // SIR
+    +'<div class="form-section" style="margin:0 16px">'
+    +'<div class="form-section-title">&#128483;&#65039; SIR — Speech Intelligibility Rating</div>'
+    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:10px">Select the level that best describes the child&#39;s speech production.</div>'
+    +'<div class="radio-group" id="oa-sir">'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-sir&quot;)"><div class="radio-dot"></div><strong>1</strong> — Connected speech not intelligible; uses non-oral communication</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-sir&quot;)"><div class="radio-dot"></div><strong>2</strong> — Connected speech intelligible only to a trained listener</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-sir&quot;)"><div class="radio-dot"></div><strong>3</strong> — Connected speech intelligible to a familiar listener with concentration</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-sir&quot;)"><div class="radio-dot"></div><strong>4</strong> — Connected speech intelligible to most listeners</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-sir&quot;)"><div class="radio-dot"></div><strong>5</strong> — Connected speech intelligible to all in everyday contexts</div>'
+    +'</div></div>'
+
+    // PEACH
+    +'<div class="form-section" style="margin:0 16px">'
+    +'<div class="form-section-title">&#128065;&#65039; PEACH — Parent Evaluation of Aural/oral performance</div>'
+    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:12px">Ask the parent each question. Score 0–4. Total score: /40.</div>'
+    + peachQuestions.map(function(q,i){ return opts04('peach_q'+(i+1), q, i+1); }).join('')
+    +'<div style="background:var(--gray);border-radius:8px;padding:10px 12px;font-size:12px;margin-top:4px">'
+    +'PEACH Total: <strong id="peach-total">0</strong> / 40 &nbsp;·&nbsp; '
+    +'<span id="peach-interp" style="color:var(--text-light)">Score questions above</span></div>'
+    +'</div>'
+
+    // Custom milestone scale
+    +'<div class="form-section" style="margin:0 16px">'
+    +'<div class="form-section-title">&#127919; Speech &amp; Language Milestone (Custom)</div>'
+    +'<div class="radio-group" id="oa-milestone">'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-milestone&quot;)"><div class="radio-dot"></div><strong>Stage 1 — Detection:</strong> Responds to sounds, startles, turns to voice</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-milestone&quot;)"><div class="radio-dot"></div><strong>Stage 2 — Discrimination:</strong> Distinguishes between different sounds</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-milestone&quot;)"><div class="radio-dot"></div><strong>Stage 3 — Identification:</strong> Recognises and names familiar words/objects</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-milestone&quot;)"><div class="radio-dot"></div><strong>Stage 4 — Comprehension:</strong> Understands spoken instructions and sentences</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-milestone&quot;)"><div class="radio-dot"></div><strong>Stage 5 — Expression:</strong> Producing meaningful speech and sentences</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-milestone&quot;)"><div class="radio-dot"></div><strong>Stage 6 — Age-appropriate:</strong> Communication equivalent to hearing peers</div>'
+    +'</div></div>'
+
+    // Overall clinical impression
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128203; Clinical Impression &amp; Recommendations</div>'
+    +'<div class="field"><div class="field-label">Overall outcome</div>'
+    +'<div class="radio-group" id="oa-outcome">'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-outcome&quot;)"><div class="radio-dot"></div>Excellent — exceeding expectations for age/duration</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;oa-outcome&quot;)"><div class="radio-dot"></div>Good — progressing as expected</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-outcome&quot;)"><div class="radio-dot"></div>Fair — slower than expected, needs monitoring</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;oa-outcome&quot;)"><div class="radio-dot"></div>Poor — significant concerns, needs clinical review</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Recommendations</div>'
+    +'<textarea class="field-input" id="oa-reco" rows="3" placeholder="Referral needed? Device mapping? Rehab change? Family counselling?"></textarea></div>'
+    +'<div class="field"><div class="field-label">Additional observations</div>'
+    +'<textarea class="field-input" id="oa-notes" rows="2" placeholder="Any other clinical notes..."></textarea></div>'
+    +'</div>'
+
+    // Submit
+    +'<div style="padding:0 16px 40px">'
+    +'<div id="oa-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
+    +'<button onclick="submitOutcomeAssessment()" style="width:100%;padding:14px;background:#4a2a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="oa-submit-btn">Save Assessment &#8594;</button>'
+    +'</div>';
+
+  showScreen('outcome');
+
+  // Live MAIS score calculation
+  setTimeout(function() {
+    document.querySelectorAll('.score-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { updateScoreTotals(); });
+    });
+  }, 100);
+}
+
+function selectScore(btn) {
+  var group = btn.getAttribute('data-group');
+  document.querySelectorAll('.score-btn[data-group="'+group+'"]').forEach(function(b) {
+    b.style.background = 'var(--surface)';
+    b.style.borderColor = 'var(--border)';
+    b.style.color = 'var(--text)';
+    b.style.fontWeight = '400';
+  });
+  btn.style.background = '#4a2a7a';
+  btn.style.borderColor = '#4a2a7a';
+  btn.style.color = '#fff';
+  btn.style.fontWeight = '700';
+  updateScoreTotals();
+}
+
+function getGroupScore(prefix, count) {
+  var total = 0;
+  for (var i=1; i<=count; i++) {
+    var sel = document.querySelector('.score-btn[data-group="'+prefix+i+'"][style*="background: rgb(74, 42, 122)"], .score-btn[data-group="'+prefix+i+'"][style*="background:#4a2a7a"]');
+    if (sel) total += parseInt(sel.getAttribute('data-val')||0);
+  }
+  return total;
+}
+
+function updateScoreTotals() {
+  var maisScore = 0;
+  for (var i=1; i<=10; i++) {
+    var btns = document.querySelectorAll('.score-btn[data-group="mais_q'+i+'"]');
+    btns.forEach(function(b) {
+      if (b.style.background === '#4a2a7a' || b.style.background === 'rgb(74, 42, 122)') {
+        maisScore += parseInt(b.getAttribute('data-val')||0);
+      }
+    });
+  }
+  var peachScore = 0;
+  for (var j=1; j<=10; j++) {
+    var pbtns = document.querySelectorAll('.score-btn[data-group="peach_q'+j+'"]');
+    pbtns.forEach(function(b) {
+      if (b.style.background === '#4a2a7a' || b.style.background === 'rgb(74, 42, 122)') {
+        peachScore += parseInt(b.getAttribute('data-val')||0);
+      }
+    });
+  }
+  var maisEl = document.getElementById('mais-total');
+  var peachEl = document.getElementById('peach-total');
+  var maisInterpEl = document.getElementById('mais-interp');
+  var peachInterpEl = document.getElementById('peach-interp');
+  if (maisEl) {
+    maisEl.textContent = maisScore;
+    maisInterpEl.textContent = maisScore >= 32 ? 'Excellent (≥80%)' : maisScore >= 20 ? 'Good (50-80%)' : maisScore >= 10 ? 'Fair (25-50%)' : 'Needs attention (<25%)';
+    maisInterpEl.style.color = maisScore >= 32 ? 'var(--green)' : maisScore >= 20 ? 'var(--amber)' : 'var(--red)';
+  }
+  if (peachEl) {
+    peachEl.textContent = peachScore;
+    peachInterpEl.textContent = peachScore >= 32 ? 'Excellent (≥80%)' : peachScore >= 20 ? 'Good (50-80%)' : peachScore >= 10 ? 'Fair (25-50%)' : 'Needs attention (<25%)';
+    peachInterpEl.style.color = peachScore >= 32 ? 'var(--green)' : peachScore >= 20 ? 'var(--amber)' : 'var(--red)';
+  }
+}
+
+async function submitOutcomeAssessment() {
+  var errEl = document.getElementById('oa-error');
+  var btn   = document.getElementById('oa-submit-btn');
+  errEl.style.display = 'none';
+
+  var date   = document.getElementById('oa-date').value;
+  var period = document.getElementById('oa-period').value;
+  var cap    = document.querySelector('#oa-cap .radio-item.checked');
+  var sir    = document.querySelector('#oa-sir .radio-item.checked');
+  var milestone = document.querySelector('#oa-milestone .radio-item.checked');
+
+  if (!date)      { errEl.textContent='Assessment date is required.';    errEl.style.display='block'; return; }
+  if (!period)    { errEl.textContent='Assessment period is required.';  errEl.style.display='block'; return; }
+  if (!cap)       { errEl.textContent='CAP level is required.';          errEl.style.display='block'; return; }
+  if (!sir)       { errEl.textContent='SIR level is required.';          errEl.style.display='block'; return; }
+  if (!milestone) { errEl.textContent='Speech milestone is required.';   errEl.style.display='block'; return; }
+
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  // Collect MAIS scores
+  var maisScores = {};
+  var maisTotal = 0;
+  for (var i=1; i<=10; i++) {
+    var sel = document.querySelector('.score-btn[data-group="mais_q'+i+'"][style*="background"]');
+    var v = 0;
+    if (sel && (sel.style.background === '#4a2a7a' || sel.style.background === 'rgb(74, 42, 122)')) {
+      v = parseInt(sel.getAttribute('data-val')||0);
+    }
+    maisScores['q'+i] = v;
+    maisTotal += v;
+  }
+  var peachScores = {};
+  var peachTotal = 0;
+  for (var j=1; j<=10; j++) {
+    var psel = document.querySelector('.score-btn[data-group="peach_q'+j+'"][style*="background"]');
+    var pv = 0;
+    if (psel && (psel.style.background === '#4a2a7a' || psel.style.background === 'rgb(74, 42, 122)')) {
+      pv = parseInt(psel.getAttribute('data-val')||0);
+    }
+    peachScores['q'+j] = pv;
+    peachTotal += pv;
+  }
+
+  var getRadio = function(id) {
+    var el = document.querySelector('#'+id+' .radio-item.checked');
+    return el ? el.textContent.trim() : '';
+  };
+
+  var entry = {
+    caseId:      String(selectedCase.id),
+    caseName:    selectedCase.name || '',
+    caseDistrict:selectedCase.district || '',
+    ageAtSurgery:selectedCase.age || '',
+    submittedBy: currentUser ? currentUser.username : '',
+    district:    currentUser ? (currentUser.district||currentUser.unit||'') : '',
+    date:        date,
+    period:      period,
+    assessor:    document.getElementById('oa-assessor').value.trim(),
+    // MAIS
+    maisScores:  maisScores,
+    maisTotal:   maisTotal,
+    maisPercent: Math.round(maisTotal/40*100),
+    // CAP
+    capLevel:    cap.textContent.trim(),
+    capScore:    cap.textContent.trim().charAt(0),
+    // SIR
+    sirLevel:    sir.textContent.trim(),
+    sirScore:    sir.textContent.trim().charAt(0),
+    // PEACH
+    peachScores: peachScores,
+    peachTotal:  peachTotal,
+    peachPercent:Math.round(peachTotal/40*100),
+    // Milestone
+    milestone:   milestone.textContent.trim(),
+    // Clinical
+    outcome:     getRadio('oa-outcome'),
+    recommendations: document.getElementById('oa-reco').value.trim(),
+    notes:       document.getElementById('oa-notes').value.trim(),
+    timestamp:   new Date().toISOString(),
+    entryId:     'OA-' + Date.now()
+  };
+
+  try {
+    var _col = window._fbFns.collection;
+    var _add = window._fbFns.addDoc;
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+
+    await _add(_col(window._fbDb, 'submissions_outcome'), entry);
+
+    // Update case with latest assessment data
+    var caseUpdates = {
+      _lastOutcomeDate:    date,
+      _lastOutcomePeriod:  period,
+      _lastMaisTotal:      maisTotal,
+      _lastCapLevel:       entry.capScore,
+      _lastSirLevel:       entry.sirScore,
+      _lastMilestone:      milestone.textContent.trim(),
+      _lastOutcomeResult:  entry.outcome,
+      lastContact:         date,
+      _lastModified:       new Date().toISOString()
+    };
+    await _upd(_doc(window._fbDb, 'cases', String(selectedCase.id)), caseUpdates);
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(selectedCase.id); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
+
+    document.getElementById('success-msg').textContent = 'Assessment saved for ' + selectedCase.name + ' — ' + period + '.';
+    document.getElementById('success-id').textContent  = entry.entryId;
+    document.getElementById('offline-note').style.display = 'none';
+    screenHistory = ['home'];
+    showScreen('success');
+  } catch(e) {
+    errEl.textContent = 'Error saving: ' + e.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Save Assessment →';
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// DISTRICT FOLLOW-UP FORM
+// ══════════════════════════════════════════════════════════════
+
+function openDistrictFollowup(cas) {
+  selectedCase = cas;
+  document.getElementById('df-title').textContent = cas.name || 'Follow-up';
+  document.getElementById('df-sub').textContent = 'Card: ' + cas.id + '  ' + (cas.district||'');
+
+  var today = new Date().toISOString().split('T')[0];
+  var mob = cleanMob(cas.mobile||'');
+
+  // Check last follow-up
+  var lastFU = cas._lastDistFollowup ? ('Last: ' + cas._lastDistFollowup) : 'No previous follow-up recorded';
+
+  document.getElementById('df-body').innerHTML =
+
+    // Patient info card (amber)
+    '<div style="margin:14px 16px 0;background:#FAEEDA;border:1px solid #FAC775;border-radius:12px;padding:14px 16px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128118; Patient Information</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
+    +piRowAmber('SAST Ref',  cas.surgRefNo||cas.tpa||'—')
+    +piRowAmber('FY',        cas.fy||'—')
+    +piRowAmber('Name',      cas.name||'—')
+    +piRowAmber('Gender',    cas.gender||'—')
+    +piRowAmber('Village',   cas.village||'—')
+    +piRowAmber('District',  cas.district||'—')
+    +piRowAmber('Hospital',  cas.hospital||'—')
+    +piRowAmber('Rehab',     cas.rehabCentre||'—')
+    +'</div>'
+    +(mob ? '<div style="margin-top:8px;padding-top:8px;border-top:0.5px solid #FAC775;display:flex;justify-content:space-between;align-items:center">'
+      +'<div style="font-size:10px;font-weight:600;color:var(--amber);text-transform:uppercase">Mobile</div>'
+      +'<a href="tel:'+mob+'" style="font-size:13px;font-weight:600;color:var(--amber)">&#128222; '+mob+'</a>'
+      +'</div>' : '')
+    +'<div style="margin-top:6px;font-size:10px;color:var(--amber-mid)">'+lastFU+'</div>'
+    +'</div>'
+
+    // Journey infographic
+    +'<div style="margin:12px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px">'
+    +buildJourneyInfographic(cas)+'</div>'
+
+    // Section 1: Contact
+    +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">&#128222; Contact Details</div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Date of call <span class="req">*</span></div><input type="date" class="field-input has-value" id="df-date" value="'+today+'"></div>'
+    +'<div class="field"><div class="field-label">Month of follow-up <span class="req">*</span></div>'
+    +'<select class="field-input" id="df-month"><option value="">Select</option>'
+    +'<option>January</option><option>February</option><option>March</option><option>April</option>'
+    +'<option>May</option><option>June</option><option>July</option><option>August</option>'
+    +'<option>September</option><option>October</option><option>November</option><option>December</option>'
+    +'</select></div>'
+    +'</div>'
+    +'<div class="field"><div class="field-label">Family reachable? <span class="req">*</span></div>'
+    +'<div class="radio-group" id="df-reachable">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-reachable&quot;)"><div class="radio-dot"></div>Yes — spoke with family</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-reachable&quot;)"><div class="radio-dot"></div>No — not reachable (attempted)</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-reachable&quot;)"><div class="radio-dot"></div>Wrong / no number</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Spoke with</div>'
+    +'<select class="field-input" id="df-spoke"><option value="">Select</option>'
+    +'<option>Mother</option><option>Father</option><option>Both parents</option>'
+    +'<option>Grandparent</option><option>Other guardian</option>'
+    +'</select></div>'
+    +'</div>'
+
+    // Section 2: Device
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#129955; Device Status</div>'
+    +'<div class="field"><div class="field-label">Device switched on?</div>'
+    +'<div class="radio-group" id="df-switchon">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-switchon&quot;)"><div class="radio-dot"></div>Yes — working</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-switchon&quot;)"><div class="radio-dot"></div>No — not switched on yet</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-switchon&quot;)"><div class="radio-dot"></div>Device issue / damaged</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Worn daily?</div>'
+    +'<div class="radio-group" id="df-worn">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-worn&quot;)"><div class="radio-dot"></div>Yes — wears every day</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-worn&quot;)"><div class="radio-dot"></div>Sometimes</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-worn&quot;)"><div class="radio-dot"></div>Rarely / not using</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Device issues</div>'
+    +'<input class="field-input" id="df-device-issue" placeholder="Battery, coil, processor issues etc. (leave blank if none)"></div>'
+    +'</div>'
+
+    // Section 3: Speech & Language
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128483;&#65039; Speech &amp; Language</div>'
+    +'<div class="field"><div class="field-label">Current milestone <span class="req">*</span></div>'
+    +'<select class="field-input" id="df-milestone"><option value="">Select milestone...</option>'
+    +'<option>1 — Detection: responds to sounds</option>'
+    +'<option>2 — Discrimination: distinguishes sounds</option>'
+    +'<option>3 — Identification: recognises familiar words</option>'
+    +'<option>4 — Comprehension: understands spoken language</option>'
+    +'<option>5 — Verbal expression: producing speech</option>'
+    +'<option>6 — Age-appropriate communication</option>'
+    +'<option>Not assessed / unknown</option>'
+    +'</select></div>'
+    +'<div class="field"><div class="field-label">Progress since last call</div>'
+    +'<div class="radio-group" id="df-progress">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Better — improved</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Same — no change</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Regressed</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>First follow-up</div>'
+    +'</div></div>'
+    +'</div>'
+
+    // Section 4: School
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#127979; School Enrolment</div>'
+    +'<div class="field"><div class="field-label">School status</div>'
+    +'<div class="radio-group" id="df-school">'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-school&quot;)"><div class="radio-dot"></div>Mainstream school</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-school&quot;)"><div class="radio-dot"></div>Special school</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-school&quot;)"><div class="radio-dot"></div>Not yet enrolled</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-school&quot;)"><div class="radio-dot"></div>Too young for school</div>'
+    +'</div></div>'
+    +'</div>'
+
+    // Section 5: Rehab attendance
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#127911; Rehab Attendance</div>'
+    +'<div class="field"><div class="field-label">Attending rehab regularly?</div>'
+    +'<div class="radio-group" id="df-rehab-attend">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-rehab-attend&quot;)"><div class="radio-dot"></div>Yes — regular</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-rehab-attend&quot;)"><div class="radio-dot"></div>Irregular</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-rehab-attend&quot;)"><div class="radio-dot"></div>Stopped attending</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-rehab-attend&quot;)"><div class="radio-dot"></div>Yet to start</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Reason for missing (if applicable)</div>'
+    +'<select class="field-input" id="df-miss-reason"><option value="">Select reason</option>'
+    +'<option>Distance / travel difficulty</option>'
+    +'<option>Financial constraints</option>'
+    +'<option>Child unwell</option>'
+    +'<option>Parent work / unavailability</option>'
+    +'<option>Satisfied — feels no more needed</option>'
+    +'<option>Unaware of importance</option>'
+    +'<option>Other</option>'
+    +'</select></div>'
+    +'</div>'
+
+    // Section 6: At-risk & flags
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#9888;&#65039; Flags &amp; Escalation</div>'
+    +'<div class="field"><div class="field-label">Any concern to escalate?</div>'
+    +'<div class="radio-group" id="df-flag">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>No concerns</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Device issue — needs attention</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Child not progressing — needs review</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Family needs support / counselling</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Claim issue — needs follow-up</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Notes / observations</div>'
+    +'<textarea class="field-input" id="df-notes" rows="3" placeholder="Any additional observations from the call..."></textarea></div>'
+    +'</div>'
+
+    // Submit
+    +'<div style="padding:0 16px 40px">'
+    +'<div id="df-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
+    +'<button onclick="submitDistrictFollowup()" style="width:100%;padding:14px;background:var(--amber-mid);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="df-submit-btn">Save Follow-up &#8594;</button>'
+    +'</div>';
+
+  showScreen('distfollow');
+}
+
+function piRowAmber(label, value) {
+  return '<div><div style="color:var(--amber);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+label+'</div>'
+    +'<div style="color:var(--amber-mid);font-weight:500;font-size:12px;margin-top:1px">'+(value||'—')+'</div></div>';
+}
+
+async function submitDistrictFollowup() {
+  var errEl = document.getElementById('df-error');
+  var btn   = document.getElementById('df-submit-btn');
+  errEl.style.display = 'none';
+
+  var date      = document.getElementById('df-date').value;
+  var month     = document.getElementById('df-month').value;
+  var reachable = document.querySelector('#df-reachable .radio-item.checked');
+  var milestone = document.getElementById('df-milestone').value;
+
+  if (!date)      { errEl.textContent='Date of call is required.';      errEl.style.display='block'; return; }
+  if (!month)     { errEl.textContent='Month of follow-up is required.'; errEl.style.display='block'; return; }
+  if (!reachable) { errEl.textContent='Please select family reachable.'; errEl.style.display='block'; return; }
+  if (!milestone) { errEl.textContent='Speech milestone is required.';   errEl.style.display='block'; return; }
+
+  btn.textContent = 'Saving...';
+  btn.disabled = true;
+
+  var getRadio = function(id) {
+    var el = document.querySelector('#'+id+' .radio-item.checked');
+    return el ? el.textContent.trim() : '';
+  };
+
+  var entry = {
+    caseId:      String(selectedCase.id),
+    caseName:    selectedCase.name || '',
+    caseDistrict:selectedCase.district || '',
+    submittedBy: currentUser ? currentUser.username : '',
+    district:    currentUser ? (currentUser.district||currentUser.unit||'') : '',
+    date:        date,
+    month:       month,
+    reachable:   getRadio('df-reachable'),
+    spoke:       document.getElementById('df-spoke').value,
+    deviceOn:    getRadio('df-switchon'),
+    wornDaily:   getRadio('df-worn'),
+    deviceIssue: document.getElementById('df-device-issue').value.trim(),
+    milestone:   milestone,
+    progress:    getRadio('df-progress'),
+    school:      getRadio('df-school'),
+    rehabAttend: getRadio('df-rehab-attend'),
+    missReason:  document.getElementById('df-miss-reason').value,
+    flag:        getRadio('df-flag'),
+    notes:       document.getElementById('df-notes').value.trim(),
+    timestamp:   new Date().toISOString(),
+    entryId:     'DF-' + Date.now()
+  };
+
+  try {
+    var _col = window._fbFns.collection;
+    var _add = window._fbFns.addDoc;
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+
+    await _add(_col(window._fbDb, 'submissions_district'), entry);
+
+    // Update case: last contact + flag
+    var caseUpdates = {
+      lastContact:        date,
+      _lastDistFollowup:  date,
+      _lastDistMonth:     month,
+      _lastMilestone:     milestone,
+      _lastModified:      new Date().toISOString()
+    };
+    if (entry.flag !== 'No concerns') caseUpdates.risk = true;
+
+    await _upd(_doc(window._fbDb, 'cases', String(selectedCase.id)), caseUpdates);
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(selectedCase.id); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
+
+    document.getElementById('success-msg').textContent = 'Follow-up saved for ' + selectedCase.name + ' (' + month + ').';
+    document.getElementById('success-id').textContent  = entry.entryId;
+    document.getElementById('offline-note').style.display = 'none';
+    screenHistory = ['home'];
+    showScreen('success');
+  } catch(e) {
+    errEl.textContent = 'Error saving: ' + e.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Save Follow-up →';
+    btn.disabled = false;
+  }
+}
+
 // HOSPITAL UPDATE FUNCTIONS
 // ══════════════════════════════════════════════════════════════
 function openCaseFromList(caseId) {
@@ -3824,6 +4633,8 @@ function openCaseFromList(caseId) {
     openHospitalUpdate(cas);
   } else if (currentRole === 'rehab') {
     openRehabSession(cas);
+  } else if (currentRole === 'district') {
+    openCaseSummary(cas);  // district sees summary first, then Follow-up button
   } else {
     openCaseSummary(cas);
   }

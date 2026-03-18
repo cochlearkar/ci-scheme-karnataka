@@ -868,6 +868,23 @@ body {
   <div class="form-scroll" id="rs-body"></div>
 </div>
 
+<!-- ======== SCREEN: DISTRICT REPORT ======== -->
+<div class="screen hidden" id="screen-distreport">
+  <div class="app-header" style="background:#7a4f1a">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.3);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff" id="dr-title">District Report</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.7)" id="dr-sub">Programme monitoring</div>
+      </div>
+    </div>
+    <div class="role-chip" style="background:rgba(255,255,255,0.15);color:#fff;border:none">&#128205; District</div>
+  </div>
+  <!-- Tab strip -->
+  <div style="display:flex;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;gap:0" id="dr-tabs"></div>
+  <div class="form-scroll" id="dr-body"></div>
+</div>
+
 <!-- ======== SCREEN: DISTRICT UNIFIED ======== -->
 <div class="screen hidden" id="screen-district">
   <div class="app-header" style="background:#7a4f1a">
@@ -1843,7 +1860,8 @@ function buildHome() {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify &amp; complete pending information</div></div><div class="action-arrow">→</div></div>`;
     if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">By district</div></div>`;
-    html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
+    html += `<div class="action-card" style="background:linear-gradient(135deg,#7a4f1a,#b87333);border:none" onclick="openDistrictReport()"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">District Report</div><div class="action-desc" style="color:rgba(255,255,255,.75)">Status · Follow-up · Outcomes · At-risk</div></div>`;
+    html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📈</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · District checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'state') {
@@ -4392,6 +4410,407 @@ async function submitOutcomeAssessment() {
   }
 }
 
+
+
+// ══════════════════════════════════════════════════════════════
+// DISTRICT REPORT
+// ══════════════════════════════════════════════════════════════
+
+var _drTab = 'status'; // active tab
+
+function openDistrictReport() {
+  const cases = filterCasesByUser(SAMPLE_CASES);
+  const d = currentUser ? (currentUser.district||currentUser.unit||'District') : 'District';
+  document.getElementById('dr-title').textContent = d + ' — Report';
+  document.getElementById('dr-sub').textContent = cases.length + ' children · Programme monitoring';
+
+  const tabs = [
+    {id:'status',   icon:'📊', label:'Status'},
+    {id:'hospital', icon:'🏥', label:'Hospitals'},
+    {id:'rehab',    icon:'🎧', label:'Rehab'},
+    {id:'followup', icon:'📞', label:'Follow-up'},
+    {id:'atrisk',   icon:'⚠️', label:'At-Risk'},
+    {id:'outcome',  icon:'🎯', label:'Outcomes'},
+    {id:'age',      icon:'👶', label:'Age'},
+    {id:'fy',       icon:'📅', label:'FY Progress'},
+  ];
+
+  document.getElementById('dr-tabs').innerHTML = tabs.map(t =>
+    `<div onclick="drShowTab('${t.id}')" id="drtab-${t.id}"
+      style="padding:10px 14px;font-size:12px;font-weight:500;color:var(--text-light);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0">
+      ${t.icon} ${t.label}</div>`
+  ).join('');
+
+  _drTab = 'status';
+  drRender(cases);
+  showScreen('distreport');
+}
+
+function drShowTab(tab) {
+  _drTab = tab;
+  document.querySelectorAll('[id^="drtab-"]').forEach(el => {
+    const active = el.id === 'drtab-'+tab;
+    el.style.color = active ? '#7a4f1a' : 'var(--text-light)';
+    el.style.borderBottomColor = active ? '#7a4f1a' : 'transparent';
+    el.style.fontWeight = active ? '600' : '500';
+  });
+  drRender(filterCasesByUser(SAMPLE_CASES));
+}
+
+function drRender(cases) {
+  const body = document.getElementById('dr-body');
+  // Activate correct tab style
+  drShowTabStyle(_drTab);
+
+  const AT_RISK_DAYS = 45;
+  function daysSince(d) {
+    if (!d) return 9999;
+    const dt = new Date(d); if (isNaN(dt)) return 9999;
+    return Math.floor((Date.now()-dt)/86400000);
+  }
+  function fmtN(n) { return Number(n||0).toLocaleString('en-IN'); }
+  function statBox(num, label, color, bg) {
+    return `<div style="background:${bg};border:0.5px solid ${color}30;border-radius:10px;padding:12px;text-align:center">
+      <div style="font-size:22px;font-weight:700;color:${color}">${num}</div>
+      <div style="font-size:10px;color:${color};font-weight:600;text-transform:uppercase;margin-top:2px">${label}</div>
+    </div>`;
+  }
+  function tableRow(cells, header) {
+    const tag = header ? 'th' : 'td';
+    const bg  = header ? 'background:#7a4f1a;color:#fff' : '';
+    return `<tr>${cells.map(c=>`<${tag} style="padding:8px 10px;font-size:12px;border-bottom:0.5px solid var(--border);${bg}">${c}</${tag}>`).join('')}</tr>`;
+  }
+  function pill(text, type) {
+    const colors = {green:'var(--green)',red:'var(--red)',amber:'var(--amber)',blue:'var(--blue-mid)'};
+    const bgs    = {green:'var(--green-light)',red:'var(--red-light)',amber:'var(--amber-light)',blue:'var(--blue-light)'};
+    const t = type||'blue';
+    return `<span style="background:${bgs[t]};color:${colors[t]};padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600">${text}</span>`;
+  }
+  function progBar(val, max, color) {
+    const pct = max>0?Math.round(val/max*100):0;
+    return `<div style="height:5px;background:var(--border);border-radius:3px;min-width:60px;overflow:hidden">
+      <div style="height:100%;width:${pct}%;background:${color};border-radius:3px"></div></div>
+      <span style="font-size:10px;color:var(--text-light)">${pct}%</span>`;
+  }
+  function sectionHead(title, count) {
+    return `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-light);margin:16px 0 8px">${title}${count!==undefined?' <span style="background:var(--amber-light);color:var(--amber);padding:1px 6px;border-radius:8px;font-size:10px">'+count+'</span>':''}</div>`;
+  }
+
+  let html = '<div style="padding:14px 16px 40px">';
+
+  // ── STATUS TAB ────────────────────────────────────────────────
+  if (_drTab === 'status') {
+    const pending  = cases.filter(c=>!c.surgAdmit&&!c.hospSubmitted).length;
+    const surg     = cases.filter(c=>c.surgAdmit||c.hospSubmitted).length;
+    const rehab1   = cases.filter(c=>c.status==='rehab1').length;
+    const rehab2   = cases.filter(c=>c.status==='rehab2').length;
+    const paid     = cases.filter(c=>c.status==='paid').length;
+    const risk     = cases.filter(c=>c.risk).length;
+
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      ${statBox(cases.length,'Total','#7a4f1a','#FFF8EE')}
+      ${statBox(paid,'Completed','var(--green)','var(--green-light)')}
+      ${statBox(risk,'At Risk','var(--red)','var(--red-light)')}
+    </div>`;
+
+    // Journey funnel
+    html += sectionHead('Programme Journey Funnel');
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">`;
+    const stages = [
+      {label:'Pre-auth / Pending', n:pending, color:'var(--amber)'},
+      {label:'Surgery Done',       n:surg,    color:'var(--blue-mid)'},
+      {label:'Rehab 1 (2002GP)',   n:rehab1,  color:'#7F77DD'},
+      {label:'Rehab 2 (2003GP)',   n:rehab2,  color:'#9F77DD'},
+      {label:'Fully Completed',    n:paid,    color:'var(--green-mid)'},
+    ];
+    stages.forEach(s => {
+      const pct = cases.length>0?Math.round(s.n/cases.length*100):0;
+      html += `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:0.5px solid var(--border)">
+        <div style="width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
+        <div style="flex:1;font-size:12px">${s.label}</div>
+        <div style="width:80px">${progBar(s.n,cases.length,s.color)}</div>
+        <div style="font-size:13px;font-weight:600;width:30px;text-align:right">${s.n}</div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // FY summary
+    const fyMap = {};
+    cases.forEach(c => {
+      const fy = c.fy||'Unknown';
+      if(!fyMap[fy]) fyMap[fy]={total:0,done:0};
+      fyMap[fy].total++;
+      if(c.status==='paid') fyMap[fy].done++;
+    });
+    html += sectionHead('By Financial Year');
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        ${tableRow(['FY','Enrolled','Completed','%'],true)}
+        ${Object.entries(fyMap).sort((a,b)=>b[0].localeCompare(a[0])).map(([fy,v])=>
+          tableRow([fy, v.total, v.done, Math.round(v.done/v.total*100)+'%'])
+        ).join('')}
+      </table></div>`;
+  }
+
+  // ── HOSPITAL TAB ──────────────────────────────────────────────
+  else if (_drTab === 'hospital') {
+    const hMap = {};
+    cases.forEach(c => {
+      const h = c.hospital||'Unknown';
+      if(!hMap[h]) hMap[h]={total:0,dist:c.hospDist||''};
+      hMap[h].total++;
+    });
+    const entries = Object.entries(hMap).sort((a,b)=>b[1].total-a[1].total);
+    html += sectionHead('Hospitals where children from this district had surgery', entries.length);
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        ${tableRow(['Hospital','Hosp. District','Cases'],true)}
+        ${entries.map(([h,v])=>tableRow([h, v.dist||'—', v.total])).join('')}
+      </table></div>`;
+  }
+
+  // ── REHAB TAB ─────────────────────────────────────────────────
+  else if (_drTab === 'rehab') {
+    const rMap = {};
+    cases.forEach(c => {
+      const r = c.rehabCentre||'Not assigned';
+      if(!rMap[r]) rMap[r]={total:0,sessions:0,active:0};
+      rMap[r].total++;
+      rMap[r].sessions += (c.sessions||0);
+      if((c.sessions||0)>0) rMap[r].active++;
+    });
+    const entries = Object.entries(rMap).sort((a,b)=>b[1].total-a[1].total);
+    html += sectionHead('Rehab centre distribution', entries.length);
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        ${tableRow(['Rehab Centre','Assigned','Sessions Started','Total Sessions'],true)}
+        ${entries.map(([r,v])=>tableRow([r, v.total, v.active, v.sessions])).join('')}
+      </table></div>`;
+  }
+
+  // ── FOLLOW-UP TAB ─────────────────────────────────────────────
+  else if (_drTab === 'followup') {
+    const contacted   = cases.filter(c=>c._lastDistFollowup).length;
+    const overdue     = cases.filter(c=>daysSince(c._lastDistFollowup)>60).length;
+    const neverCalled = cases.filter(c=>!c._lastDistFollowup).length;
+    const assessed    = cases.filter(c=>c._lastOutcomeDate).length;
+
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      ${statBox(contacted,'Contacted','var(--green)','var(--green-light)')}
+      ${statBox(neverCalled,'Never Called','var(--amber)','var(--amber-light)')}
+      ${statBox(overdue,'Overdue >60d','var(--red)','var(--red-light)')}
+      ${statBox(assessed,'Assessed','#4a2a7a','#EEEDFE')}
+    </div>`;
+
+    html += sectionHead('Never contacted — action needed', neverCalled);
+    const neverList = cases.filter(c=>!c._lastDistFollowup).slice(0,20);
+    if(neverList.length) {
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          ${tableRow(['Name','Village','Status','Mobile'],true)}
+          ${neverList.map(c=>{
+            const mob = cleanMob(c.mobile||'');
+            return tableRow([
+              c.name||'—', c.village||'—',
+              pill(c.status||'pending', c.status==='paid'?'green':c.status==='rehab2'?'blue':'amber'),
+              mob?`<a href="tel:${mob}" style="color:var(--blue-mid)">${mob}</a>`:'—'
+            ]);
+          }).join('')}
+        </table></div>`;
+      if(neverCalled>20) html += `<div style="font-size:11px;color:var(--text-light);margin-top:6px;text-align:center">Showing 20 of ${neverCalled}</div>`;
+    } else {
+      html += `<div style="text-align:center;padding:24px;color:var(--green);font-size:13px">✅ All children have been contacted at least once</div>`;
+    }
+
+    html += sectionHead('Overdue — no contact in 60+ days', overdue);
+    const overdueList = cases.filter(c=>c._lastDistFollowup&&daysSince(c._lastDistFollowup)>60)
+      .sort((a,b)=>daysSince(b._lastDistFollowup)-daysSince(a._lastDistFollowup)).slice(0,20);
+    if(overdueList.length) {
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          ${tableRow(['Name','Last Contact','Days','Mobile'],true)}
+          ${overdueList.map(c=>{
+            const mob = cleanMob(c.mobile||'');
+            const days = daysSince(c._lastDistFollowup);
+            return tableRow([
+              c.name||'—', c._lastDistFollowup||'—',
+              pill(days+' days','red'),
+              mob?`<a href="tel:${mob}" style="color:var(--blue-mid)">${mob}</a>`:'—'
+            ]);
+          }).join('')}
+        </table></div>`;
+    }
+  }
+
+  // ── AT-RISK TAB ───────────────────────────────────────────────
+  else if (_drTab === 'atrisk') {
+    const atRisk = cases.filter(c=>c.status!=='paid'&&daysSince(c.lastContact)>=AT_RISK_DAYS)
+      .sort((a,b)=>daysSince(b.lastContact)-daysSince(a.lastContact));
+    html += sectionHead('At-Risk Children — no contact in 45+ days', atRisk.length);
+    if(atRisk.length) {
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          ${tableRow(['Name','Village','Journey','Last Contact','Days','Mobile'],true)}
+          ${atRisk.map(c=>{
+            const mob = cleanMob(c.mobile||'');
+            const days = daysSince(c.lastContact);
+            const dStr = days>=9000?'Never':days+' days';
+            return tableRow([
+              c.name||'—', c.village||'—',
+              pill(c.phase||c.status||'—','blue'),
+              c.lastContact||'—',
+              pill(dStr,days>=90?'red':'amber'),
+              mob?`<a href="tel:${mob}" style="color:var(--blue-mid)">${mob}</a>`:'—'
+            ]);
+          }).join('')}
+        </table></div>`;
+    } else {
+      html += `<div style="text-align:center;padding:24px;color:var(--green);font-size:13px">✅ No at-risk children in this district</div>`;
+    }
+  }
+
+  // ── OUTCOME TAB ───────────────────────────────────────────────
+  else if (_drTab === 'outcome') {
+    const assessed = cases.filter(c=>c._lastMaisTotal!==undefined||c._lastCapLevel||c._lastMilestone);
+    const notAssessed = cases.length - assessed.length;
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      ${statBox(assessed.length,'Assessed','#4a2a7a','#EEEDFE')}
+      ${statBox(notAssessed,'Not Yet Assessed','var(--amber)','var(--amber-light)')}
+    </div>`;
+
+    if(assessed.length) {
+      // MAIS distribution
+      const mGroups = {'0-10 (Needs attention)':0,'11-20 (Fair)':0,'21-30 (Good)':0,'31-40 (Excellent)':0};
+      assessed.forEach(c=>{
+        const s = c._lastMaisTotal||0;
+        if(s<=10) mGroups['0-10 (Needs attention)']++;
+        else if(s<=20) mGroups['11-20 (Fair)']++;
+        else if(s<=30) mGroups['21-30 (Good)']++;
+        else mGroups['31-40 (Excellent)']++;
+      });
+      html += sectionHead('MAIS Score Distribution (latest)');
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">`;
+      Object.entries(mGroups).forEach(([label,n])=>{
+        const col = label.includes('Needs')?'var(--red)':label.includes('Fair')?'var(--amber)':label.includes('Good')?'var(--blue-mid)':'var(--green)';
+        html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--border)">
+          <div style="flex:1;font-size:12px">${label}</div>
+          <div style="width:100px">${progBar(n,assessed.length,col)}</div>
+          <div style="font-size:13px;font-weight:600;width:24px;text-align:right;color:${col}">${n}</div>
+        </div>`;
+      });
+      html += `</div>`;
+
+      // CAP distribution
+      const capMap = {};
+      assessed.filter(c=>c._lastCapLevel).forEach(c=>{
+        const level = 'Level '+c._lastCapLevel;
+        capMap[level] = (capMap[level]||0) + 1;
+      });
+      if(Object.keys(capMap).length) {
+        html += sectionHead('CAP Level Distribution');
+        html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+          <table style="width:100%;border-collapse:collapse">
+            ${tableRow(['CAP Level','Children'],true)}
+            ${Object.entries(capMap).sort((a,b)=>b[0].localeCompare(a[0])).map(([l,n])=>tableRow([l,n])).join('')}
+          </table></div>`;
+      }
+
+      // Individual outcome list
+      html += sectionHead('Individual latest assessment scores');
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          ${tableRow(['Name','MAIS','CAP','SIR','Milestone','Last Assessment'],true)}
+          ${assessed.map(c=>tableRow([
+            c.name||'—',
+            c._lastMaisTotal!==undefined?c._lastMaisTotal+'/40':'—',
+            c._lastCapLevel||'—',
+            c._lastSirLevel||'—',
+            (c._lastMilestone||'—').substring(0,20),
+            c._lastOutcomeDate||c._lastDistFollowup||'—'
+          ])).join('')}
+        </table></div>`;
+    } else {
+      html += `<div style="text-align:center;padding:32px 16px;color:var(--text-light);font-size:13px">
+        No outcome assessments recorded yet.<br>Use the <strong>Full Outcome Assessment</strong> form when visiting children.
+      </div>`;
+    }
+  }
+
+  // ── AGE TAB ───────────────────────────────────────────────────
+  else if (_drTab === 'age') {
+    const ageGroups = {'0-6 months':0,'7-12 months':0,'13-24 months':0,'25-36 months':0,'37-60 months':0,'61+ months':0};
+    cases.forEach(c => {
+      const a = parseInt(c.age)||0;
+      if(a<=6) ageGroups['0-6 months']++;
+      else if(a<=12) ageGroups['7-12 months']++;
+      else if(a<=24) ageGroups['13-24 months']++;
+      else if(a<=36) ageGroups['25-36 months']++;
+      else if(a<=60) ageGroups['37-60 months']++;
+      else ageGroups['61+ months']++;
+    });
+    const avgAge = cases.length ? Math.round(cases.filter(c=>c.age).reduce((s,c)=>s+(parseInt(c.age)||0),0)/cases.filter(c=>c.age).length) : 0;
+    const optimal = cases.filter(c=>(parseInt(c.age)||99)<=24).length;
+
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      ${statBox(avgAge+' mo','Avg Age at Surgery','var(--blue-mid)','var(--blue-light)')}
+      ${statBox(optimal,'Optimal (≤24 mo)','var(--green)','var(--green-light)')}
+    </div>`;
+
+    html += sectionHead('Age at Surgery Distribution');
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">`;
+    Object.entries(ageGroups).forEach(([label,n])=>{
+      const col = label.includes('0-6')||label.includes('7-12')||label.includes('13-24')?'var(--green-mid)':label.includes('25-36')?'var(--amber-mid)':'var(--red)';
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1;font-size:12px">${label}</div>
+        <div style="width:100px">${progBar(n,cases.length,col)}</div>
+        <div style="font-size:13px;font-weight:600;width:24px;text-align:right">${n}</div>
+      </div>`;
+    });
+    html += `</div>`;
+    html += `<div style="font-size:11px;color:var(--text-light);margin-top:8px;padding:10px 12px;background:var(--amber-light);border-radius:8px">
+      ℹ️ WHO recommends cochlear implantation before 12 months for optimal speech outcomes. ${optimal} (${cases.length?Math.round(optimal/cases.length*100):0}%) children in this district received optimal timing.
+    </div>`;
+  }
+
+  // ── FY PROGRESS TAB ───────────────────────────────────────────
+  else if (_drTab === 'fy') {
+    const fyMap = {};
+    cases.forEach(c => {
+      const fy = c.fy||'Unknown';
+      if(!fyMap[fy]) fyMap[fy]={enrolled:0,surg:0,r1:0,r2:0,paid:0,risk:0};
+      fyMap[fy].enrolled++;
+      if(c.surgAdmit||c.hospSubmitted) fyMap[fy].surg++;
+      if(c.r1Admit||c.r1Status) fyMap[fy].r1++;
+      if(c.r2Admit||c.r2Status) fyMap[fy].r2++;
+      if(c.status==='paid') fyMap[fy].paid++;
+      if(c.risk) fyMap[fy].risk++;
+    });
+    html += sectionHead('Year-on-Year Progress');
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        ${tableRow(['FY','Enrolled','Surgery','Rehab 1','Rehab 2','Completed','At Risk'],true)}
+        ${Object.entries(fyMap).sort((a,b)=>b[0].localeCompare(a[0])).map(([fy,v])=>
+          tableRow([fy, v.enrolled, v.surg, v.r1, v.r2,
+            `<span style="color:var(--green);font-weight:600">${v.paid}</span>`,
+            v.risk>0?`<span style="color:var(--red);font-weight:600">${v.risk}</span>`:'0'
+          ])
+        ).join('')}
+      </table></div>`;
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+  drShowTabStyle(_drTab);
+}
+
+function drShowTabStyle(tab) {
+  document.querySelectorAll('[id^="drtab-"]').forEach(el => {
+    const active = el.id === 'drtab-'+tab;
+    el.style.color = active ? '#7a4f1a' : 'var(--text-light)';
+    el.style.borderBottomColor = active ? '#7a4f1a' : 'transparent';
+    el.style.fontWeight = active ? '600' : '500';
+  });
+}
 
 // ══════════════════════════════════════════════════════════════
 // DISTRICT UNIFIED SCREEN — Case view + Follow-up + Assessment

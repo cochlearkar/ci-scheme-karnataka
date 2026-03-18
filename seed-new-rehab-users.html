@@ -25,6 +25,14 @@
 
   <div class="warn">⚠️ Run this only once. Running again will try to create duplicate accounts and show errors for existing ones — that's safe to ignore.</div>
 
+  <div style="background:#f0f4ff;border:1px solid #c0cff8;border-radius:8px;padding:12px 14px;margin-bottom:16px">
+    <div style="font-size:12px;font-weight:600;color:#1a3a8a;margin-bottom:8px">🔐 Sign in with your state admin account first</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <input id="admin-user" type="text" placeholder="Your username (e.g. cochlearkar)" style="padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:inherit">
+      <input id="admin-pass" type="password" placeholder="Your password" style="padding:8px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:inherit">
+    </div>
+  </div>
+
   <div class="user-row">
     <strong>Dr.S.R.Chandrasekhar Institute of Speech and Hearing</strong>
     <span>Username: r_srcs_bengaluru &nbsp;·&nbsp; Password: CIScheme@2025 &nbsp;·&nbsp; Role: rehab</span>
@@ -101,21 +109,23 @@ window.seedUsers = async function() {
 
   function print(msg) { log.textContent += msg + '\n'; }
 
-  // First sign in as admin to have write permissions
+  // Sign in with admin credentials entered by user
+  const adminUser = document.getElementById('admin-user').value.trim();
+  const adminPass = document.getElementById('admin-pass').value.trim();
+  if (!adminUser || !adminPass) {
+    print('✗ Please enter your admin username and password above.');
+    btn.disabled = false;
+    return;
+  }
   try {
-    await signInWithEmailAndPassword(auth, 'ci_admin@shravan.app', 'CIAdmin@2024');
-    print('✓ Signed in as admin');
+    const email = adminUser.includes('@') ? adminUser : adminUser + '@shravan.app';
+    await signInWithEmailAndPassword(auth, email, adminPass);
+    print('✓ Signed in as ' + adminUser);
   } catch(e) {
-    // Try alternate admin
-    try {
-      await signInWithEmailAndPassword(auth, 'cochlearkar@shravan.app', 'Shravan@2024');
-      print('✓ Signed in as cochlearkar');
-    } catch(e2) {
-      print('✗ Could not sign in as admin: ' + e2.message);
-      print('  Please sign in to the main app first, then run this tool.');
-      btn.disabled = false;
-      return;
-    }
+    print('✗ Sign-in failed: ' + e.message);
+    print('  Check your username and password and try again.');
+    btn.disabled = false;
+    return;
   }
 
   for (const u of NEW_USERS) {

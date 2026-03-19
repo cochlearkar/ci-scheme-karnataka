@@ -915,6 +915,32 @@ body {
   <div class="form-scroll" id="qe-body"></div>
 </div>
 
+<!-- ======== SCREEN: REHAB CLAIM CASES ======== -->
+<div class="screen hidden" id="screen-claimcases">
+  <div class="app-header" style="background:var(--blue)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.3);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff">Claim Cases</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.7)" id="claim-sub">Search &amp; assign your cases</div>
+      </div>
+    </div>
+    <div class="role-chip" style="background:rgba(255,255,255,0.2);color:#fff;border:none">&#127911; Rehab</div>
+  </div>
+  <div style="padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)">
+    <div style="font-size:12px;color:var(--text-light);margin-bottom:8px">Search by child name, card number or district. Then assign your centre and enter the switch-on date.</div>
+    <div style="display:flex;gap:8px">
+      <input class="field-input" id="claim-search" placeholder="Name / Card no / District..." oninput="claimSearch()" style="flex:1;margin:0">
+      <div style="background:var(--blue);color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0" onclick="claimSearch()">Search</div>
+    </div>
+  </div>
+  <div class="form-scroll" id="claim-results" style="padding:10px 14px">
+    <div style="text-align:center;padding:32px;color:var(--text-light);font-size:13px">
+      Search for a child to claim them for your rehab centre
+    </div>
+  </div>
+</div>
+
 <!-- ======== SCREEN: REHAB QUARTERLY EVALUATION ======== -->
 <div class="screen hidden" id="screen-qeval">
   <div class="app-header" style="background:var(--blue)">
@@ -1873,9 +1899,34 @@ function filterCasesByUser(cases) {
   }
   if (currentUser.role === 'rehab') {
     const unit = (currentUser.unit || '').toLowerCase().trim();
+    // Zone mapping — which zones each rehab centre primarily serves
+    const ZONE_MAP = {
+      'aiish bengaluru':       ['bangalore'],
+      'aiish mysuru':          ['mysore'],
+      'nimhans bengaluru':     ['bangalore'],
+      'ksad dharwad':          ['belgaum'],
+      'sdm dharwad':           ['belgaum'],
+      'samspanda mandya':      ['mysore'],
+      'mims mandya rehab':     ['mysore'],
+      'jss hospital mysuru':   ['mysore'],
+      'kmc manipal rehab':     ['mysore'],
+      'kasturba hospital udupi':['mysore'],
+      'bims audiology center belagavi': ['belgaum'],
+      'dr.s.r.chandrasekhar institute': ['bangalore'],
+      'sri sathya sai sarala memorial': ['mysore'],
+      'manasa cochlear implant':        ['bangalore'],
+    };
     return cases.filter(c => {
+      // First try: exact match on rehabCentre field
       const rec = (c.rehabCentre || '').toLowerCase().trim();
-      return rec && rec === unit;
+      if (rec && rec.includes(unit.split(' ')[0])) return true;
+      // Second try: if no rehabCentre assigned, match by zone
+      if (!c.rehabCentre) {
+        const zones = ZONE_MAP[unit] || [];
+        const cZone = (c.zone || '').toLowerCase();
+        return zones.some(z => cZone.includes(z));
+      }
+      return false;
     });
   }
   if (currentUser.role === 'district') {
@@ -1950,6 +2001,7 @@ function buildHome() {
     const qDue = allMyCases.filter(c => isQuarterlyDue(c)).length;
     if (qDue > 0) html += `<div class="action-card primary" onclick="buildCaseList('qdueonly');showScreen('cases')" style="background:#4a2a7a;border-color:#4a2a7a"><div class="action-icon">📋</div><div><div class="action-title">${qDue} quarterly evaluation${qDue!==1?'s':''} due</div><div class="action-desc">Submit Q report — MAIS, speech, language</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All assigned cases</div></div>`;
+    html += `<div class="action-card" onclick="openClaimCases()" style="border-color:var(--blue-mid);background:var(--blue-light)"><div class="action-icon">🔍</div><div><div class="action-title" style="color:var(--blue)">Claim New Cases</div><div class="action-desc">Search &amp; assign cases to your centre</div></div><div class="action-arrow">→</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'district') {
@@ -3996,6 +4048,138 @@ function buildSummaryHTML(c) {
 
 // ======== REHAB SESSION FORM ========
 
+
+// ══════════════════════════════════════════════════════════════
+// REHAB CLAIM CASES
+// Rehab centre searches all cases and tags unassigned ones
+// ══════════════════════════════════════════════════════════════
+
+function openClaimCases() {
+  var unit = currentUser ? currentUser.unit : '';
+  document.getElementById('claim-sub').textContent = unit + ' — search & assign cases';
+  document.getElementById('claim-search').value = '';
+  document.getElementById('claim-results').innerHTML =
+    '<div style="text-align:center;padding:32px;color:var(--text-light);font-size:13px">'
+    +'Search for a child by name, card number or district to assign them to your centre.</div>';
+  showScreen('claimcases');
+}
+
+function claimSearch() {
+  var q = (document.getElementById('claim-search').value || '').trim().toLowerCase();
+  var resultsEl = document.getElementById('claim-results');
+
+  if (q.length < 2) {
+    resultsEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-light);font-size:12px">Type at least 2 characters to search</div>';
+    return;
+  }
+
+  // Search ALL cases — not just assigned ones
+  var matches = SAMPLE_CASES.filter(function(c) {
+    return (c.name||'').toLowerCase().includes(q)
+      || String(c.id).includes(q)
+      || (c.district||'').toLowerCase().includes(q)
+      || (c.hospital||'').toLowerCase().includes(q);
+  }).slice(0, 20);
+
+  if (!matches.length) {
+    resultsEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-light);font-size:12px">No cases found for "' + q + '"</div>';
+    return;
+  }
+
+  var unit = currentUser ? currentUser.unit : '';
+
+  resultsEl.innerHTML = matches.map(function(c) {
+    var alreadyMine = (c.rehabCentre||'').toLowerCase() === unit.toLowerCase();
+    var otherCentre = c.rehabCentre && !alreadyMine;
+
+    return '<div style="background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px">'
+      // Patient info
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+      +'<div>'
+      +'<div style="font-size:13px;font-weight:600">'+(c.name||'—')+'</div>'
+      +'<div style="font-size:11px;color:var(--text-light);margin-top:2px">Card: '+c.id+' · '+c.hospital+'</div>'
+      +'<div style="font-size:11px;color:var(--text-light)">District: '+(c.district||'—')+' · FY: '+(c.fy||'—')+'</div>'
+      +'</div>'
+      +'<span style="background:'+(alreadyMine?'var(--green-light)':otherCentre?'var(--amber-light)':'var(--blue-light)')
+      +';color:'+(alreadyMine?'var(--green)':otherCentre?'var(--amber)':'var(--blue)')
+      +';font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;flex-shrink:0">'
+      +(alreadyMine?'✓ Yours':otherCentre?'At '+c.rehabCentre:'Unassigned')+'</span>'
+      +'</div>'
+
+      // Claim form — show if unassigned OR already mine (to update switch-on date)
+      +(alreadyMine
+        // Already claimed — just show switch-on date update
+        ? '<div style="background:var(--green-light);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--green)">'
+          +'✓ Assigned to your centre'
+          +(c.switchOnDate ? ' · Switch-on: '+c.switchOnDate : ' · No switch-on date set')
+          +'</div>'
+          +'<div style="display:flex;gap:6px;margin-top:6px">'
+          +'<div style="flex:1"><div style="font-size:10px;color:var(--text-light);margin-bottom:3px">Update switch-on date</div>'
+          +'<input type="date" id="switchon-'+c.id+'" class="field-input" style="margin:0;font-size:12px" value="'+(c.switchOnDate||'')+'" placeholder="Switch-on date"></div>'
+          +'<div style="background:var(--blue);color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;align-self:flex-end;white-space:nowrap" '
+          +'onclick="claimCase(&quot;'+c.id+'&quot;, true)">Update</div>'
+          +'</div>'
+
+        // Not yet claimed — show full claim form
+        : '<div style="display:flex;gap:6px;align-items:flex-end">'
+          +'<div style="flex:1"><div style="font-size:10px;color:var(--text-light);margin-bottom:3px">Switch-on date <span style="color:var(--red)">*</span></div>'
+          +'<input type="date" id="switchon-'+c.id+'" class="field-input" style="margin:0;font-size:12px" placeholder="Date of switch-on"></div>'
+          +'<div style="background:'+(otherCentre?'var(--amber-mid)':'var(--blue)')+';color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap" '
+          +'onclick="claimCase(&quot;'+c.id+'&quot;, false)">'
+          +(otherCentre?'Override &amp; Claim':'Claim Case')+'</div>'
+          +'</div>'
+      )
+      +'</div>';
+  }).join('');
+}
+
+async function claimCase(caseId, updateOnly) {
+  var switchOnEl = document.getElementById('switchon-' + caseId);
+  var switchOn = switchOnEl ? switchOnEl.value : '';
+  var unit = currentUser ? currentUser.unit : '';
+
+  if (!switchOn) {
+    alert('Please enter the switch-on date before claiming.');
+    return;
+  }
+
+  var cas = SAMPLE_CASES.find(function(c){ return String(c.id) === String(caseId); });
+  if (!cas) { alert('Case not found.'); return; }
+
+  try {
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+
+    var updates = {
+      rehabCentre:  unit,
+      switchOnDate: switchOn,
+      _lastModified: new Date().toISOString()
+    };
+
+    // If claiming fresh — set current session count from paper if >0
+    // For hybrid approach: don't reset sessions, just assign centre
+    if (!updateOnly && !cas.rehabCentre) {
+      updates.status = cas.status || 'rehab1';
+    }
+
+    await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+
+    // Update local cache
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(caseId); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
+
+    // Refresh search results
+    claimSearch();
+
+    // Show brief confirmation
+    var btn = null; // button reference not needed after &quot; fix
+    if (btn) { btn.textContent = '✓ Done'; btn.style.background = 'var(--green-mid)'; }
+
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
 function openRehabSession(cas) {
   selectedCase = cas;
   document.getElementById('rs-title').textContent = cas.name || 'Log Session';
@@ -4015,8 +4199,25 @@ function openRehabSession(cas) {
   var r1checked = (cas.r1Admit && !cas.r2Admit) ? 'checked' : '';
   var r2checked = cas.r2Admit ? 'checked' : '';
 
-  document.getElementById('rs-body').innerHTML =
-    '<div style="margin:14px 16px 0;background:var(--blue-light);border:1px solid #B5D4F4;border-radius:12px;padding:14px 16px">'
+  // Guidance banner
+  var guidanceBanner = '';
+  if (!cas.switchOnDate) {
+    guidanceBanner = '<div style="margin:12px 14px 0;background:#fff8e1;border:1px solid #f59e0b;border-radius:10px;padding:10px 14px;font-size:12px;color:#92400e">'
+      +'⚠️ <strong>Switch-on date not set.</strong> Use <em>Claim New Cases</em> on home screen to set the switch-on date first.</div>';
+  }
+  var yearNote = '';
+  if (cas.switchOnDate) {
+    var monthsSinceOn = Math.floor((Date.now()-new Date(cas.switchOnDate))/86400000/30.5);
+    var inYear2 = monthsSinceOn > 12;
+    var expPerWeek = inYear2 ? 1 : 2;
+    var expPerMonth = inYear2 ? 4 : 8;
+    yearNote = '<div style="background:var(--blue-light);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--blue);margin:8px 14px 0">'
+      +'📅 '+(inYear2?'Year 2':'Year 1')+' · '+monthsSinceOn+' months post switch-on'
+      +' · Expected: <strong>'+expPerWeek+' session'+(expPerWeek>1?'s':'')+'/week</strong> ('+expPerMonth+'/month)</div>';
+  }
+
+  document.getElementById('rs-body').innerHTML = guidanceBanner + yearNote +
+    '<div style="margin:12px 14px 0;background:var(--blue-light);border:1px solid #B5D4F4;border-radius:12px;padding:14px 16px">'
     +'<div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Patient Information</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
     +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">SAST Ref</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.surgRefNo||cas.tpa||'-')+'</div></div>'
@@ -4031,6 +4232,7 @@ function openRehabSession(cas) {
     +'<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
     +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Programme Journey</div>'
     +buildJourneyInfographic(cas)+'</div>'
+    +yearNote
     +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">Session Progress</div>'
     +'<div class="session-dots">'+dotsHTML+'</div>'
     +'<div style="font-size:11px;color:var(--text-light);margin-top:4px">'+sessionsDone+' completed &middot; '+(totalSess-sessionsDone)+' remaining</div></div>'

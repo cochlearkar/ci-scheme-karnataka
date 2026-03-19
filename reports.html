@@ -158,6 +158,8 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
     <div class="tab" onclick="showTab('distyr')">🗂️ District × Year</div>
     <div class="tab" onclick="showTab('device')">🦻 Device Status</div>
     <div class="tab" onclick="showTab('avt')">🎧 AVT Attendance</div>
+    <div class="tab" onclick="showTab('qeval')">📊 Quarterly Eval</div>
+    <div class="tab" onclick="showTab('qeval')">📋 Quarterly Eval</div>
     <div class="tab" onclick="showTab('quarterly')">&#128197; Monthly / Quarterly</div>
     <div class="tab" onclick="showTab('device')">&#129955; Device Status</div>
   </div>
@@ -430,6 +432,40 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
       </div>
     </div>
 
+    <!-- ── QUARTERLY EVALUATION ── -->
+    <div class="report-section" id="sec-qeval">
+      <div class="stat-grid" id="qeval-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Latest Quarterly Evaluation — All Children</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-qeval','quarterly_evaluation')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-qeval">
+          <thead><tr>
+            <th>Name</th><th>District</th><th>Rehab Centre</th>
+            <th>Quarter</th><th>MAIS (/40)</th><th>Speech %</th>
+            <th>Audiogram</th><th>RLA</th><th>ELA</th><th>Progress</th><th>Date</th>
+          </tr></thead>
+          <tbody id="tbody-qeval"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ── QUARTERLY EVALUATION ── -->
+    <div class="report-section" id="sec-qeval">
+      <div class="stat-grid" id="qeval-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Latest Quarterly Evaluation — All Children</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-qeval','quarterly_eval')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-qeval">
+          <thead><tr><th>Name</th><th>District</th><th>Rehab Centre</th><th>Quarter</th><th>MAIS</th><th>Speech%</th><th>Audiogram</th><th>Progress</th><th>Date</th></tr></thead>
+          <tbody id="tbody-qeval"></tbody>
+        </table></div>
+      </div>
+    </div>
+
 
 
 <script type="module">
@@ -559,6 +595,8 @@ function showTab(name) {
   if (name === 'distyr') { renderDistYr(); }
   if (name === 'device') { renderDevice(); }
   if (name === 'avt') { renderAvt(); }
+  if (name === 'qeval') { renderQeval(); }
+  if (name === 'qeval') { renderQeval(); }
   if (name === 'quarterly') { renderQuarterly(); }
   if (name === 'device') { renderDevice(); }
   // Re-init sorting for newly visible table
@@ -640,6 +678,7 @@ function renderAll() {
   renderDistrict();
   renderDevice();
   renderAvt();
+  renderQeval();
   renderHospital();
   renderFinancial();
   renderRehab();
@@ -1096,6 +1135,83 @@ function closeDrilldown() {
 // -- DISTRICT × YEAR GRID ------------------------------------------------------
 
 
+
+// ── QUARTERLY EVALUATION ─────────────────────────────────────────────────────
+async function renderQeval() {
+  document.getElementById('tbody-qeval').innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-light)">Loading...</td></tr>';
+
+  try {
+    var _col = window._fbFns && window._fbFns.collection;
+    var _get = window._fbFns && window._fbFns.getDocs;
+    if (!_col || !_get) { throw new Error('Firebase not ready'); }
+
+    var snap = await _get(_col(window._fbDb, 'submissions_qeval'));
+    var evals = [];
+    snap.forEach(function(d){ evals.push(d.data()); });
+
+    // Latest eval per case
+    var latestMap = {};
+    evals.forEach(function(e) {
+      var cid = String(e.caseId);
+      if (!latestMap[cid] || e.date > latestMap[cid].date) latestMap[cid] = e;
+    });
+    var latest = Object.values(latestMap);
+
+    // Filter by current FILTERED_CASES
+    var caseIds = new Set(FILTERED_CASES.map(function(c){ return String(c.id); }));
+    latest = latest.filter(function(e){ return caseIds.has(String(e.caseId)); });
+
+    var onTrack  = latest.filter(function(e){ return e.overallProgress && e.overallProgress.includes('On track'); }).length;
+    var ahead    = latest.filter(function(e){ return e.overallProgress && e.overallProgress.includes('Ahead'); }).length;
+    var behind   = latest.filter(function(e){ return e.overallProgress && e.overallProgress.includes('Behind'); }).length;
+    var concern  = latest.filter(function(e){ return e.overallProgress && e.overallProgress.includes('Concern'); }).length;
+    var notDone  = FILTERED_CASES.filter(function(c){ return !c._lastQEvalDate && (c.sessions||0)>=26; }).length;
+
+    document.getElementById('qeval-stats').innerHTML =
+      statCard(onTrack,  'On Track',    'var(--green-mid)') +
+      statCard(ahead,    'Ahead',       'var(--blue-mid)') +
+      statCard(behind,   'Behind',      'var(--amber-mid)') +
+      statCard(concern,  'Concern',     'var(--red)') +
+      statCard(notDone,  'Eval Pending','var(--text-light)');
+
+    var avgMais = latest.length
+      ? Math.round(latest.reduce(function(s,e){ return s+(e.maisScore||0); }, 0) / latest.length)
+      : 0;
+
+    var progColor = function(p) {
+      if(!p) return '';
+      if(p.includes('Ahead'))   return 'color:var(--blue-mid);font-weight:600';
+      if(p.includes('On track'))return 'color:var(--green);font-weight:600';
+      if(p.includes('Behind'))  return 'color:var(--amber);font-weight:600';
+      if(p.includes('Concern')) return 'color:var(--red);font-weight:600';
+      return '';
+    };
+
+    document.getElementById('tbody-qeval').innerHTML = latest.length
+      ? latest.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).map(function(e){
+          var prog = e.overallProgress||'—';
+          return '<tr>'
+            +'<td><strong>'+e.caseName+'</strong></td>'
+            +'<td>'+e.caseDistrict+'</td>'
+            +'<td style="font-size:11px">'+e.rehabCentre+'</td>'
+            +'<td style="font-size:11px">'+e.quarter+'</td>'
+            +'<td><strong>'+(e.maisScore||'—')+'</strong>/40</td>'
+            +'<td>'+(e.speechPercent?e.speechPercent+'%':'—')+'</td>'
+            +'<td style="font-size:10px">'+(e.audiogramResult||'—').substring(0,30)+'</td>'
+            +'<td style="font-size:11px">'+(e.rla||'—')+'</td>'
+            +'<td style="font-size:11px">'+(e.ela||'—')+'</td>'
+            +'<td><span style="'+progColor(prog)+'">'+prog.replace(/[🌟✅⚠️🔴]/g,'').trim()+'</span></td>'
+            +'<td style="font-size:11px">'+e.date+'</td>'
+            +'</tr>';
+        }).join('')
+      : '<tr><td colspan="11" class="empty">No quarterly evaluations submitted yet</td></tr>';
+
+    makeSortable('tbl-qeval');
+  } catch(e) {
+    document.getElementById('tbody-qeval').innerHTML = '<tr><td colspan="11" class="empty">Error loading: '+e.message+'</td></tr>';
+  }
+}
+
 // ── AVT ATTENDANCE ─────────────────────────────────────────────────────────────
 function renderAvt() {
   var cases = FILTERED_CASES;
@@ -1160,6 +1276,52 @@ function renderAvt() {
   makeSortable('tbl-avt-red');
   makeSortable('tbl-avt-yellow');
   makeSortable('tbl-avt-centre');
+}
+
+
+// ── QUARTERLY EVALUATION ───────────────────────────────────────────────────────
+function renderQeval() {
+  var cases = FILTERED_CASES;
+  var evaluated  = cases.filter(function(c){ return c._lastQEvalDate; });
+  var overdue    = cases.filter(function(c){ return !c._lastQEvalDate && c.sessions >= 26; });
+  var notStarted = cases.filter(function(c){ return (c.sessions||0) < 26; });
+  var concern    = cases.filter(function(c){ return c._lastQProgress && (c._lastQProgress.includes('Concern') || c._lastQProgress.includes('Behind')); });
+
+  document.getElementById('qeval-stats').innerHTML =
+    statCard(evaluated.length,  'Evaluated',    'var(--green-mid)') +
+    statCard(overdue.length,    'Eval Overdue',  'var(--red)') +
+    statCard(concern.length,    'Need Review',  'var(--amber-mid)') +
+    statCard(notStarted.length, 'Not Ready',    'var(--text-light)');
+
+  var rows = cases.filter(function(c){ return c._lastQEvalDate || c.sessions >= 26; })
+    .sort(function(a,b){ return (b._lastMaisScore||0)-(a._lastMaisScore||0); })
+    .map(function(c){
+      var maisBar = c._lastMaisScore !== undefined
+        ? '<div style="display:flex;align-items:center;gap:6px"><div style="width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:'
+          +Math.round((c._lastMaisScore||0)/40*100)+'%;height:100%;background:'
+          +(c._lastMaisScore>=32?'var(--green-mid)':c._lastMaisScore>=20?'var(--amber-mid)':'var(--red)')
+          +';border-radius:3px"></div></div><span>'+c._lastMaisScore+'/40</span></div>'
+        : '—';
+      var progColor = !c._lastQProgress ? 'var(--text-light)'
+        : c._lastQProgress.includes('Ahead') ? 'var(--green)'
+        : c._lastQProgress.includes('track') ? 'var(--blue-mid)'
+        : c._lastQProgress.includes('Behind') ? 'var(--amber)'
+        : 'var(--red)';
+      return '<tr>'
+        +'<td><strong>'+c.name+'</strong></td>'
+        +'<td>'+c.district+'</td>'
+        +'<td style="font-size:11px">'+c.rehabCentre+'</td>'
+        +'<td style="font-size:11px">'+(c._lastQEvalQuarter||'—')+'</td>'
+        +'<td>'+maisBar+'</td>'
+        +'<td>'+(c._lastSpeechPct ? c._lastSpeechPct+'%' : '—')+'</td>'
+        +'<td style="font-size:10px">'+(c._lastAudiogramResult||'—')+'</td>'
+        +'<td><span style="color:'+progColor+';font-size:11px;font-weight:600">'+(c._lastQProgress||'Not evaluated')+'</span></td>'
+        +'<td style="font-size:11px">'+(c._lastQEvalDate||'<span style="color:var(--red)">Overdue</span>')+'</td>'
+        +'</tr>';
+    }).join('');
+
+  document.getElementById('tbody-qeval').innerHTML = rows || '<tr><td colspan="9" class="empty">No quarterly evaluations recorded yet</td></tr>';
+  makeSortable('tbl-qeval');
 }
 
 // ── DEVICE STATUS ─────────────────────────────────────────────────────────────

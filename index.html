@@ -1180,6 +1180,44 @@ let filteredCases = [...SAMPLE_CASES];
 let selectedYears = ['all']; // 'all' means show all years
 let activeStatusFilter = 'All';
 let pendingQueue = JSON.parse(localStorage.getItem('ci_pending') || '[]');
+
+// ── DEMO MODE ────────────────────────────────────────────────────────────────
+function isDemo() { return !!(currentUser && currentUser.isDemo); }
+
+function maskName(name) {
+  if (!isDemo() || !name) return name;
+  // Convert "Vainavi K Gowda" → "V. K. G."
+  return name.split(' ').map(function(w){ return w.length>0 ? w[0].toUpperCase()+'.' : ''; }).join(' ');
+}
+
+function maskMob(mob) {
+  if (!isDemo() || !mob) return mob;
+  // Show only last 2 digits: "XXXXXXXX12"
+  var clean = String(mob).replace(/[^0-9]/g,'');
+  return clean.length >= 4 ? 'XXXXXX' + clean.slice(-4) : '——';
+}
+
+function demoBlock(btnId, formId) {
+  if (!isDemo()) return false;
+  var btn = document.getElementById(btnId);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '🔒 Demo account — read only';
+    btn.style.background = 'var(--gray-mid)';
+    btn.style.color = 'var(--text-light)';
+  }
+  if (formId) {
+    var form = document.getElementById(formId);
+    if (form) form.querySelectorAll('input,select,textarea').forEach(function(el){ el.disabled = true; });
+  }
+  return true;
+}
+
+function demoBanner() {
+  return isDemo()
+    ? '<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:10px;padding:8px 14px;font-size:12px;color:#92400e;margin-bottom:12px;display:flex;gap:8px;align-items:center"><span>🔒</span><span><strong>Demo account</strong> — read only. Patient names and contacts are masked.</span></div>'
+    : '';
+}
 // Fixed hospital totals — calculated once when entering cases screen
 let _hospTotalPending = 0;
 let _hospTotalUpdated = 0;
@@ -1623,6 +1661,7 @@ async function authenticateAndLogin() {
       district:           profile.district || '',
       zone:               profile.zone     || '',
       mustChangePassword: profile.mustChangePassword || false,
+      isDemo:             profile.isDemo   || false,
       token:              cred.user.uid
     };
     currentRole = profile.role;
@@ -1816,7 +1855,7 @@ function buildHome() {
   chip.className = 'role-chip ' + meta.chip;
   // User info bar
   if (currentUser) {
-    document.getElementById('user-display-name').textContent = currentUser.username;
+    document.getElementById('user-display-name').textContent = currentUser.username + (isDemo() ? ' 🔒 Demo' : '');
     document.getElementById('user-display-role').textContent = meta.label + (currentUser.unit ? ' · ' + currentUser.unit.substring(0,30) : '');
   }
 
@@ -2350,7 +2389,7 @@ function caseCardHTML(c) {
   const devFlag = c._deviceFlag ? '<span style="background:#FFF0F0;color:var(--red);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">🔧 DEVICE</span>' : '';
   return '<div class="case-card" style="'+cardBorder+'" onclick="openCaseFromList(\''+c.id+'\')">'+
     '<div class="case-header">'+
-    '<div class="case-name">'+c.name+deviceBadge+(c._deviceFlag?'<span style="background:#FFF0F0;color:var(--red);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">🔧</span>':'')+'</div>'+
+    '<div class="case-name">'+(isDemo()?maskName(c.name):c.name)+deviceBadge+(c._deviceFlag?'<span style="background:#FFF0F0;color:var(--red);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">🔧</span>':'')+'</div>'+
     '<span class="status-pill '+pillClass+'">'+pillLabel+'</span>'+
     (c._deviceStatus && !c._deviceStatus.includes('Functional') && !c._deviceStatus.includes('Waiting')
       ? '<span class="status-pill" style="background:#fff0f0;color:var(--red);margin-left:4px">🔧 Device</span>'
@@ -3720,7 +3759,7 @@ function openCaseSummary(cas) {
   backBtn.style.cssText = 'background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;';
   document.getElementById('summary-title').style.color = '#fff';
   document.getElementById('summary-sub').style.color = 'rgba(255,255,255,0.6)';
-  document.getElementById('summary-title').textContent = cas.name || 'Case Summary';
+  document.getElementById('summary-title').textContent = (isDemo()?maskName(cas.name):cas.name) || 'Case Summary';
   document.getElementById('summary-sub').textContent = 'Card: ' + cas.id + (cas.fy ? ' · FY ' + cas.fy : '');
   const chip = document.getElementById('summary-chip');
   chip.textContent = meta.label;
@@ -3963,6 +4002,7 @@ function openRehabSession(cas) {
 }
 
 async function submitRehabSession() {
+  if (isDemo()) { alert('🔒 Demo account — submissions are disabled.'); return; }
   var errEl = document.getElementById('rs-error');
   var btn   = document.getElementById('rs-submit-btn');
   errEl.style.display = 'none';
@@ -4296,6 +4336,7 @@ function updateScoreTotals() {
 }
 
 async function submitOutcomeAssessment() {
+  if (isDemo()) { alert('🔒 Demo account — submissions are disabled.'); return; }
   var errEl = document.getElementById('oa-error');
   var btn   = document.getElementById('oa-submit-btn');
   errEl.style.display = 'none';
@@ -5058,7 +5099,7 @@ function drShowTabStyle(tab) {
 
 function openDistrictUnified(cas) {
   selectedCase = cas;
-  document.getElementById('dist-title').textContent = cas.name || 'Child Assessment';
+  document.getElementById('dist-title').textContent = (isDemo()?maskName(cas.name):cas.name) || 'Child Assessment';
   document.getElementById('dist-sub').textContent = 'Card ' + cas.id + '  ·  ' + (cas.district||'');
 
   // Current age calculation
@@ -5524,6 +5565,7 @@ function piRowAmber(label, value) {
 }
 
 async function submitDistrictFollowup() {
+  if (isDemo()) { alert('🔒 Demo account — submissions are disabled.'); return; }
   var errEl = document.getElementById('df-error');
   var btn   = document.getElementById('df-submit-btn');
   errEl.style.display = 'none';
@@ -5837,6 +5879,7 @@ function piRowG(label, value) {
 
 
 async function submitHospitalUpdate() {
+  if (isDemo()) { alert('🔒 Demo account — submissions are disabled.'); return; }
   const errEl = document.getElementById('hu-error');
   const btn   = document.getElementById('hu-submit-btn');
   errEl.style.display = 'none';
@@ -5937,6 +5980,7 @@ async function submitHospitalUpdate() {
 }
 
 async function submitNewCase() {
+  if (isDemo()) { alert('🔒 Demo account — submissions are disabled.'); return; }
   const errEl = document.getElementById('nc-error');
   const btn   = document.getElementById('nc-submit-btn');
   errEl.style.display = 'none';

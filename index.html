@@ -4151,168 +4151,145 @@ function openRehabSession(cas) {
   // ── Patient info strip ──────────────────────────────────────
   var mob = cleanMob(cas.mobile);
   var infoHTML =
-    '<div style="margin:14px 16px 0;background:#e8f5ee;border:1px solid #b7ddc8;border-radius:12px;padding:12px 14px">'
-    +'<div style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Patient · '+monthName+' · Quarter '+quarterLabel+'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px">'
+    '<div style="margin:12px 16px 0;background:#e8f5ee;border:1px solid #b7ddc8;border-radius:10px;padding:10px 12px">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:12px">'
     +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Name</span><div style="color:#0a3d2e;font-weight:600">'+(cas.name||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Card</span><div style="color:#0a3d2e;font-weight:600">'+(cas.id||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">District</span><div style="color:#0a3d2e;font-weight:600">'+(cas.district||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Mobile</span><div style="color:#0a3d2e;font-weight:600">'+(mob?'<a href="tel:'+mob+'" style="color:#0a3d2e">'+mob+'</a>':'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Sessions done</span><div style="color:#0a3d2e;font-weight:700">'+sessionsDone+' / '+( sessYear===1?'104':'104+')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Year / Freq</span><div style="color:#0a3d2e;font-weight:600">Year '+sessYear+' · '+sessPerWeek+'x per week</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Last session</span><div style="color:'+(daysSinceLast>14?'#dc2626':'#0a3d2e')+';font-weight:600">'+(lastSess||'Not recorded')+(daysSinceLast>14?' ('+daysSinceLast+' days ago)':'')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">This month</span><div style="color:'+(missedMo>=4?'#dc2626':missedMo>=2?'#d97706':'#0a3d2e')+';font-weight:600">'+(missedMo||0)+' missed | '+(cas._monthAttendPct!=null?cas._monthAttendPct+'% attended':'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">ID</span><div style="color:#0a3d2e;font-weight:600">'+(cas.id||'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Parent</span><div style="color:#0a3d2e">'+(cas.guardian||'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Mobile</span><div style="color:#0a3d2e">'+(mob?'<a href="tel:'+mob+'" style="color:#0a3d2e">'+mob+'</a>':'—')+'</div></div>'
+    +'<div style="grid-column:span 2"><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Address</span><div style="color:#0a3d2e">'+(cas.village||'')+(cas.taluk?' · '+cas.taluk:'')+(cas.district?' · '+cas.district:'')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Surgical hospital</span><div style="color:#0a3d2e">'+(cas.hospital||'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Rehab centre</span><div style="color:#0a3d2e">'+(currentUser.unit||'—')+'</div></div>'
     +'</div></div>';
 
-  // ── Journey infographic ─────────────────────────────────────
-  var journeyHTML =
-    '<div style="margin:10px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px">'
-    +buildJourneyInfographic(cas)+'</div>';
+  var qtrFromSessions = sessionsDone < 26 ? 1 : sessionsDone < 52 ? 2 : sessionsDone < 78 ? 3 : 4;
+  var qtrHTML =
+    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">TICK ONE ONLY</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px">'
+    +['Quarter I — Month 1 to 3','Quarter II — Month 4 to 6','Quarter III — Month 7 to 9','Quarter IV — Month 10 to 12'].map(function(lbl,i){
+      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">'
+        +'<input type="radio" name="rs-qtr" value="'+(i+1)+'" '+(qtrFromSessions===i+1?'checked ':'')+'style="accent-color:var(--blue);width:14px;height:14px" onchange="rsUpdateQtrMonth()"> '+lbl+'</label>';
+    }).join('')
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
+    +'<span style="font-size:12px;color:var(--text-mid)">Month:</span>'
+    +'<input type="month" id="rs-month" value="'+new Date().toISOString().slice(0,7)+'" style="font-size:12px;border:0.5px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface);color:var(--text)">'
+    +'</div>'
+    +'</div>';
 
-  // ── Therapist + Stage (common fields) ───────────────────────
-  var r1checked = (cas.r1Admit && !cas.r2Admit) ? 'checked' : '';
-  var r2checked = cas.r2Admit ? 'checked' : '';
   var commonHTML =
-    '<div class="form-section" style="margin:14px 16px 0">'
-    +'<div class="form-section-title">Therapist &amp; Stage</div>'
-    +'<div class="field"><div class="field-label">Audiologist / Therapist name <span class="req">*</span></div>'
-    +'<input class="field-input" id="rs-therapist" placeholder="Name of AVT therapist / audiologist"></div>'
+    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+    +'<div class="field-row" style="margin-bottom:0">'
+    +'<div class="field"><div class="field-label">Audiologist / AVT Therapist <span class="req">*</span></div>'
+    +'<input class="field-input" id="rs-therapist" placeholder="Name of therapist"></div>'
     +'<div class="field"><div class="field-label">Rehab stage <span class="req">*</span></div>'
-    +'<div class="radio-group" id="rs-stage">'
-    +'<div class="radio-item '+r1checked+'" onclick="selectRadio(this,\'rs-stage\')"><div class="radio-dot"></div>Part 1 (2002GP) — Year 1 · Sessions 1–104</div>'
-    +'<div class="radio-item '+r2checked+'" onclick="selectRadio(this,\'rs-stage\')"><div class="radio-dot"></div>Part 2 (2003GP) — Year 2 · Sessions 105+</div>'
-    +'</div></div></div>';
+    +'<div class="radio-group" id="rs-stage" style="flex-direction:row;gap:6px">'
+    +'<div class="radio-item '+(cas.r1Admit&&!cas.r2Admit?'checked':'')+'" onclick="selectRadio(this,\'rs-stage\')" style="flex:1"><div class="radio-dot"></div>Part 1</div>'
+    +'<div class="radio-item '+(cas.r2Admit?'checked':'')+'" onclick="selectRadio(this,\'rs-stage\')" style="flex:1"><div class="radio-dot"></div>Part 2</div>'
+    +'</div></div>'
+    +'</div></div>';
 
-  // ── Weekly session slots (matches AIISH paper) ──────────────
-  // Show sessPerWeek+1 slots so centre can log more if needed
-  var slotCount = sessPerWeek + 1;
-  window._rs_slotCount = slotCount;
-  window._rs_sessYear = sessYear;
+  var weeks14 = ['Week-1','Week-1','Week-1','Week-1','Week-2','Week-2','Week-2','Week-3','Week-3','Week-3','Week-4','Week-4','Week-4','Week-4'];
+  var sessStart = (qtrFromSessions-1)*26 + 1;
+
+  var tableRows = weeks14.map(function(w,i){
+    return '<tr id="rs-row-'+i+'">'
+      +'<td style="padding:5px 4px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">'+(i+1)+'</td>'
+      +'<td style="padding:5px 4px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">'+w+'</td>'
+      +'<td style="padding:3px 4px;border-bottom:1px solid var(--border)">'
+        +'<input type="date" id="rs-date-'+i+'" style="font-size:11px;border:none;background:transparent;width:100%;min-width:90px;color:var(--text)"></td>'
+      +'<td style="padding:3px 4px;border-bottom:1px solid var(--border);text-align:center">'
+        +'<select id="rs-att-'+i+'" onchange="rsRowAtt('+i+',this.value)" style="font-size:12px;font-weight:700;border:none;background:transparent;color:var(--text);width:38px;cursor:pointer">'
+          +'<option value="">—</option>'
+          +'<option value="P">P</option>'
+          +'<option value="A">A</option>'
+          +'<option value="H">H</option>'
+        +'</select></td>'
+      +'<td style="padding:5px 4px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);font-weight:600;color:var(--blue)" id="rs-snum-'+i+'"></td>'
+      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-aud-'+i+'" class="rs-dot" onclick="rsDotTap(this)">—</span></td>'
+      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-spe-'+i+'" class="rs-dot" onclick="rsDotTap(this)">—</span></td>'
+      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-lan-'+i+'" class="rs-dot" onclick="rsDotTap(this)">—</span></td>'
+      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-cog-'+i+'" class="rs-dot" onclick="rsDotTap(this)">—</span></td>'
+      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-par-'+i+'" class="rs-dot" onclick="rsDotTap(this)">—</span></td>'
+      +'</tr>';
+  }).join('');
+
+  var tableHTML =
+    '<div style="margin:10px 16px 0">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">REPORT OF AUDITORY VERBAL THERAPY AND MAPPING</div>'
+    +'<style>'
+    +'.rs-dot{display:inline-block;min-width:22px;padding:2px 3px;border-radius:4px;font-size:11px;cursor:pointer;text-align:center;color:var(--text-light);background:var(--gray);transition:background .12s}'
+    +'.rs-dot.tick{background:#e1f5ee;color:#085041;font-weight:700}'
+    +'.rs-dot.na{background:#faeeda;color:#633806;font-size:9px}'
+    +'.rs-dot.off{opacity:.25;pointer-events:none}'
+    +'</style>'
+    +'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:10px">'
+    +'<table style="width:100%;border-collapse:collapse;min-width:380px">'
+    +'<thead>'
+    +'<tr style="background:var(--blue-light)">'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Sl.</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);border-bottom:2px solid var(--blue-mid)">Week</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);border-bottom:2px solid var(--blue-mid)">Date</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">P/A</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">#</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Aud</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Spe</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Lan</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Cog</th>'
+    +'<th style="padding:6px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Par</th>'
+    +'</tr>'
+    +'</thead>'
+    +'<tbody>'+tableRows+'</tbody>'
+    +'<tfoot>'
+    +'<tr style="background:var(--gray)">'
+    +'<td colspan="4" style="padding:7px 8px;font-size:11px;font-weight:600;color:var(--text-mid)">Total sessions attended</td>'
+    +'<td colspan="6" style="padding:7px 8px;font-size:12px;font-weight:700;color:var(--blue)" id="rs-total">0 / 0</td>'
+    +'</tr>'
+    +'</tfoot>'
+    +'</table>'
+    +'</div>'
+    +'<div style="margin-top:6px;font-size:10px;color:var(--text-light)">P = Present | A = Absent | H = Holiday | Tap Aud/Spe/Lan/Cog/Par to toggle ✓ → NA → —</div>'
+    +'</div>';
+
+  var mappingHTML =
+    '<div style="margin:12px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Mapping Session</div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Mapping date</div><input type="date" class="field-input" id="rs-mapdate"></div>'
+    +'<div class="field"><div class="field-label">No. of maps</div><input type="number" class="field-input" id="rs-mapcount" min="0" max="10" placeholder="e.g. 1"></div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+    +[['rs-soundfield','Sound field test'],['rs-ecap','ECAP done'],['rs-magnet','Magnet/coil comfortable'],['rs-entref','ENT referral needed']].map(function(f){
+      return '<div class="field" style="margin:0"><div class="field-label" style="font-size:11px">'+f[1]+'</div>'
+        +'<div class="radio-group" id="'+f[0]+'" style="flex-direction:row;gap:4px">'
+        +'<div class="radio-item" onclick="selectRadio(this,\''+f[0]+'\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>Yes</div>'
+        +'<div class="radio-item checked" onclick="selectRadio(this,\''+f[0]+'\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>No</div>'
+        +'</div></div>';
+    }).join('')
+    +'</div>'
+    +'<div class="field"><div class="field-label">Issues / device status</div>'
+    +'<input class="field-input" id="rs-devicestatus" placeholder="None, or describe..."></div>'
+    +'</div>';
+
+  var submitHTML =
+    '<div style="margin:12px 16px 40px">'
+    +'<div class="field"><div class="field-label">Notes / observations</div>'
+    +'<textarea class="field-input" id="rs-notes" rows="2" placeholder="Progress, parent feedback..."></textarea></div>'
+    +'<div class="field"><div class="field-label">Issues to flag</div>'
+    +'<textarea class="field-input" id="rs-issues" rows="2" placeholder="Device, attendance, family..."></textarea></div>'
+    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
+    +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-submit-btn">Save Monthly Log \u2192</button>'
+    +'</div>';
+
+  window._rs_sessStart   = sessStart;
+  window._rs_slotCount   = 14;
+  window._rs_sessYear    = sessYear;
   window._rs_sessPerWeek = sessPerWeek;
   window._rs_sessionsDone = sessionsDone;
 
-  // Get Mon of current week
-  var dayOfWeek = today.getDay();
-  var monday = new Date(today);
-  monday.setDate(today.getDate() - ((dayOfWeek+6)%7));
-
-  var slotsHTML = '<div class="form-section" style="margin:0 16px"><div class="form-section-title">📋 Weekly Attendance Sheet</div>'
-    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:10px">Log each session this week · '
-    +sessPerWeek+'x per week expected (Year '+sessYear+')</div>';
-
-  for (var s=0; s<slotCount; s++) {
-    var d = new Date(monday);
-    d.setDate(monday.getDate() + (s * Math.floor(5/sessPerWeek)));
-    var dStr = d.toISOString().split('T')[0];
-    var weekNum = Math.ceil((d.getDate())/7);
-    var weekLbl = 'Week-'+weekNum;
-    var sNum = sessionsDone + s + 1;
-    var sid = 'rs-slot-'+s;
-
-    slotsHTML +=
-      '<div id="'+sid+'-card" style="border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface);transition:border-color .2s">'
-      // Header row: SI no + week label + session number
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-      +'<div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">'+(s+1)+'</div>'
-      +'<div style="font-size:11px;font-weight:700;color:var(--text-light);background:var(--gray-bg);padding:3px 8px;border-radius:6px">'+weekLbl+'</div>'
-      +'<div style="font-size:11px;color:var(--text-light)">Session '+sNum+'</div>'
-      +'<input type="date" class="field-input" id="'+sid+'-date" value="'+dStr+'" style="flex:1;font-size:12px;padding:5px 8px;min-width:0">'
-      +'</div>'
-      // Attendance: P / Absent-Informed / Absent-Not Reachable
-      +'<div style="margin-bottom:8px">'
-      +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-bottom:5px">Present (P) / Absent (A)</div>'
-      +'<div style="display:flex;gap:6px">'
-      +'<button type="button" id="'+sid+'-P" onclick="rsSelectAtt(\''+sid+'\',\'P\')" '
-      +'style="flex:1;padding:8px 4px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#374151">P<br><span style="font-size:9px;font-weight:400">Present</span></button>'
-      +'<button type="button" id="'+sid+'-AI" onclick="rsSelectAtt(\''+sid+'\',\'AI\')" '
-      +'style="flex:1;padding:8px 4px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#374151">A<br><span style="font-size:9px;font-weight:400">Absent-Informed</span></button>'
-      +'<button type="button" id="'+sid+'-ANR" onclick="rsSelectAtt(\''+sid+'\',\'ANR\')" '
-      +'style="flex:1;padding:8px 4px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#374151">A<br><span style="font-size:9px;font-weight:400">Absent-NR</span></button>'
-      +'</div></div>'
-      // Activities (shown when Present)
-      +'<div id="'+sid+'-acts" style="display:none;margin-top:8px">'
-      +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-bottom:5px">Session Activities ✓</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
-      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-aud" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Audition</label>'
-      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-spe" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Speech</label>'
-      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-lan" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Language</label>'
-      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-cog" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Cognition</label>'
-      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-par" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Parent guidance</label>'
-      +'</div></div>'
-      +'</div>';
-  }
-  slotsHTML += '</div>';
-
-  // ── Mapping section (monthly) ────────────────────────────────
-  var mappingHTML =
-    '<div class="form-section" style="margin:0 16px">'
-    +'<div class="form-section-title">🎧 Mapping (if done this week)</div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Mapping date</div><input type="date" class="field-input" id="rs-mapdate"></div>'
-    +'<div class="field"><div class="field-label">No. of maps done</div><input type="number" class="field-input" id="rs-mapcount" min="0" max="10" placeholder="e.g. 1"></div>'
-    +'</div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Sound field test</div>'
-    +'<div class="radio-group" id="rs-soundfield" style="flex-direction:row;gap:6px">'
-    +'<div class="radio-item" onclick="selectRadio(this,\'rs-soundfield\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
-    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-soundfield\')" style="flex:1"><div class="radio-dot"></div>No</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">ECAP done</div>'
-    +'<div class="radio-group" id="rs-ecap" style="flex-direction:row;gap:6px">'
-    +'<div class="radio-item" onclick="selectRadio(this,\'rs-ecap\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
-    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-ecap\')" style="flex:1"><div class="radio-dot"></div>No</div>'
-    +'</div></div>'
-    +'</div>'
-    +'<div class="field"><div class="field-label">Issues in mapping / device status</div>'
-    +'<input class="field-input" id="rs-devicestatus" placeholder="None / describe issues with sutures, coil, processor..."></div>'
-    +'</div>';
-
-  // ── Progress + notes ─────────────────────────────────────────
-  var progressHTML =
-    '<div class="form-section" style="margin:0 16px">'
-    +'<div class="form-section-title">📊 Progress This Week</div>'
-    +'<div class="field"><div class="field-label">Child\'s overall response</div>'
-    +'<div class="radio-group" id="rs-progress">'
-    +'<div class="radio-item" onclick="selectRadio(this,\'rs-progress\')"><div class="radio-dot"></div>Excellent — exceeding expectations</div>'
-    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-progress\')"><div class="radio-dot"></div>Good — on track</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,\'rs-progress\')"><div class="radio-dot"></div>Fair — needs more attention</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,\'rs-progress\')"><div class="radio-dot"></div>Poor — significant difficulty</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">Current milestone</div>'
-    +'<select class="field-input" id="rs-milestone">'
-    +'<option value="">Select milestone...</option>'
-    +'<option>Detection — responds to sounds</option>'
-    +'<option>Discrimination — distinguishes sounds</option>'
-    +'<option>Identification — recognises familiar words</option>'
-    +'<option>Comprehension — understands spoken language</option>'
-    +'<option>Verbal expression — producing speech</option>'
-    +'<option>Age-appropriate communication</option>'
-    +'</select></div>'
-    +'<div class="field"><div class="field-label">Parent guidance done</div>'
-    +'<div class="radio-group" id="rs-parentguidance" style="flex-direction:row;gap:6px">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-parentguidance\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,\'rs-parentguidance\')" style="flex:1"><div class="radio-dot"></div>No</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">Video recorded (3 min)</div>'
-    +'<div class="radio-group" id="rs-video" style="flex-direction:row;gap:6px">'
-    +'<div class="radio-item" onclick="selectRadio(this,\'rs-video\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
-    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-video\')" style="flex:1"><div class="radio-dot"></div>No</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">Notes / observations</div>'
-    +'<textarea class="field-input" id="rs-notes" rows="3" placeholder="Child\'s response, parent feedback, observations this week..."></textarea></div>'
-    +'<div class="field"><div class="field-label">Issues to flag</div>'
-    +'<textarea class="field-input" id="rs-issues" rows="2" placeholder="Device issues, attendance concerns, family situation..."></textarea></div>'
-    +'</div>';
-
-  // ── Submit ───────────────────────────────────────────────────
-  var submitHTML =
-    '<div style="padding:0 16px 40px">'
-    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
-    +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="rs-submit-btn">Save Weekly Log →</button>'
-    +'</div>';
-
   document.getElementById('rs-body').innerHTML =
-    alertHTML + infoHTML + journeyHTML + commonHTML + slotsHTML + mappingHTML + progressHTML + submitHTML;
+    alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + mappingHTML + submitHTML;
 
   showScreen('rehabsession');
 }
@@ -4367,6 +4344,80 @@ document.addEventListener('change', function(e) {
     if (sec) sec.style.display = (e.target.value === '4') ? '' : 'none';
   }
 });
+// ── Table-row helpers for new 14-row monthly form ────────────────────
+function rsRowAtt(rowIdx, val) {
+  // Activity dots: enable/disable based on P or not
+  ['aud','spe','lan','cog','par'].forEach(function(act) {
+    var dot = document.getElementById('rs-'+act+'-'+rowIdx);
+    if (!dot) return;
+    if (val === 'P') {
+      dot.classList.remove('off');
+      // Auto-tick all when marked Present for first time
+      if (dot.textContent === '—') { dot.classList.add('tick'); dot.textContent = '\u2713'; }
+    } else {
+      dot.classList.remove('tick','na');
+      dot.classList.add('off');
+      dot.textContent = '—';
+    }
+  });
+  // Session number — count running P rows
+  var sessStart = window._rs_sessStart || 1;
+  var pCount = 0;
+  for (var i = 0; i <= rowIdx; i++) {
+    var sel = document.getElementById('rs-att-'+i);
+    if (sel && sel.value === 'P') pCount++;
+  }
+  var snEl = document.getElementById('rs-snum-'+rowIdx);
+  if (snEl) snEl.textContent = (val === 'P') ? (sessStart + pCount - 1) : '';
+  // Recalculate all session numbers below this row too
+  var runningP = 0;
+  for (var j = 0; j < 14; j++) {
+    var s = document.getElementById('rs-att-'+j);
+    var sn = document.getElementById('rs-snum-'+j);
+    if (!s || !sn) continue;
+    if (s.value === 'P') { runningP++; sn.textContent = sessStart + runningP - 1; }
+    else sn.textContent = '';
+  }
+  // Update total footer
+  rsUpdateTotal();
+}
+function rsDotTap(el) {
+  if (el.classList.contains('off')) return;
+  if (el.classList.contains('tick')) {
+    el.classList.remove('tick'); el.classList.add('na'); el.textContent = 'NA';
+  } else if (el.classList.contains('na')) {
+    el.classList.remove('na'); el.textContent = '—';
+  } else {
+    el.classList.add('tick'); el.textContent = '\u2713';
+  }
+}
+function rsUpdateTotal() {
+  var present = 0, possible = 0;
+  for (var i = 0; i < 14; i++) {
+    var s = document.getElementById('rs-att-'+i);
+    if (!s || s.value === '') continue;
+    if (s.value !== 'H') possible++;
+    if (s.value === 'P') present++;
+  }
+  var el = document.getElementById('rs-total');
+  if (el) el.textContent = present + ' / ' + possible + ' attended';
+}
+function rsUpdateQtrMonth() {
+  var radio = document.querySelector('input[name="rs-qtr"]:checked');
+  if (!radio) return;
+  var qtr = parseInt(radio.value);
+  window._rs_sessStart = (qtr-1)*26 + 1;
+  // Recalculate all visible session numbers
+  var runningP = 0;
+  for (var j = 0; j < 14; j++) {
+    var s = document.getElementById('rs-att-'+j);
+    var sn = document.getElementById('rs-snum-'+j);
+    if (!s || !sn) continue;
+    if (s.value === 'P') { runningP++; sn.textContent = window._rs_sessStart + runningP - 1; }
+    else sn.textContent = '';
+  }
+}
+
 // ── Original slot-based rsSelectAtt (used in openRehabSession) ────────
 function rsSelectAtt(sid, val) {
   // val: 'P', 'AI' (Absent-Informed), 'ANR' (Absent-Not Reachable)

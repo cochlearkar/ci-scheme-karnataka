@@ -436,7 +436,7 @@ html:'<div style="min-height:554px;background:var(--green-dark);display:flex;fle
 
 // ── AUTO-PLAY ENGINE ──────────────────────────────────────────────────────────
 var autoInterval = null;
-var AUTO_DURATION = 9000; // 9 seconds per slide — optimised for video recording
+var AUTO_DURATION = 6000;
 var autoPlaying = false;
 
 function toggleAuto() {
@@ -473,43 +473,47 @@ function startDemo() {
   document.getElementById('splash').style.display = 'none';
   var outer = document.getElementById('demo-outer');
   outer.style.display = 'flex';
-  render();
-  autoPlaying = true;
-  document.getElementById('btn-auto').textContent = '⏸';
-  startAuto();
+  // Wait one frame so outer is painted before render touches its children
+  setTimeout(function() {
+    render();
+    autoPlaying = true;
+    var btn = document.getElementById('btn-auto');
+    if (btn) btn.textContent = '⏸';
+    startAuto();
+  }, 50);
 }
 
 function render() {
   var s = SLIDES[current];
   var el = document.getElementById('slide-content');
-  el.classList.add('fade');
+  if (!el) return;
+
+  // Fade out → swap content → fade in
+  el.style.transition = 'opacity 0.4s';
+  el.style.opacity = '0';
+
   setTimeout(function() {
-    el.style.position = 'relative';
-    // Caption bar at bottom showing slide label
-    var caption = '<div style="position:fixed;bottom:8px;left:0;right:0;z-index:40;padding:0 16px">'
+    var caption = '<div style="position:fixed;bottom:8px;left:0;right:0;z-index:40;padding:0 14px">'
       + '<div style="background:rgba(10,61,46,.88);backdrop-filter:blur(6px);border-radius:12px;'
-      + 'padding:8px 16px;text-align:center;color:rgba(255,255,255,.9);font-size:12px;font-weight:500;'
+      + 'padding:8px 14px;text-align:center;color:rgba(255,255,255,.9);font-size:11px;font-weight:500;'
       + 'line-height:1.4">' + s.label + '</div></div>';
     el.innerHTML = s.html + caption;
-    el.classList.remove('fade');
-  }, 150);
+    el.style.opacity = '1';
+  }, 300);
 
-  document.getElementById('slide-label').textContent = s.label;
+  // Update overlays safely
   var ctr = document.getElementById('slide-counter-text');
-  if (ctr) ctr.textContent = (current+1) + ' / ' + SLIDES.length;
+  if (ctr) ctr.textContent = (current + 1) + ' / ' + SLIDES.length;
   var numEl = document.getElementById('slide-num-overlay');
-  if (numEl) numEl.textContent = (current+1) + ' / ' + SLIDES.length;
+  if (numEl) numEl.textContent = (current + 1) + ' / ' + SLIDES.length;
   var pf = document.getElementById('progress-fill');
-  if (pf) pf.style.width = Math.round(((current+1)/SLIDES.length)*100) + '%';
-
-
+  if (pf) pf.style.width = Math.round(((current + 1) / SLIDES.length) * 100) + '%';
   var dots = document.getElementById('dots');
-  if (!dots) return;
-  dots.innerHTML = SLIDES.map(function(_, i) {
-    var cls = i===current?'dot active':i<current?'dot done':'dot';
-    return '<div class="'+cls+'" onclick="goTo('+i+')"></div>';
+  if (dots) dots.innerHTML = SLIDES.map(function(_, i) {
+    return '<div class="' + (i === current ? 'dot active' : i < current ? 'dot done' : 'dot') + '" onclick="goTo(' + i + ')"></div>';
   }).join('');
 }
+
 
 function nextSlide() {
   if (current < SLIDES.length - 1) { current++; }

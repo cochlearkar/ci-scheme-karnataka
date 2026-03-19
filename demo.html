@@ -2,546 +2,687 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Shravan Sanjeevini — Application Demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Shravan Sanjeevini — Walkthrough</title>
 <style>
-:root {
-  --green-dark:#0a3d2e;--green:#1a6b4a;--green-mid:#1D9E75;--green-light:#E1F5EE;--green-border:#9FE1CB;
-  --blue:#1a4a7a;--blue-mid:#378ADD;--blue-light:#E6F1FB;
-  --amber:#8a5a0a;--amber-mid:#EF9F27;--amber-light:#FAEEDA;
-  --red:#A32D2D;--red-light:#FCEBEB;--purple:#4a2a7a;
-  --surface:#fffcf8;--border:#e8e4dc;--text:#1a1612;--text-light:#8a8278;--gray:#f5f3ef;
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;600&family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap');
+
+:root{
+  --g:#0a3d2e;--gm:#1D9E75;--gl:#E1F5EE;--gb:#9FE1CB;
+  --b:#1a4a7a;--bm:#378ADD;--bl:#E6F1FB;
+  --a:#7a4f1a;--am:#EF9F27;--al:#FFF8EE;
+  --r:#A32D2D;--rl:#FCEBEB;
+  --p:#4a2a7a;--pm:#7F77DD;--pl:#EEEDFE;
+  --s:#fffcf8;--br:#e8e4dc;--t:#1a1612;--tl:#8a8278;--gr:#f5f3ef;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--green-dark);min-height:100vh;overflow-x:hidden;}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;background:#0a3d2e;}
 
-/* ── MOBILE: full screen slide, no phone frame ── */
-.outer{display:flex;flex-direction:column;align-items:center;min-height:100vh;}
-.phone{width:100%;background:var(--surface);min-height:100vh;position:relative;}
-.phone-notch{display:none;}
-.phone-content{min-height:calc(100vh - 100px);overflow:hidden;transition:opacity .5s;}
-.phone-content.fade{opacity:0;}
-
-/* bottom controls bar — fixed at bottom on mobile */
-.bottom-ui{position:fixed;bottom:0;left:0;right:0;background:transparent;padding:10px 16px 14px;z-index:100;pointer-events:none;}
-.progress-bar{width:100%;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin-bottom:0;}
-.progress-fill{height:100%;background:var(--green-mid);border-radius:2px;transition:width .6s ease;}
-.progress-fill{height:100%;background:var(--green-mid);border-radius:2px;transition:width .4s;}
-.bottom-row{display:none;}
-.slide-counter{font-size:11px;color:rgba(255,255,255,.55);flex-shrink:0;}
-.dots{display:flex;gap:5px;flex:1;justify-content:center;flex-wrap:wrap;}
-.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);cursor:pointer;transition:all .2s;flex-shrink:0;}
-.dot.active{background:#fff;transform:scale(1.4);}
-.dot.done{background:rgba(255,255,255,.5);}
-
-/* controls-row is just the play button on mobile */
-.controls-row{display:flex;justify-content:center;margin-top:0;}
-.ctrl-btn{border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;padding:8px 20px;background:var(--green-mid);color:#fff;}
-.ctrl-btn.active{background:#1a6b4a;}
-
-/* splash screen (shown before play) */
-.splash{position:fixed;inset:0;background:var(--green-dark);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;z-index:200;}
-.splash h1{color:#fff;font-size:24px;font-weight:700;margin:16px 0 6px;}
-.splash p{color:rgba(255,255,255,.6);font-size:13px;line-height:1.6;margin-bottom:32px;}
-.play-btn{background:var(--green-mid);color:#fff;border:none;border-radius:50px;padding:16px 40px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 8px 32px rgba(29,158,117,.4);}
-.play-btn:active{transform:scale(.97);}
-.splash-creds{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px 16px;width:100%;max-width:320px;text-align:left;margin-top:24px;}
-.creds-title{color:rgba(255,255,255,.5);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
-.creds-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid rgba(255,255,255,.1);}
-.creds-row:last-child{border:none;}
-.creds-role{font-size:12px;color:rgba(255,255,255,.75);}
-.creds-val{font-size:11px;color:#fff;font-family:monospace;background:rgba(255,255,255,.12);padding:2px 8px;border-radius:4px;}
-
-/* slide label — inside the slide at top as a small badge */
-.slide-badge{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(10,61,46,.7);color:rgba(255,255,255,.8);font-size:10px;padding:3px 12px;border-radius:20px;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}
-
-/* desktop: keep phone frame look */
-@media (min-width:480px){
-  body{display:flex;align-items:flex-start;justify-content:center;padding:24px 16px 60px;}
-  .outer{width:100%;max-width:400px;}
-  .phone{border-radius:32px;min-height:600px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5);border:6px solid #1a1a1a;}
-  .phone-notch{display:flex;height:24px;background:#111;align-items:center;justify-content:center;}
-  .phone-notch-pill{width:70px;height:7px;background:#333;border-radius:4px;}
-  .phone-content{min-height:554px;}
-  .bottom-ui{position:static;background:transparent;padding:12px 0 0;}
-  .splash{border-radius:28px;position:relative;inset:auto;padding:40px 28px;}
+/* ── STAGE ── */
+#stage{
+  position:fixed;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
 }
 
-/* hide demo-header on mobile (shown in splash instead) */
-.demo-header{display:none;}
-@media (min-width:480px){.demo-header{display:block;text-align:center;padding:0 0 16px;color:#fff;}
-.demo-header h1{font-size:18px;font-weight:700;}.demo-header p{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;}}
+/* ── ROLE HUB — fills phone exactly like login screen ── */
+#hub{
+  position:absolute;
+  width:100%;height:100%;
+  overflow:hidden;
+  transition:transform 1s cubic-bezier(.4,0,.2,1), opacity 0.6s;
+}
+.role-tile{
+  position:relative;overflow:hidden;
+  cursor:pointer;
+  transition:transform 0.15s;
+}
+.role-tile:active{transform:scale(.97);}
+/* Highlight colours per role — match the app exactly */
+.role-tile.active-tile#tile-h{border-color:#1D9E75!important;background:#E1F5EE!important;}
+.role-tile.active-tile#tile-r{border-color:#378ADD!important;background:#E6F1FB!important;}
+.role-tile.active-tile#tile-d{border-color:#EF9F27!important;background:#FFF8EE!important;}
+.role-tile.active-tile#tile-s{border-color:#7F77DD!important;background:#EEEDFE!important;}
+.pulse-ring{
+  position:absolute;inset:-2px;border-radius:14px;
+  border:2px solid transparent;
+  animation:pulse 1.5s ease-in-out infinite;
+  opacity:0;pointer-events:none;
+}
+.role-tile.active-tile#tile-h .pulse-ring{border-color:#1D9E75;opacity:1;}
+.role-tile.active-tile#tile-r .pulse-ring{border-color:#378ADD;opacity:1;}
+.role-tile.active-tile#tile-d .pulse-ring{border-color:#EF9F27;opacity:1;}
+.role-tile.active-tile#tile-s .pulse-ring{border-color:#7F77DD;opacity:1;}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:0;}50%{transform:scale(1.04);opacity:1;}}
 
-.slide-label{display:none;}
-.app-link{display:none;}
-/* ── SCREEN COMPONENTS ── */
-.sh{padding:13px 15px 11px;color:#fff;}
-.sh.green{background:var(--green-dark);}
-.sh.blue{background:var(--blue);}
-.sh.amber{background:#7a4f1a;}
-.sh.purple{background:var(--purple);}
-.sh.wa{background:#128C7E;}
-.sh-title{font-size:15px;font-weight:600;}
-.sh-sub{font-size:10px;opacity:.65;margin-top:1px;}
-.chip-b{display:inline-block;background:rgba(255,255,255,.18);color:#fff;padding:2px 9px;border-radius:9px;font-size:10px;font-weight:600;margin-top:5px;}
-.bp{padding:12px 14px;}
-.slbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-light);margin:10px 0 6px;}
-.slbl:first-child{margin-top:0;}
-.ac{background:var(--surface);border:.5px solid var(--border);border-radius:11px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;}
-.ac.pr{background:var(--red);border-color:var(--red);}
-.ac.pg{background:var(--green-dark);border-color:var(--green-dark);}
-.ac.pb{background:var(--blue);border-color:var(--blue);}
-.ac.pp{background:var(--purple);border-color:var(--purple);}
-.ac.gd{background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none;}
-.ac.gr{background:linear-gradient(135deg,#0a3d2e,#1a6b4a);border:none;}
+/* ── PHONE — the zoomed-in screen ── */
+#phone-wrap{
+  position:absolute;
+  width:100%;height:100%;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity 0.4s;
+}
+#phone-wrap.visible{opacity:1;pointer-events:all;}
+.phone-frame{
+  width:min(360px,94vw);
+  height:min(640px,88vh);
+  background:var(--s);
+  border-radius:28px;
+  overflow:hidden;
+  box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);
+  position:relative;
+  display:flex;flex-direction:column;
+}
+.phone-bar{
+  height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.phone-pill{width:64px;height:6px;border-radius:3px;background:rgba(255,255,255,.3);}
+#phone-screen{flex:1;overflow:hidden;position:relative;}
+
+/* ── CAPTION ── */
+#caption-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:10px 16px 16px;
+  background:linear-gradient(transparent,rgba(10,61,46,.95));
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  z-index:100;
+  opacity:0;transition:opacity 0.4s;
+}
+#caption-bar.show{opacity:1;}
+#caption-text{
+  color:#fff;font-size:13px;font-weight:500;text-align:center;
+  background:rgba(0,0,0,.35);padding:7px 16px;border-radius:20px;
+  line-height:1.4;max-width:340px;
+}
+#progress-track{
+  width:min(340px,90vw);height:3px;
+  background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden;
+}
+#progress-fill{
+  height:100%;background:var(--gm);border-radius:2px;
+  transition:width 0.3s linear;
+}
+#slide-info{
+  color:rgba(255,255,255,.45);font-size:10px;
+}
+
+/* ── SPLASH ── */
+#splash{
+  position:fixed;inset:0;z-index:200;
+  background:var(--g);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px 24px;text-align:center;
+}
+.splash-icon{font-size:64px;margin-bottom:16px;animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+.splash-title{
+  font-family:'DM Serif Display',serif;
+  color:#fff;font-size:28px;margin-bottom:6px;
+}
+.splash-sub{color:rgba(255,255,255,.55);font-size:13px;line-height:1.6;margin-bottom:32px;}
+.play-btn{
+  background:var(--gm);color:#fff;border:none;
+  border-radius:50px;padding:16px 44px;
+  font-size:16px;font-weight:700;cursor:pointer;
+  font-family:'DM Sans',sans-serif;
+  box-shadow:0 8px 32px rgba(29,158,117,.45);
+  transition:transform .15s, box-shadow .15s;
+  letter-spacing:.3px;
+}
+.play-btn:active{transform:scale(.97);box-shadow:0 4px 16px rgba(29,158,117,.3);}
+.splash-creds{
+  margin-top:28px;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.12);border-radius:16px;
+  padding:16px 20px;width:100%;max-width:320px;text-align:left;
+}
+.sc-title{color:rgba(255,255,255,.45);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+.sc-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:.5px solid rgba(255,255,255,.08);}
+.sc-row:last-child{border:none;}
+.sc-role{font-size:12px;color:rgba(255,255,255,.7);}
+.sc-val{font-size:11px;color:#fff;font-family:monospace;background:rgba(255,255,255,.12);padding:2px 8px;border-radius:5px;}
+
+/* ── MINI APP STYLES (inside phone) ── */
+.mh{padding:13px 15px 10px;color:#fff;flex-shrink:0;}
+.mh.g{background:var(--g);}
+.mh.b{background:var(--b);}
+.mh.a{background:#7a4f1a;}
+.mh.p{background:var(--p);}
+.mh.w{background:#128C7E;}
+.mh-row{display:flex;align-items:center;gap:10px;}
+.back{background:rgba(255,255,255,.18);border-radius:7px;padding:3px 10px;font-size:15px;}
+.mht{font-size:15px;font-weight:600;}
+.mhs{font-size:10px;opacity:.6;margin-top:1px;}
+.chip{display:inline-block;background:rgba(255,255,255,.18);color:#fff;padding:2px 10px;border-radius:9px;font-size:10px;font-weight:600;margin-top:5px;}
+.bp{padding:12px 14px;overflow-y:auto;flex:1;}
+.sg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px;}
+.sb{background:var(--s);border:.5px solid var(--br);border-radius:9px;padding:9px;text-align:center;}
+.sn{font-size:18px;font-weight:700;}
+.sl{font-size:8px;color:var(--tl);text-transform:uppercase;font-weight:600;margin-top:1px;}
+.lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--tl);margin:10px 0 6px;}
+.ac{background:var(--s);border:.5px solid var(--br);border-radius:11px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;}
+.ac.pr{background:var(--r);border-color:var(--r);}
+.ac.pg{background:var(--g);}
+.ac.pb{background:var(--b);}
+.ac.pp{background:var(--p);}
 .ac.gw{background:linear-gradient(135deg,#128C7E,#25D366);border:none;}
-.ac.ga{background:linear-gradient(135deg,#7a4f1a,#b87333);border:none;}
+.ac.ga{background:linear-gradient(135deg,#7a4f1a,#b87a2a);border:none;}
 .ai{font-size:20px;flex-shrink:0;}
 .at{font-size:12px;font-weight:600;}
-.ad{font-size:10px;opacity:.7;margin-top:1px;}
+.ad{font-size:10px;margin-top:1px;opacity:.7;}
 .w{color:#fff;}.w.ad{opacity:.8;}
-.ar{margin-left:auto;font-size:14px;opacity:.45;}
-.srow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:10px;}
-.sb{background:var(--surface);border:.5px solid var(--border);border-radius:9px;padding:9px;text-align:center;}
-.sn{font-size:19px;font-weight:700;}
-.sl{font-size:8px;color:var(--text-light);text-transform:uppercase;font-weight:600;margin-top:1px;}
-.cc{background:var(--surface);border:.5px solid var(--border);border-radius:9px;padding:10px 11px;margin-bottom:6px;border-left:4px solid transparent;}
-.cc.r{border-left-color:var(--red);}
-.cc.g{border-left-color:var(--green-mid);}
+.arr{margin-left:auto;opacity:.4;font-size:14px;}
+.cc{background:var(--s);border:.5px solid var(--br);border-radius:9px;padding:10px 11px;margin-bottom:6px;border-left:4px solid transparent;}
+.cc.r{border-left-color:var(--r);}
+.cc.g2{border-left-color:var(--gm);}
+.cc.b2{border-left-color:var(--bm);}
+.cc.a2{border-left-color:var(--am);}
 .cn{font-size:12px;font-weight:500;}
-.cs{font-size:10px;color:var(--text-light);margin-top:2px;}
+.cs{font-size:10px;color:var(--tl);margin-top:2px;}
 .pill{display:inline-block;padding:2px 7px;border-radius:7px;font-size:9px;font-weight:600;margin-top:3px;}
-.pr2{background:#FCEBEB;color:var(--red);}
-.pg2{background:var(--green-light);color:var(--green);}
-.pb2{background:var(--blue-light);color:var(--blue);}
-.pa2{background:#FAEEDA;color:var(--amber);}
-.pp2{background:#EEEDFE;color:var(--purple);}
+.pr2{background:var(--rl);color:var(--r);}
+.pg2{background:var(--gl);color:var(--g);}
+.pb2{background:var(--bl);color:var(--b);}
+.pa2{background:var(--al);color:var(--a);}
+.pp2{background:var(--pl);color:var(--p);}
 .ic{border-radius:9px;padding:11px 13px;margin-bottom:9px;}
 .ig{display:grid;grid-template-columns:1fr 1fr;gap:5px 9px;margin-top:7px;}
-.il{font-size:8px;font-weight:700;text-transform:uppercase;opacity:.65;}
+.il{font-size:8px;font-weight:700;text-transform:uppercase;opacity:.6;}
 .iv{font-size:11px;font-weight:500;margin-top:1px;}
-.fs{background:var(--surface);border:.5px solid var(--border);border-radius:9px;padding:10px 13px;margin-bottom:7px;}
-.ft{font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-bottom:6px;}
+.fs{background:var(--s);border:.5px solid var(--br);border-radius:9px;padding:10px 13px;margin-bottom:7px;}
+.ft{font-size:9px;font-weight:700;color:var(--tl);text-transform:uppercase;margin-bottom:6px;}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:6px;}
-.fl{font-size:9px;color:var(--text-light);margin-bottom:2px;}
+.fl{font-size:9px;color:var(--tl);margin-bottom:2px;}
 .fv{font-size:11px;font-weight:500;}
-.ts{display:flex;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--border);}
-.tab{padding:8px 11px;font-size:10px;color:var(--text-light);white-space:nowrap;border-bottom:2px solid transparent;}
-.tab.a{color:var(--green-dark);border-bottom-color:var(--green-dark);font-weight:600;}
-.pi{display:flex;align-items:center;gap:7px;padding:7px 0;border-bottom:.5px solid var(--border);}
-.pd{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.pbw{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
-.pb3{height:100%;border-radius:2px;}
-.j{display:flex;align-items:center;overflow-x:auto;padding:6px 0;}
+.tab-strip{display:flex;overflow-x:auto;background:var(--s);border-bottom:1px solid var(--br);scrollbar-width:none;}
+.tab{padding:8px 11px;font-size:10px;color:var(--tl);white-space:nowrap;border-bottom:2px solid transparent;flex-shrink:0;}
+.tab.on{color:var(--g);border-bottom-color:var(--g);font-weight:600;}
+.j{display:flex;align-items:center;overflow-x:auto;padding:6px 0;scrollbar-width:none;}
 .jstep{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
-.jc{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;background:var(--surface);}
-.jc.done{background:var(--green-mid);border-color:var(--green-mid);color:#fff;}
-.jc.act{background:var(--blue-light);border-color:var(--blue-mid);color:var(--blue);}
-.jl{font-size:7px;color:var(--text-light);margin-top:2px;text-align:center;max-width:32px;}
-.jline{width:18px;height:2px;background:var(--border);flex-shrink:0;margin-top:-9px;}
-.jline.done{background:var(--green-mid);}
-.sc2{background:#fff;border:1px solid #c4b8f8;border-radius:9px;padding:9px 11px;margin-bottom:7px;}
-.st2{font-size:9px;font-weight:700;color:var(--purple);text-transform:uppercase;margin-bottom:5px;}
-.hr{display:flex;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);gap:7px;}
-.hdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.hn{flex:1;font-size:10px;font-weight:500;}
-.wa-prev{background:#ECE5DD;padding:10px;border-radius:9px;margin:7px 0;}
+.jc{width:24px;height:24px;border-radius:50%;border:2px solid var(--br);display:flex;align-items:center;justify-content:center;font-size:9px;background:var(--s);}
+.jc.done{background:var(--gm);border-color:var(--gm);color:#fff;}
+.jc.act{background:var(--bl);border-color:var(--bm);color:var(--b);}
+.jl2{font-size:7px;color:var(--tl);margin-top:2px;text-align:center;max-width:30px;}
+.jline{width:16px;height:2px;background:var(--br);flex-shrink:0;margin-top:-8px;}
+.jline.done{background:var(--gm);}
+.sc3{background:#fff;border:1px solid #c4b8f8;border-radius:9px;padding:9px 11px;margin-bottom:7px;}
+.st3{font-size:9px;font-weight:700;color:var(--p);text-transform:uppercase;margin-bottom:5px;}
+.scorebar{height:5px;background:var(--br);border-radius:3px;overflow:hidden;margin:3px 0;}
+.scorefill{height:100%;border-radius:3px;}
+.scgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;}
+.scbtn{text-align:center;padding:4px 2px;border:1px solid var(--br);border-radius:5px;font-size:8px;}
+.scbtn.on{background:var(--p);border-color:var(--p);color:#fff;}
+.pi{display:flex;align-items:center;gap:7px;padding:7px 0;border-bottom:.5px solid var(--br);}
+.pdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.pbar{flex:1;height:4px;background:var(--br);border-radius:2px;overflow:hidden;}
+.pfill{height:100%;border-radius:2px;}
+.wa-bg{background:#ECE5DD;padding:10px;border-radius:9px;margin:7px 0;}
 .wa-bub{background:#fff;border-radius:7px 7px 7px 0;padding:9px 11px;font-size:11px;line-height:1.5;color:#1a1a1a;max-width:92%;box-shadow:0 1px 2px rgba(0,0,0,.1);}
 .wa-t{font-size:9px;color:#667781;margin-top:3px;text-align:right;}
+.ms{background:var(--s);border:.5px solid var(--br);border-radius:7px;padding:7px;text-align:center;}
+.mn{font-size:14px;font-weight:700;}
+.ml{font-size:8px;color:var(--tl);text-transform:uppercase;font-weight:600;margin-top:1px;}
 </style>
 </head>
 <body>
-<!-- SPLASH SCREEN -->
-<div class="splash" id="splash">
-  <div style="font-size:56px;margin-bottom:8px">🦻</div>
-  <h1>Shravan Sanjeevini</h1>
-  <p>Karnataka Cochlear Implant Programme · NPPCD<br>Application Walkthrough<br><span style="font-size:11px;opacity:.6">12 screens · ~2 minutes</span></p>
-  <button class="play-btn" onclick="startDemo()">▶ Play Demo</button>
+
+<!-- SPLASH -->
+<div id="splash">
+  <div class="splash-icon">🦻</div>
+  <div class="splash-title">Shravan Sanjeevini</div>
+  <div class="splash-sub">Karnataka Cochlear Implant Programme · NPPCD<br>Application Walkthrough · 4 Roles · ~90 seconds</div>
+  <button class="play-btn" onclick="startWalkthrough()">▶ Watch Walkthrough</button>
   <div class="splash-creds">
-    <div class="creds-title">🔑 Demo Login · Password: Demo@2025</div>
-    <div class="creds-row"><span class="creds-role">🏥 Hospital</span><span class="creds-val">demo_hospital</span></div>
-    <div class="creds-row"><span class="creds-role">🎧 Rehab</span><span class="creds-val">demo_rehab</span></div>
-    <div class="creds-row"><span class="creds-role">📍 District</span><span class="creds-val">demo_district</span></div>
-    <div class="creds-row" style="opacity:.5"><span class="creds-role">🌐 State</span><span style="font-size:10px;color:rgba(255,255,255,.5);font-style:italic">Request: cochlearkar@gmail.com</span></div>
+    <div class="sc-title">🔑 Demo Login · Password: Demo@2025</div>
+    <div class="sc-row"><span class="sc-role">🏥 Hospital</span><span class="sc-val">demo_hospital</span></div>
+    <div class="sc-row"><span class="sc-role">🎧 Rehab</span><span class="sc-val">demo_rehab</span></div>
+    <div class="sc-row"><span class="sc-role">📍 District</span><span class="sc-val">demo_district</span></div>
+    <div class="sc-row" style="opacity:.5"><span class="sc-role">🌐 State</span><span style="font-size:10px;color:rgba(255,255,255,.4);font-style:italic">Request: cochlearkar@gmail.com</span></div>
   </div>
-  <a href="https://cochlearkar.github.io/ci-scheme-karnataka/" target="_blank"
-    style="margin-top:16px;color:rgba(255,255,255,.5);font-size:12px;text-decoration:none">
-    🚀 Or open the app directly
-  </a>
 </div>
 
-<!-- DEMO SCREEN (hidden until Play is tapped) -->
-<div id="demo-outer" style="display:none;flex-direction:column;min-height:100vh">
+<!-- STAGE -->
+<div id="stage">
 
-  <!-- slide fills the screen -->
-  <div class="phone-content" id="slide-content" style="position:relative;flex:1"></div>
-
-  <!-- slide number overlay — top right -->
-  <div id="slide-num-overlay" style="position:fixed;top:12px;right:12px;background:rgba(0,0,0,.35);
-    color:rgba(255,255,255,.7);font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;
-    z-index:60;pointer-events:none">1 / 12</div>
-
-  <!-- fixed bottom bar -->
-  <div class="bottom-ui" id="bottom-ui">
-    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:8%"></div></div>
-    <div class="bottom-row">
-      <span class="slide-counter" id="slide-counter-text">1 / 12</span>
-      <div class="dots" id="dots"></div>
-      <button class="ctrl-btn" id="btn-auto" onclick="toggleAuto()">⏸</button>
+  <!-- ROLE HUB — matches exact login screen of the app -->
+  <div id="hub">
+    <!-- Green background fills phone -->
+    <div style="background:var(--g);width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;">
+      <div style="text-align:center;margin-bottom:28px;">
+        <div style="font-size:48px;margin-bottom:12px;">🦻</div>
+        <h1 style="color:#fff;font-size:20px;font-weight:700;letter-spacing:-.3px;">Shravan Sanjeevini</h1>
+        <p style="color:rgba(255,255,255,.55);font-size:12px;margin-top:5px;">Cochlear Implant Programme · NPPCD</p>
+      </div>
+      <!-- White card — exactly like the app -->
+      <div style="background:#fffcf8;border-radius:18px;padding:20px 18px;width:100%;max-width:320px;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Select your role</div>
+        <div style="font-size:11px;color:#8a8278;margin-bottom:16px;">Choose how you are connected to the programme</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">
+          <div class="role-tile" id="tile-h" style="border:1.5px solid #e8e4dc;border-radius:12px;padding:13px 10px;text-align:center;cursor:pointer;background:#fffcf8;">
+            <div class="pulse-ring"></div>
+            <div style="font-size:24px;margin-bottom:5px;">🏥</div>
+            <div style="font-size:12px;font-weight:500;color:#1a1612;">Hospital</div>
+            <div style="font-size:10px;color:#8a8278;margin-top:2px;">Surgery &amp; device data</div>
+          </div>
+          <div class="role-tile" id="tile-r" style="border:1.5px solid #e8e4dc;border-radius:12px;padding:13px 10px;text-align:center;cursor:pointer;background:#fffcf8;">
+            <div class="pulse-ring"></div>
+            <div style="font-size:24px;margin-bottom:5px;">🎧</div>
+            <div style="font-size:12px;font-weight:500;color:#1a1612;">Rehab Institute</div>
+            <div style="font-size:10px;color:#8a8278;margin-top:2px;">AVT session logs</div>
+          </div>
+          <div class="role-tile" id="tile-d" style="border:1.5px solid #e8e4dc;border-radius:12px;padding:13px 10px;text-align:center;cursor:pointer;background:#fffcf8;">
+            <div class="pulse-ring"></div>
+            <div style="font-size:24px;margin-bottom:5px;">📍</div>
+            <div style="font-size:12px;font-weight:500;color:#1a1612;">District Officer</div>
+            <div style="font-size:10px;color:#8a8278;margin-top:2px;">Follow-up &amp; field notes</div>
+          </div>
+          <div class="role-tile" id="tile-s" style="border:1.5px solid #e8e4dc;border-radius:12px;padding:13px 10px;text-align:center;cursor:pointer;background:#fffcf8;">
+            <div class="pulse-ring"></div>
+            <div style="font-size:24px;margin-bottom:5px;">🏛️</div>
+            <div style="font-size:12px;font-weight:500;color:#1a1612;">State Team</div>
+            <div style="font-size:10px;color:#8a8278;margin-top:2px;">Outcomes &amp; overview</div>
+          </div>
+        </div>
+        <div style="width:100%;margin-top:14px;padding:12px;background:#0a3d2e;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;text-align:center;opacity:.4;">Continue →</div>
+      </div>
     </div>
   </div>
+
+  <!-- PHONE (zoomed-in view) -->
+  <div id="phone-wrap">
+    <div class="phone-frame">
+      <div class="phone-bar" id="phone-bar" style="background:#111"><div class="phone-pill"></div></div>
+      <div id="phone-screen"></div>
+    </div>
+  </div>
+
+</div><!-- end stage -->
+
+<!-- CAPTION BAR -->
+<div id="caption-bar">
+  <div id="caption-text">Loading...</div>
+  <div id="progress-track"><div id="progress-fill" style="width:0%"></div></div>
+  <div id="slide-info">Slide 1 of 15</div>
 </div>
 
-
 <script>
-// ── MASKED DEMO DATA ──────────────────────────────────────────────────────────
-// Names shown as initials, mobiles masked — matching demo account behaviour
-var D = {
-  // Masked patient names
-  n1: 'V. K. G.', n2: 'F. A. A.', n3: 'S. K.',
-  n4: 'A. P.', n5: 'R. M.',
-  // Masked mobiles
-  m1: 'XXXXXX3210', m2: 'XXXXXX7654', m3: 'XXXXXX9876',
+// ── SCREENS ───────────────────────────────────────────────────────────────────
+function ir(l,v,c){return '<div><div class="il" style="color:'+(c||'var(--g)')+'">'+l+'</div><div class="iv" style="color:'+(c==='#7a4f1a'?c:'var(--t)')+'">'+v+'</div></div>';}
+function fd(l,v){return '<div><div class="fl">'+l+'</div><div class="fv">'+v+'</div></div>';}
+function js(ic,lb,dn,ac){return '<div class="jstep"><div class="jc'+(dn?' done':ac?' act':'')+'"><span style="font-size:9px">'+(dn?'✓':ic)+'</span></div><div class="jl2">'+lb+'</div></div>';}
+function jl(dn){return '<div class="jline'+(dn?' done':'')+'"></div>';}
+function sc4(n,en,sel){return '<div class="scbtn'+(sel?' on':'')+'"><b>'+n+'</b><br><span style="opacity:.7">'+en+'</span></div>';}
+
+var D={n1:'V. K. G.',n2:'F. A. A.',n3:'S. K.',n4:'A. P.',n5:'R. M.',m1:'XXXXXX3210'};
+
+var SCREENS = {
+
+hosp_home:`<div class="mh g"><div class="mht">🏥 JSS Hospital Demo</div><div class="mhs">Hospital · Shravan Sanjeevini</div><div class="chip">Hospital</div></div>
+<div class="bp">
+<div class="sg"><div class="sb"><div class="sn">34</div><div class="sl">Total</div></div><div class="sb"><div class="sn" style="color:var(--r)">29</div><div class="sl">Pending</div></div><div class="sb"><div class="sn" style="color:var(--gm)">5</div><div class="sl">Updated</div></div></div>
+<div class="lbl">Quick Action</div>
+<div class="ac pr"><div class="ai">🔴</div><div><div class="at w">29 cases need update</div><div class="ad w">Surgery & device details pending</div></div><div class="arr" style="color:#fff">→</div></div>
+<div class="ac"><div class="ai">✅</div><div><div class="at">5 updated</div><div class="ad">Surgery details submitted</div></div></div>
+<div class="ac"><div class="ai">📋</div><div class="at">Browse all cases</div><div class="arr">→</div></div>
+</div>`,
+
+hosp_cases:`<div class="mh g"><div class="mh-row"><div class="back">←</div><div><div class="mht">JSS Hospital — Cases</div><div class="mhs">Tap to update</div></div></div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 13px;background:var(--s);border-bottom:1px solid var(--br)">
+<div style="background:var(--rl);border-radius:7px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--r)">29</div><div style="font-size:8px;color:var(--r);font-weight:700;text-transform:uppercase">Needs Update</div></div>
+<div style="background:var(--gl);border-radius:7px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--gm)">5</div><div style="font-size:8px;color:var(--gm);font-weight:700;text-transform:uppercase">Updated ✓</div></div></div>
+<div class="bp">
+<div class="cc r"><div class="cn">`+D.n1+`</div><div class="cs">Card: 1 · 2022-2023</div><span class="pill pr2">⚠ Needs update</span></div>
+<div class="cc r"><div class="cn">`+D.n2+`</div><div class="cs">Card: 2 · 2024-2025</div><span class="pill pr2">⚠ Needs update</span></div>
+<div class="cc g2"><div class="cn">`+D.n3+`</div><div class="cs">Card: 3 · 2024-2025</div><span class="pill pg2">✓ Updated</span></div>
+</div>`,
+
+hosp_form:`<div class="mh g"><div class="mh-row"><div class="back">←</div><div><div class="mht">`+D.n1+`</div><div class="mhs">Card: 1</div></div></div></div>
+<div style="padding:7px 13px;background:#fff8e1;border-bottom:1px solid #FAC775;font-size:10px;color:var(--a)">⚠️ Locked permanently after submission</div>
+<div class="bp">
+<div class="ic" style="background:var(--gl);border:1px solid var(--gb)">
+<div style="font-size:8px;font-weight:700;color:var(--g);text-transform:uppercase">Patient Information</div>
+<div class="ig">`+ir('SAST Ref','COC-2022-001')+ir('FY','2022-2023')+ir('Name',D.n1)+ir('Gender','Female')+ir('District','MYSURU')+ir('Hospital','JSS Hospital')+`</div></div>
+<div class="fs"><div class="ft">Surgery Dates</div><div class="fr">`+fd('Admission','12-Nov-2022')+fd('Surgery','15-Nov-2022')+`</div><div class="fr">`+fd('Discharge','18-Nov-2022')+fd('Switch-on','22-Dec-2022')+`</div></div>
+<div class="fs"><div class="ft">Device Details</div><div class="fr">`+fd('Manufacturer','Cochlear Ltd')+fd('Serial No','CI-20221115')+`</div></div>
+<div style="background:var(--g);color:#fff;padding:11px;border-radius:9px;text-align:center;font-size:12px;font-weight:600;margin-top:8px">Submit & Lock →</div>
+</div>`,
+
+rehab_home:`<div class="mh b"><div class="mht">🎧 AIISH Bengaluru Demo</div><div class="mhs">Rehab Institute · Shravan Sanjeevini</div><div class="chip">Rehab</div></div>
+<div class="bp">
+<div class="sg"><div class="sb"><div class="sn">18</div><div class="sl">Assigned</div></div><div class="sb"><div class="sn" style="color:var(--gm)">11</div><div class="sl">Active</div></div><div class="sb"><div class="sn" style="color:var(--am)">7</div><div class="sl">Not started</div></div></div>
+<div class="lbl">Quick Action</div>
+<div class="ac pb"><div class="ai">🎧</div><div><div class="at w">Update Rehab Sessions</div><div class="ad w">Log today's AVT session</div></div><div class="arr" style="color:#fff">→</div></div>
+<div class="lbl">Recent Cases</div>
+<div class="cc b2"><div class="cn">`+D.n1+`</div><div class="cs">Session 8 of 54 · Last: 12-Mar-2025</div><span class="pill pb2">Rehab 1</span></div>
+<div class="cc g2"><div class="cn">`+D.n4+`</div><div class="cs">Session 42 of 54 · Last: 10-Mar-2025</div><span class="pill pg2">Rehab 2</span></div>
+<div class="cc a2"><div class="cn">`+D.n5+`</div><div class="cs">No sessions yet</div><span class="pill pa2">Not started</span></div>
+</div>`,
+
+rehab_session:`<div class="mh b"><div class="mh-row"><div class="back">←</div><div><div class="mht">Log Session</div><div class="mhs">`+D.n1+`· Session 9</div></div></div></div>
+<div class="bp">
+<div class="ic" style="background:var(--bl);border:1px solid #B5D4F4">
+<div style="font-size:8px;font-weight:700;color:var(--b);text-transform:uppercase">Session Progress</div>
+<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+<div style="flex:1;height:6px;background:var(--br);border-radius:3px;overflow:hidden"><div style="width:17%;height:100%;background:var(--bm);border-radius:3px"></div></div>
+<div style="font-size:11px;font-weight:600;color:var(--b)">9 / 54</div></div>
+<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">`+[1,2,3,4,5,6,7,8].map(n=>'<div style="width:18px;height:18px;border-radius:4px;background:var(--bm);display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:600">'+n+'</div>').join('')+`<div style="width:18px;height:18px;border-radius:4px;border:2px solid var(--bm);display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--bm);font-weight:700">9</div></div></div>
+<div class="fs"><div class="ft">Today's Session</div>
+<div class="fl" style="margin-bottom:4px">Session type</div>
+<div style="display:flex;gap:6px;margin-bottom:8px"><div style="padding:5px 10px;border-radius:14px;font-size:10px;background:var(--b);color:#fff;font-weight:600">Auditory</div><div style="padding:5px 10px;border-radius:14px;font-size:10px;border:1px solid var(--br)">Speech</div><div style="padding:5px 10px;border-radius:14px;font-size:10px;border:1px solid var(--br)">Language</div></div>
+<div class="fl" style="margin-bottom:4px">Child's response</div>
+<div style="display:flex;gap:5px"><div style="padding:5px 10px;border-radius:14px;font-size:10px;border:1px solid var(--br)">🌟 Excellent</div><div style="padding:5px 10px;border-radius:14px;font-size:10px;background:var(--gl);border:1px solid var(--gb);color:var(--g);font-weight:600">✅ Good</div><div style="padding:5px 10px;border-radius:14px;font-size:10px;border:1px solid var(--br)">⚠ Fair</div></div></div>
+<div style="background:var(--b);color:#fff;padding:11px;border-radius:9px;text-align:center;font-size:12px;font-weight:600;margin-top:8px">Save Session →</div>
+</div>`,
+
+dist_home:`<div class="mh a"><div class="mht">📍 Belagavi District Demo</div><div class="mhs">District Officer · Shravan Sanjeevini</div><div class="chip">District</div></div>
+<div class="bp">
+<div class="sg"><div class="sb"><div class="sn">52</div><div class="sl">In District</div></div><div class="sb"><div class="sn" style="color:var(--r)">8</div><div class="sl">At Risk</div></div><div class="sb"><div class="sn" style="color:var(--gm)">31</div><div class="sl">Contacted</div></div></div>
+<div class="lbl">Actions</div>
+<div class="ac pr"><div class="ai">🔴</div><div><div class="at w">8 at-risk children</div><div class="ad w">No contact in 45+ days</div></div><div class="arr" style="color:#fff">→</div></div>
+<div class="ac ga"><div class="ai">📊</div><div><div class="at w">District Report</div><div class="ad w">Status · Follow-up · Outcomes</div></div><div class="arr" style="color:#fff">→</div></div>
+<div class="ac"><div class="ai">📋</div><div class="at">Browse 52 cases</div><div class="arr">→</div></div>
+</div>`,
+
+dist_case:`<div class="mh a"><div class="mh-row"><div class="back">←</div><div><div class="mht">`+D.n1+`</div><div class="mhs">Card 1 · BELAGAVI</div></div></div></div>
+<div class="bp">
+<div class="j" style="justify-content:center;gap:2px;margin-bottom:9px">`+js('🩺','Pre-auth',true,false)+jl(true)+js('🔪','Surgery',true,false)+jl(true)+js('🎧','Rehab 1',false,true)+jl(false)+js('✓','Rehab 2',false,false)+jl(false)+js('🏆','Done',false,false)+`</div>
+<div class="ic" style="background:#FFF8EE;border:1px solid #FAC775">
+<div style="font-size:8px;font-weight:700;color:#7a4f1a;text-transform:uppercase;margin-bottom:6px">👶 Patient · ರೋಗಿಯ ಮಾಹಿತಿ</div>
+<div class="ig">`+ir('Name',D.n1,'#7a4f1a')+ir('Age at Surgery','12 months','#7a4f1a')+ir('Current Age','2 yrs 4 mo','#7a4f1a')+ir('Surgery Date','15-Nov-2022','#7a4f1a')+ir('Hospital','JSS Hospital','#7a4f1a')+ir('Mobile',D.m1,'#7a4f1a')+`</div></div>
+<div style="border-radius:8px;overflow:hidden;margin-bottom:6px"><div style="background:#1a4a7a;padding:8px 12px;display:flex;justify-content:space-between"><div style="color:#fff;font-size:11px;font-weight:600">📞 Telephonic Follow-up · ದೂರವಾಣಿ</div><div style="color:#fff">▼</div></div></div>
+<div style="border-radius:8px;overflow:hidden"><div style="background:var(--p);padding:8px 12px;display:flex;justify-content:space-between"><div style="color:#fff;font-size:11px;font-weight:600">🎯 Outcome Assessment · ಮೌಲ್ಯಮಾಪನ</div><div style="color:#fff">▼</div></div></div>
+</div>`,
+
+dist_outcome:`<div class="mh p"><div class="mh-row"><div class="back">←</div><div><div class="mht">Outcome Assessment</div><div class="mhs">`+D.n1+` · IT-MAIS + CAP + SIR</div></div></div></div>
+<div class="bp">
+<div class="sc3"><div class="st3">📊 IT-MAIS · Auditory Integration Score</div>
+<div class="scorebar"><div class="scorefill" style="width:72%;background:var(--p)"></div></div>
+<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--tl);margin-top:2px"><span>29 / 40</span><span style="color:var(--p);font-weight:600">Good (72%)</span></div>
+<div style="margin-top:8px;font-size:9px;font-weight:600;color:var(--p);margin-bottom:4px">Q3 · Does child alert to sounds? · ಶಬ್ದಕ್ಕೆ ಸ್ಪಂದಿಸುತ್ತದೆಯೇ?</div>
+<div class="scgrid">`+sc4('0','Never',false)+sc4('1','Rarely',false)+sc4('2','Sometimes',false)+sc4('3','Often',true)+sc4('4','Always',false)+`</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+<div class="sc3"><div class="st3">🎯 CAP Level</div><div style="font-size:20px;font-weight:700;color:var(--p)">5</div><div style="font-size:9px;color:var(--tl)">Understands phrases<br>ಪದಗಳ ಗ್ರಹಣ</div></div>
+<div class="sc3"><div class="st3">🗣️ SIR Level</div><div style="font-size:20px;font-weight:700;color:var(--p)">3</div><div style="font-size:9px;color:var(--tl)">Familiar listener<br>ಪರಿಚಿತ ವ್ಯಕ್ತಿಗೆ ಅರ್ಥ</div></div>
+</div>
+<div class="sc3"><div class="st3">🎯 Milestone</div>
+<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`+['1-Detect','2-Discrim','3-Identify','4-Comprehend','5-Express','6-Age OK'].map((s,i)=>'<div style="padding:3px 8px;border-radius:12px;font-size:9px;'+(i===3?'background:var(--p);color:#fff;font-weight:600':'background:var(--gr);color:var(--tl)')+'">'+s+'</div>').join('')+`</div></div>
+</div>`,
+
+dist_report:`<div class="mh a" style="padding-bottom:8px"><div class="mht">BELAGAVI — District Report</div><div class="mhs">52 children · Programme monitoring</div></div>
+<div class="tab-strip"><div class="tab on">📊 Status</div><div class="tab">🏥 Hospitals</div><div class="tab">📞 Follow-up</div><div class="tab">🦻 Device</div><div class="tab">⚠️ At-Risk</div><div class="tab">🎯 Outcomes</div><div class="tab">📅 FY</div></div>
+<div class="bp">
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">
+<div class="ms"><div class="mn">52</div><div class="ml">Total</div></div>
+<div class="ms"><div class="mn" style="color:var(--gm)">8</div><div class="ml">Completed</div></div>
+<div class="ms"><div class="mn" style="color:var(--r)">8</div><div class="ml">At Risk</div></div>
+</div>
+<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:var(--tl);margin-bottom:6px">Journey Funnel</div>
+<div style="background:var(--s);border:.5px solid var(--br);border-radius:9px;overflow:hidden">
+`+[['Pre-auth','9','var(--am)',17],['Surgery Done','43','var(--bm)',83],['Rehab 1','28','var(--pm)',54],['Rehab 2','15','var(--gm)',29],['Completed','8','var(--g)',15]].map(([l,n,c,p])=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:.5px solid var(--br)"><div style="width:7px;height:7px;border-radius:50%;background:${c};flex-shrink:0"></div><div style="flex:1;font-size:11px">${l}</div><div style="width:70px"><div style="height:4px;background:var(--br);border-radius:2px;overflow:hidden"><div style="width:${p}%;height:100%;background:${c};border-radius:2px"></div></div></div><div style="font-size:12px;font-weight:600;width:20px;text-align:right">${n}</div></div>`).join('')+`
+</div></div>`,
+
+state_home:`<div class="mh g"><div class="mht">🌐 State Programme Office</div><div class="mhs">State · Shravan Sanjeevini</div><div class="chip">State</div></div>
+<div class="bp">
+<div class="sg"><div class="sb"><div class="sn">651</div><div class="sl">Total</div></div><div class="sb"><div class="sn" style="color:var(--gm)">47</div><div class="sl">Updated</div></div><div class="sb"><div class="sn" style="color:var(--r)">604</div><div class="sl">Pending</div></div></div>
+<div class="lbl">Actions</div>
+<div class="ac pp"><div class="ai">➕</div><div><div class="at w">Add New Case</div><div class="ad w">Enter SAST pre-auth data</div></div><div class="arr" style="color:#fff">→</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px">
+<div class="ac pg" style="margin:0"><div class="ai">📊</div><div><div class="at w">Dashboard</div><div class="ad w">Charts & trends</div></div></div>
+<div class="ac pg" style="margin:0;background:linear-gradient(135deg,#0a3d2e,#1a6b4a)"><div class="ai">📋</div><div><div class="at w">Reports</div><div class="ad w">9 tabs · CSV export</div></div></div>
+</div>
+<div class="ac gw"><div class="ai">📤</div><div><div class="at w">Share WhatsApp Update</div><div class="ad w">Pre-filled daily status message</div></div><div class="arr" style="color:#fff">→</div></div>
+</div>`,
+
+state_hosp:`<div class="mh g" style="padding-bottom:8px"><div class="mht">Hospital Update Status</div><div class="mhs">Tap any hospital → see cases</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:var(--s);border-bottom:1px solid var(--br)">
+<div style="padding:10px;text-align:center;background:var(--rl)"><div style="font-size:20px;font-weight:700;color:var(--r)">604</div><div style="font-size:8px;color:var(--r);font-weight:700;text-transform:uppercase">Pending Update</div></div>
+<div style="padding:10px;text-align:center;background:var(--gl)"><div style="font-size:20px;font-weight:700;color:var(--gm)">47</div><div style="font-size:8px;color:var(--gm);font-weight:700;text-transform:uppercase">Updated ✓</div></div></div>
+<div class="bp">`+[['JSS Hospital Mysuru',108,5,103,5],['Apollo Hospitals',90,12,78,13],['K C General Hospital',79,8,71,10],['IGICH',34,4,30,12]].map(([n,t,u,p,pct])=>`<div style="background:var(--s);border:.5px solid var(--br);border-radius:9px;padding:9px 11px;margin-bottom:5px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><div style="font-size:11px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</div><div style="display:flex;gap:4px;flex-shrink:0"><span class="pill pr2">${p} pend</span><span class="pill pg2">${u} done</span></div></div><div style="height:4px;background:var(--br);border-radius:2px;overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--gm);border-radius:2px"></div></div></div>`).join('')+`</div>`,
+
+state_reports:`<div style="background:var(--g);padding:11px 14px"><div style="color:#fff;font-size:13px;font-weight:600">📋 Reports — Shravan Sanjeevini</div><div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:1px">Karnataka Cochlear Implant Programme</div></div>
+<div class="tab-strip"><div class="tab on">📍 District</div><div class="tab">🏥 Hospital</div><div class="tab">💰 Financial</div><div class="tab">🎧 Rehab</div><div class="tab">🦻 Device</div><div class="tab">⚠️ At-Risk</div><div class="tab">📅 FY</div><div class="tab">🗂️ Dist×Year</div><div class="tab">📅 Monthly</div></div>
+<div class="bp">
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:9px">
+<div class="ms"><div class="mn">651</div><div class="ml">Total</div></div>
+<div class="ms"><div class="mn" style="color:var(--bm)">30</div><div class="ml">Districts</div></div>
+<div class="ms"><div class="mn" style="color:var(--gm)">47</div><div class="ml">Complete</div></div>
+<div class="ms"><div class="mn" style="color:var(--r)">12</div><div class="ml">At Risk</div></div>
+</div>
+<div style="background:var(--s);border:.5px solid var(--br);border-radius:8px;overflow:hidden">
+<div style="display:flex;justify-content:space-between;padding:7px 11px;border-bottom:.5px solid var(--br)"><span style="font-size:10px;font-weight:600">District Summary ▲ sortable</span><span style="font-size:9px;background:var(--g);color:#fff;padding:2px 7px;border-radius:4px">⬇ CSV</span></div>
+<table style="width:100%;font-size:9px;border-collapse:collapse"><tr style="background:var(--g)"><th style="padding:4px 7px;color:#fff;text-align:left">District</th><th style="padding:4px 7px;color:#fff">Total</th><th style="padding:4px 7px;color:#fff">Done</th><th style="padding:4px 7px;color:#fff">%</th></tr>
+<tr><td style="padding:4px 7px">BELAGAVI<div style="font-size:8px;color:var(--tl)">Belgaum</div></td><td style="padding:4px 7px;text-align:center">52</td><td style="padding:4px 7px;text-align:center;color:var(--gm);font-weight:600">8</td><td style="padding:4px 7px;text-align:center">15%</td></tr>
+<tr><td style="padding:4px 7px">RAICHUR<div style="font-size:8px;color:var(--tl)">Kalyana</div></td><td style="padding:4px 7px;text-align:center">43</td><td style="padding:4px 7px;text-align:center;color:var(--gm);font-weight:600">5</td><td style="padding:4px 7px;text-align:center">12%</td></tr>
+<tr><td style="padding:4px 7px">MYSURU<div style="font-size:8px;color:var(--tl)">Mysore</div></td><td style="padding:4px 7px;text-align:center">39</td><td style="padding:4px 7px;text-align:center;color:var(--gm);font-weight:600">11</td><td style="padding:4px 7px;text-align:center">28%</td></tr>
+</table></div></div>`,
+
+state_wa:`<div class="mh w"><div class="mht">📤 WhatsApp Daily Update</div><div class="mhs">Pre-filled — opens WhatsApp ready to send</div></div>
+<div class="bp">
+<div class="wa-bg"><div class="wa-bub"><div>🦻 <b>Shravan Sanjeevini — Hospital Update</b></div><div>📅 19 March 2026 | 06:00 PM</div><div style="margin-top:5px">✅ Updated: 3 hospitals (47 cases)</div><div>🔴 Pending: 74 hospitals (604 cases)</div><div style="margin-top:5px">👉 Live status:</div><div style="color:var(--bm);font-size:10px;text-decoration:underline">cochlearkar.github.io/.../status.html</div><div class="wa-t">6:00 PM ✓</div></div></div>
+<div style="font-size:10px;color:var(--tl);margin:9px 0 5px">Live status page — no login needed, share with anyone:</div>
+<div style="background:#fff;border:1px solid var(--gb);border-radius:9px;padding:11px">
+<div style="font-size:11px;font-weight:600;color:var(--g);margin-bottom:7px">🦻 Hospital Update Status</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:7px">
+<div class="ms"><div class="mn" style="color:var(--gm)">3</div><div class="ml">Complete</div></div>
+<div class="ms"><div class="mn" style="color:var(--am)">2</div><div class="ml">Partial</div></div>
+<div class="ms"><div class="mn" style="color:var(--r)">72</div><div class="ml">Pending</div></div>
+</div>
+<div style="height:5px;background:var(--rl);border-radius:3px;overflow:hidden"><div style="width:4%;height:100%;background:var(--gm);border-radius:3px"></div></div>
+<div style="font-size:8px;color:var(--tl);margin-top:2px">4% complete · Live data</div>
+</div></div>`
+
 };
 
-// ── SLIDE HELPER FUNCTIONS ────────────────────────────────────────────────────
-function rb(icon,label,desc,bg,col){
-  return '<div style="background:'+bg+';border-radius:11px;padding:11px;cursor:pointer">'
-    +'<div style="font-size:22px;margin-bottom:3px">'+icon+'</div>'
-    +'<div style="font-size:11px;font-weight:600;color:'+col+'">'+label+'</div>'
-    +'<div style="font-size:9px;color:'+col+';opacity:.7">'+desc+'</div>'
-    +'</div>';
-}
-function ir(l,v,col){
-  return '<div><div class="il" style="color:'+(col||'var(--green)')+'">'+l+'</div>'
-    +'<div class="iv" style="color:'+(col||'var(--green-dark)')+'">'+v+'</div></div>';
-}
-function fd(l,v){ return '<div><div class="fl">'+l+'</div><div class="fv">'+v+'</div></div>'; }
-function js(icon,label,done,act){
-  var cls=done?'done':act?'act':'';
-  return '<div class="jstep"><div class="jc '+cls+'">'+(done?'✓':icon)+'</div><div class="jl">'+label+'</div></div>';
-}
-function jl(done){ return '<div class="jline'+(done?' done':'')+'"></div>'; }
-function sc(n,en,sel){
-  return '<div style="text-align:center;padding:4px 2px;border:1px solid '+(sel?'#4a2a7a':'var(--border)')+';border-radius:5px;font-size:9px;background:'+(sel?'#4a2a7a':'var(--surface)')+'"><div style="font-weight:700;color:'+(sel?'#fff':'var(--text)')+'">'+n+'</div><div style="font-size:8px;color:'+(sel?'rgba(255,255,255,.7)':'var(--text-light)')+'">'+en+'</div></div>';
-}
-function hr2(name,total,upd,pend,pct){
-  return '<div style="background:var(--surface);border:.5px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:5px">'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
-    +'<div style="font-size:11px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+name+'</div>'
-    +'<div style="display:flex;gap:4px;flex-shrink:0">'
-    +'<span class="pill pr2">'+pend+' pend</span><span class="pill pg2">'+upd+' done</span>'
-    +'</div></div>'
-    +'<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">'
-    +'<div style="width:'+pct+'%;height:100%;background:var(--green-mid);border-radius:2px"></div></div></div>';
-}
-function ms(n,l,c){
-  return '<div style="background:var(--surface);border:.5px solid var(--border);border-radius:7px;padding:7px;text-align:center">'
-    +'<div style="font-size:15px;font-weight:700;color:'+c+'">'+n+'</div>'
-    +'<div style="font-size:8px;color:var(--text-light);text-transform:uppercase;font-weight:600;margin-top:1px">'+l+'</div>'
-    +'</div>';
-}
-function mtr(dist,zone,total,done,pct){
-  return '<tr><td style="padding:4px 7px">'+dist+'<div style="font-size:8px;color:var(--text-light)">'+zone+'</div></td>'
-    +'<td style="padding:4px 7px;text-align:center">'+total+'</td>'
-    +'<td style="padding:4px 7px;text-align:center;color:var(--green);font-weight:600">'+done+'</td>'
-    +'<td style="padding:4px 7px;text-align:center">'+pct+'%</td></tr>';
-}
-function cr(role,user){
-  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid rgba(255,255,255,.1)">'
-    +'<span style="color:rgba(255,255,255,.8);font-size:11px">'+role+'</span>'
-    +'<span style="font-size:10px;color:#fff;font-family:monospace;background:rgba(255,255,255,.1);padding:2px 7px;border-radius:4px">'+user+'</span>'
-    +'</div>';
-}
-
-// ── SLIDES ────────────────────────────────────────────────────────────────────
-var SLIDES = [
-
-// 1. LOGIN
-{label:'Login — Select your role to enter the programme',
-html:'<div style="background:var(--green-dark);min-height:554px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 18px">'
-+'<div style="font-size:44px;margin-bottom:12px">🦻</div>'
-+'<div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:3px">Shravan Sanjeevini</div>'
-+'<div style="color:rgba(255,255,255,.5);font-size:11px;margin-bottom:28px">Cochlear Implant Programme · NPPCD</div>'
-+'<div style="background:var(--surface);border-radius:16px;padding:18px;width:100%">'
-+'<div style="font-size:12px;font-weight:600;margin-bottom:3px">Select your role</div>'
-+'<div style="font-size:10px;color:var(--text-light);margin-bottom:14px">Choose how you are connected to the programme</div>'
-+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">'
-+rb('🏥','Hospital','Surgery & device data','#e1f5ee','#0a3d2e')
-+rb('🎧','Rehab Institute','AVT session logs','#e6f1fb','#1a4a7a')
-+rb('📍','District Officer','Follow-up & outcomes','#faeeda','#8a5a0a')
-+rb('🌐','State Team','Programme monitoring','#eeedfe','#4a2a7a')
-+'</div></div></div>'},
-
-// 2. HOSPITAL HOME
-{label:'Hospital Login — See pending vs updated surgery cases at a glance',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh green"><div class="sh-title">🏥 JSS Hospital Demo</div><div class="sh-sub">Hospital · Shravan Sanjeevini</div><div class="chip-b">Hospital</div></div>'
-+'<div class="bp">'
-+'<div class="srow"><div class="sb"><div class="sn">34</div><div class="sl">Total Cases</div></div>'
-+'<div class="sb"><div class="sn" style="color:var(--red)">29</div><div class="sl">Pending</div></div>'
-+'<div class="sb"><div class="sn" style="color:var(--green)">5</div><div class="sl">Updated</div></div></div>'
-+'<div class="slbl">Quick Action</div>'
-+'<div class="ac pr"><div class="ai">🔴</div><div><div class="at w">29 cases need your update</div><div class="ad w">Surgery & device details not yet submitted</div></div><div class="ar" style="color:#fff">→</div></div>'
-+'<div class="ac"><div class="ai">✅</div><div><div class="at">5 updated</div><div class="ad">Surgery details submitted</div></div></div>'
-+'<div class="ac"><div class="ai">📋</div><div><div class="at">Browse all cases</div></div><div class="ar">→</div></div>'
-+'</div></div>'},
-
-// 3. CASE LIST (masked names)
-{label:'Case list — Colour coded red (pending) and green (updated). Names masked in demo.',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh green" style="padding-bottom:8px"><div style="display:flex;align-items:center;gap:8px"><div style="background:rgba(255,255,255,.2);border-radius:7px;padding:3px 9px;font-size:16px">←</div><div><div class="sh-title">JSS Hospital — Cases</div><div class="sh-sub">Tap a case to update</div></div></div></div>'
-+'<div style="display:grid;grid-template-columns:1fr 1fr;background:var(--surface);padding:9px 13px;gap:9px;border-bottom:1px solid var(--border)">'
-+'<div style="background:var(--red-light);border-radius:7px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--red)">29</div><div style="font-size:8px;color:var(--red);font-weight:700;text-transform:uppercase">Pending Update</div></div>'
-+'<div style="background:var(--green-light);border-radius:7px;padding:7px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--green)">5</div><div style="font-size:8px;color:var(--green);font-weight:700;text-transform:uppercase">Updated ✓</div></div></div>'
-+'<div style="display:flex;gap:6px;padding:7px 12px;background:var(--surface);border-bottom:1px solid var(--border)">'
-+'<div style="padding:4px 11px;border-radius:14px;font-size:10px;background:var(--green-dark);color:#fff;font-weight:600">All</div>'
-+'<div style="padding:4px 11px;border-radius:14px;font-size:10px;border:1px solid var(--border)">Needs update</div>'
-+'<div style="padding:4px 11px;border-radius:14px;font-size:10px;border:1px solid var(--border)">Updated</div></div>'
-+'<div style="padding:9px 12px">'
-+'<div class="cc r"><div class="cn">'+D.n1+'</div><div class="cs">Card: 1 · 2022-2023</div><span class="pill pr2">⚠ Needs update</span></div>'
-+'<div class="cc r"><div class="cn">'+D.n2+'</div><div class="cs">Card: 2 · 2024-2025</div><span class="pill pr2">⚠ Needs update</span></div>'
-+'<div class="cc g"><div class="cn">'+D.n3+'</div><div class="cs">Card: 3 · 2024-2025</div><span class="pill pg2">✓ Updated</span></div>'
-+'</div></div>'},
-
-// 4. HOSPITAL FORM
-{label:'Hospital form — Surgery dates, device details. Locked after submission.',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh green"><div style="display:flex;align-items:center;gap:8px"><div style="background:rgba(255,255,255,.2);border-radius:7px;padding:3px 9px;font-size:16px">←</div><div><div class="sh-title">'+D.n1+'</div><div class="sh-sub">Card: 1</div></div></div></div>'
-+'<div style="padding:9px 13px;background:#fff8e1;border-bottom:1px solid #FAC775;font-size:10px;color:var(--amber)">⚠️ Once submitted this form is <strong>locked permanently</strong>.</div>'
-+'<div style="padding:9px 13px">'
-+'<div class="ic" style="background:var(--green-light);border:1px solid var(--green-border)">'
-+'<div style="font-size:8px;font-weight:700;color:var(--green);text-transform:uppercase">Patient Information</div>'
-+'<div class="ig">'+ir('SAST Ref','COC-2022-001')+ir('FY','2022-2023')+ir('Name',D.n1)+ir('Gender','Female')+ir('District','MYSURU')+ir('Hospital','JSS Hospital')+'</div></div>'
-+'<div class="fs"><div class="ft">Surgery Dates</div><div class="fr">'+fd('Admission','12-Nov-2022')+fd('Surgery','15-Nov-2022')+'</div><div class="fr">'+fd('Discharge','18-Nov-2022')+fd('Switch-on','22-Dec-2022')+'</div></div>'
-+'<div class="fs"><div class="ft">Device Details</div><div class="fr">'+fd('Manufacturer','Cochlear Ltd (AU)')+fd('Serial No.','CI-20221115')+'</div></div>'
-+'<div style="background:var(--green-dark);color:#fff;padding:11px;border-radius:9px;text-align:center;font-size:12px;font-weight:600">Submit & Lock →</div>'
-+'</div></div>'},
-
-// 5. REHAB HOME
-{label:'Rehab Login — Log AVT sessions for assigned children',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh blue"><div class="sh-title">🎧 AIISH Bengaluru Demo</div><div class="sh-sub">Rehab Institute · Shravan Sanjeevini</div><div class="chip-b">Rehab</div></div>'
-+'<div class="bp">'
-+'<div class="srow"><div class="sb"><div class="sn">18</div><div class="sl">Assigned</div></div><div class="sb"><div class="sn" style="color:var(--green)">11</div><div class="sl">Active</div></div><div class="sb"><div class="sn" style="color:var(--amber)">7</div><div class="sl">Not started</div></div></div>'
-+'<div class="slbl">Quick Action</div>'
-+'<div class="ac pb"><div class="ai">🎧</div><div><div class="at w">Update Rehab Sessions</div><div class="ad w">Select a case to log today\'s session</div></div><div class="ar" style="color:#fff">→</div></div>'
-+'<div class="slbl">Cases</div>'
-+'<div class="cc" style="border-left:4px solid var(--blue-mid)"><div class="cn">'+D.n1+'</div><div class="cs">Session 8 of 54 · Last: 12-Mar-2025</div><span class="pill pb2">Rehab 1</span></div>'
-+'<div class="cc" style="border-left:4px solid var(--green-mid)"><div class="cn">'+D.n4+'</div><div class="cs">Session 42 of 54 · Last: 10-Mar-2025</div><span class="pill pg2">Rehab 2</span></div>'
-+'<div class="cc" style="border-left:4px solid var(--amber-mid)"><div class="cn">'+D.n5+'</div><div class="cs">No sessions yet · Last: —</div><span class="pill pa2">Not started</span></div>'
-+'</div></div>'},
-
-// 6. DISTRICT UNIFIED
-{label:'District — One screen: patient info + follow-up + outcome assessment',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh amber"><div style="display:flex;align-items:center;gap:8px"><div style="background:rgba(255,255,255,.2);border-radius:7px;padding:3px 9px;font-size:16px">←</div><div><div class="sh-title">'+D.n1+'</div><div class="sh-sub">Card: 1 · BELAGAVI</div></div></div></div>'
-+'<div style="padding:9px 13px">'
-+'<div class="j" style="justify-content:center;gap:2px;margin-bottom:9px">'+js('🩺','Pre-auth',true,false)+jl(true)+js('🔪','Surgery',true,false)+jl(true)+js('🎧','Rehab 1',false,true)+jl(false)+js('✓','Rehab 2',false,false)+jl(false)+js('🏆','Done',false,false)+'</div>'
-+'<div class="ic" style="background:#FFF8EE;border:1px solid #FAC775">'
-+'<div style="font-size:8px;font-weight:700;color:#7a4f1a;text-transform:uppercase;margin-bottom:7px">👶 Patient · ರೋಗಿಯ ಮಾಹಿತಿ</div>'
-+'<div class="ig">'+ir('Name',D.n1,'#7a4f1a')+ir('Age at Surgery','12 months','#7a4f1a')+ir('Current Age','2 yrs 4 mo','#7a4f1a')+ir('Surgery Date','15-Nov-2022','#7a4f1a')+ir('Hospital','JSS Hospital','#7a4f1a')+ir('Mobile',D.m1,'#7a4f1a')+'</div></div>'
-+'<div style="border-radius:9px;overflow:hidden;margin-bottom:7px">'
-+'<div style="background:#1a4a7a;padding:9px 13px;display:flex;justify-content:space-between;align-items:center">'
-+'<div><div style="color:#fff;font-size:11px;font-weight:600">📞 Telephonic Follow-up · ದೂರವಾಣಿ</div><div style="color:rgba(255,255,255,.6);font-size:9px">~3 min · Alternate month</div></div>'
-+'<div style="color:#fff;font-size:14px">▼</div></div></div>'
-+'<div style="border-radius:9px;overflow:hidden">'
-+'<div style="background:#4a2a7a;padding:9px 13px;display:flex;justify-content:space-between;align-items:center">'
-+'<div><div style="color:#fff;font-size:11px;font-weight:600">🎯 Structured Outcome Assessment</div><div style="color:rgba(255,255,255,.6);font-size:9px">~8 min · IT-MAIS + CAP + SIR + PEACH</div></div>'
-+'<div style="color:#fff;font-size:14px">▼</div></div></div>'
-+'</div></div>'},
-
-// 7. OUTCOME ASSESSMENT
-{label:'Outcome assessment — Bilingual (English + Kannada). IT-MAIS scored live.',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh purple"><div style="display:flex;align-items:center;gap:8px"><div style="background:rgba(255,255,255,.2);border-radius:7px;padding:3px 9px;font-size:16px">←</div><div><div class="sh-title">Outcome Assessment · ಮೌಲ್ಯಮಾಪನ</div><div class="sh-sub">'+D.n1+' · IT-MAIS</div></div></div></div>'
-+'<div style="padding:9px 13px">'
-+'<div class="sc2"><div class="st2">📊 IT-MAIS Score · ಒಟ್ಟು ಅಂಕ</div>'
-+'<div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:4px 0"><div style="width:72%;height:100%;background:#4a2a7a;border-radius:3px"></div></div>'
-+'<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-light)"><span>29 / 40</span><span style="color:#4a2a7a;font-weight:600">Good (72%)</span></div></div>'
-+'<div style="background:#fff;border:1px solid #c4b8f8;border-radius:9px;padding:9px 11px;margin-bottom:7px">'
-+'<div style="font-size:9px;font-weight:700;color:#4a2a7a;margin-bottom:5px">Q3 · Does child alert to environmental sounds?<br><span style="color:#7a4f1a;font-weight:400;font-size:8px">ಮಗು ಪರಿಸರ ಶಬ್ದಗಳಿಗೆ ಸ್ಪಂದಿಸುತ್ತದೆಯೇ?</span></div>'
-+'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:3px">'+sc('0','Never',false)+sc('1','Rarely',false)+sc('2','Sometimes',false)+sc('3','Often',true)+sc('4','Always',false)+'</div></div>'
-+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">'
-+'<div class="sc2"><div class="st2">🎯 CAP Level</div><div style="font-size:17px;font-weight:700;color:#4a2a7a;margin:3px 0">Level 5</div><div style="font-size:9px;color:var(--text-light)">Understands common phrases · ಸಾಮಾನ್ಯ ಪದಗಳ ಗ್ರಹಣ</div></div>'
-+'<div class="sc2"><div class="st2">🗣️ SIR Level</div><div style="font-size:17px;font-weight:700;color:#4a2a7a;margin:3px 0">Level 3</div><div style="font-size:9px;color:var(--text-light)">Intelligible to familiar listener · ಪರಿಚಿತ ವ್ಯಕ್ತಿಗೆ ಅರ್ಥ</div></div>'
-+'</div></div></div>'},
-
-// 8. STATE HOME
-{label:'State Login — Full programme overview, add cases, dashboard and reports',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh green"><div class="sh-title">🌐 State Programme Office</div><div class="sh-sub">State · Shravan Sanjeevini</div><div class="chip-b">State</div></div>'
-+'<div class="bp">'
-+'<div class="srow"><div class="sb"><div class="sn">651</div><div class="sl">Total</div></div><div class="sb"><div class="sn" style="color:var(--green)">47</div><div class="sl">Updated</div></div><div class="sb"><div class="sn" style="color:var(--red)">604</div><div class="sl">Pending</div></div></div>'
-+'<div class="slbl">Quick Actions</div>'
-+'<div class="ac pp"><div class="ai">➕</div><div><div class="at w">Add New Case</div><div class="ad w">Enter new SAST pre-auth data</div></div><div class="ar" style="color:#fff">→</div></div>'
-+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px"><div class="ac gd" style="margin:0"><div class="ai">📊</div><div><div class="at w">Dashboard</div><div class="ad w">Charts & trends</div></div></div><div class="ac gr" style="margin:0"><div class="ai">📋</div><div><div class="at w">Reports</div><div class="ad w">8 tabs · Download CSV</div></div></div></div>'
-+'<div class="ac gw"><div class="ai">📤</div><div><div class="at w">Share Daily Update on WhatsApp</div><div class="ad w">Pre-filled message with live status link</div></div><div style="color:#fff;margin-left:auto;font-size:16px">→</div></div>'
-+'</div></div>'},
-
-// 9. STATE HOSPITAL SUMMARY
-{label:'State — Hospital-wise pending vs updated with drill-down buttons',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh green" style="padding-bottom:8px"><div class="sh-title">Hospital Update Status</div><div class="sh-sub">Tap any hospital → see pending or updated cases</div></div>'
-+'<div style="padding:11px 13px">'
-+'<div style="display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border-radius:9px;overflow:hidden;border:.5px solid var(--border);margin-bottom:11px">'
-+'<div style="padding:9px;text-align:center;background:var(--red-light)"><div style="font-size:20px;font-weight:700;color:var(--red)">604</div><div style="font-size:8px;color:var(--red);font-weight:700;text-transform:uppercase">Pending Update</div></div>'
-+'<div style="padding:9px;text-align:center;background:var(--green-light)"><div style="font-size:20px;font-weight:700;color:var(--green)">47</div><div style="font-size:8px;color:var(--green);font-weight:700;text-transform:uppercase">Updated ✓</div></div></div>'
-+hr2('JSS Hospital Mysuru',108,5,103,5)+hr2('Apollo Hospitals',90,12,78,13)+hr2('K C General Hospital',79,8,71,10)+hr2('IGICH',34,4,30,12)
-+'</div></div>'},
-
-// 10. REPORTS
-{label:'Reports — 9 tabs, sortable tables, filters, CSV download',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div style="background:var(--green-dark);padding:11px 14px"><div style="color:#fff;font-size:13px;font-weight:600">📋 Reports — Shravan Sanjeevini</div><div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:1px">Karnataka Cochlear Implant Programme · State Level</div></div>'
-+'<div style="background:var(--surface);padding:7px 11px;display:flex;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--border)">'
-+'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:9px;color:var(--text-light)">FY</span><select style="font-size:10px;padding:2px 5px;border:1px solid var(--border);border-radius:4px"><option>All Years</option></select></div>'
-+'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:9px;color:var(--text-light)">Zone</span><select style="font-size:10px;padding:2px 5px;border:1px solid var(--border);border-radius:4px"><option>All Zones</option></select></div>'
-+'<div style="display:flex;align-items:center;gap:4px"><span style="font-size:9px;color:var(--text-light)">District</span><select style="font-size:10px;padding:2px 5px;border:1px solid var(--border);border-radius:4px"><option>All</option></select></div></div>'
-+'<div class="ts"><div class="tab a">📍 District</div><div class="tab">🏥 Hospital</div><div class="tab">💰 Financial</div><div class="tab">🎧 Rehab</div><div class="tab">🦻 Device</div><div class="tab">⚠️ At-Risk</div><div class="tab">📅 FY</div><div class="tab">🗂️ Dist×Year</div><div class="tab">📅 Monthly</div></div>'
-+'<div style="padding:9px 11px">'
-+'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:9px">'+ms('651','Total','var(--text)')+ms('30','Districts','var(--blue-mid)')+ms('47','Completed','var(--green-mid)')+ms('12','At Risk','var(--red)')+'</div>'
-+'<div style="background:var(--surface);border:.5px solid var(--border);border-radius:8px;overflow:hidden">'
-+'<div style="display:flex;justify-content:space-between;padding:7px 11px;border-bottom:.5px solid var(--border)"><span style="font-size:10px;font-weight:600">District Summary ▲ click to sort</span><span style="font-size:9px;background:var(--green-dark);color:#fff;padding:2px 7px;border-radius:4px">⬇ CSV</span></div>'
-+'<table style="width:100%;font-size:9px;border-collapse:collapse"><tr style="background:var(--green-dark)"><th style="padding:4px 7px;color:#fff;text-align:left">District</th><th style="padding:4px 7px;color:#fff">Total</th><th style="padding:4px 7px;color:#fff">Done</th><th style="padding:4px 7px;color:#fff">%</th></tr>'+mtr('BELAGAVI','Belgaum',52,8,15)+mtr('RAICHUR','Kalyana',43,5,12)+mtr('MYSURU','Mysore',39,11,28)+'</table></div></div></div>'},
-
-// 11. WHATSAPP
-{label:'WhatsApp Share — Pre-filled daily update. Live status link shared with group.',
-html:'<div style="min-height:554px;background:var(--gray)">'
-+'<div class="sh wa"><div class="sh-title">📤 WhatsApp Daily Update</div><div class="sh-sub">Pre-filled — just tap Send</div></div>'
-+'<div style="padding:11px 13px">'
-+'<div style="font-size:10px;color:var(--text-light);margin-bottom:7px">Message opens in WhatsApp ready to send to group:</div>'
-+'<div class="wa-prev"><div class="wa-bub"><div>🦻 <strong>Shravan Sanjeevini — Hospital Update</strong></div><div>📅 19 March 2026 | 06:00 PM</div><div style="margin-top:5px">✅ Updated: 3 hospitals (47 cases)</div><div>🔴 Pending: 74 hospitals (604 cases)</div><div style="margin-top:5px">👉 View live status:</div><div style="color:var(--blue-mid);font-size:10px;text-decoration:underline">cochlearkar.github.io/.../status.html</div><div class="wa-t">6:00 PM ✓</div></div></div>'
-+'<div style="font-size:10px;color:var(--text-light);margin:9px 0 5px">Live status page — no login needed:</div>'
-+'<div style="background:#fff;border:1px solid var(--green-border);border-radius:9px;padding:11px">'
-+'<div style="font-size:11px;font-weight:600;color:var(--green-dark);margin-bottom:7px">🦻 Hospital Update Status</div>'
-+'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:7px">'+ms('3','Completed','var(--green-mid)')+ms('2','Partial','var(--amber-mid)')+ms('72','Not Started','var(--red)')+'</div>'
-+'<div style="height:5px;background:var(--red-light);border-radius:3px;overflow:hidden"><div style="width:4%;height:100%;background:var(--green-mid);border-radius:3px"></div></div>'
-+'<div style="font-size:8px;color:var(--text-light);margin-top:2px">4% complete · Live data · No login needed</div>'
-+'</div></div></div>'},
-
-// 12. FINAL
-{label:'Explore the live application with demo credentials',
-html:'<div style="min-height:554px;background:var(--green-dark);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 22px;text-align:center">'
-+'<div style="font-size:44px;margin-bottom:14px">🎉</div>'
-+'<div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:7px">Demo Complete!</div>'
-+'<div style="color:rgba(255,255,255,.6);font-size:12px;line-height:1.6;margin-bottom:24px">Shravan Sanjeevini manages the complete lifecycle — from pre-auth to surgery, rehab, field follow-up, bilingual outcome assessment and state-level reporting across Karnataka.</div>'
-+'<div style="background:rgba(255,255,255,.1);border-radius:11px;padding:13px 15px;width:100%;text-align:left">'
-+'<div style="color:rgba(255,255,255,.6);font-size:9px;font-weight:700;text-transform:uppercase;margin-bottom:7px">Demo Credentials · Password: Demo@2025</div>'
-+cr('🏥 Hospital','demo_hospital')+cr('🎧 Rehab','demo_rehab')+cr('📍 District','demo_district')
-+'<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.1)">🌐 State access available on request · cochlearkar@gmail.com</div>'
-+'</div></div>'}
-
+// ── SEQUENCE ─────────────────────────────────────────────────────────────────
+// Each step: [tileId or null, screenKey, caption, duration(ms)]
+var SEQ = [
+  // Hospital
+  ['tile-h', 'hosp_home',    '🏥 Hospital Login — Pending cases at a glance',                    8000],
+  [null,     'hosp_cases',   '🏥 Case list — Red = needs update · Green = submitted',             7000],
+  [null,     'hosp_form',    '🏥 Enter surgery dates, device details — locked after submission',   8000],
+  // Rehab
+  ['tile-r', 'rehab_home',   '🎧 Rehab Login — Assigned children & AVT session progress',         8000],
+  [null,     'rehab_session','🎧 Log AVT session — attendance, response, milestone',       8000],
+  // District
+  ['tile-d', 'dist_home',    '📍 District Login — 52 children in Belagavi to follow up',          8000],
+  [null,     'dist_case',    '📍 Tap a child — journey + patient info + follow-up + assessment',   8000],
+  [null,     'dist_outcome', '📍 Bilingual outcome assessment — IT-MAIS, CAP, SIR, PEACH',         8000],
+  [null,     'dist_report',  '📍 District Report — funnel, hospitals, device status, outcomes',    8000],
+  // State
+  ['tile-s', 'state_home',   '🌐 State Login — 651 cases across 77 hospitals in Karnataka',       8000],
+  [null,     'state_hosp',   '🌐 Hospital-wise update status — pending vs submitted',              7000],
+  [null,     'state_reports','🌐 Reports — 9 tabs, filterable by FY/Zone/District, CSV export',    8000],
+  [null,     'state_wa',     '🌐 One tap — WhatsApp update with live status link for group',       8000],
 ];
 
-// ── AUTO-PLAY ENGINE ──────────────────────────────────────────────────────────
-var autoInterval = null;
-var AUTO_DURATION = 6000;
-var autoPlaying = false;
+var step = 0;
+var timer = null;
+var running = false;
 
-function toggleAuto() {
-  var btn = document.getElementById('btn-auto');
-  if (!autoPlaying) {
-    autoPlaying = true;
-    btn.textContent = '⏸';
-    startAuto();
-  } else {
-    autoPlaying = false;
-    btn.textContent = '▶';
-    clearInterval(autoInterval);
-  }
-}
+// ── ANIMATION ─────────────────────────────────────────────────────────────────
+function zoomToHub() {
+  var hub = document.getElementById('hub');
+  var pw  = document.getElementById('phone-wrap');
+  var cap = document.getElementById('caption-bar');
 
-function startAuto() {
-  clearInterval(autoInterval);
-  autoInterval = setInterval(function() {
-    if (current < SLIDES.length - 1) {
-      current++;
-      render();
-    } else {
-      // Loop back
-      current = 0;
-      render();
-    }
-  }, AUTO_DURATION);
-}
+  pw.classList.remove('visible');
+  cap.classList.remove('show');
 
-// ── SLIDE ENGINE ──────────────────────────────────────────────────────────────
-var current = 0;
+  // Reset to centre origin before zooming back so it scales evenly
+  hub.style.transformOrigin = '50% 50%';
+  hub.style.transition = 'transform 1.1s cubic-bezier(.4,0,.2,1), opacity 0.7s';
+  hub.style.transform  = 'scale(1)';
+  hub.style.opacity    = '1';
+  hub.style.pointerEvents = 'none';
 
-function startDemo() {
-  document.getElementById('splash').style.display = 'none';
-  var outer = document.getElementById('demo-outer');
-  outer.style.display = 'flex';
-  // Wait one frame so outer is painted before render touches its children
+  // Clear tile highlights after zoom-back completes
   setTimeout(function() {
-    render();
-    autoPlaying = true;
-    var btn = document.getElementById('btn-auto');
-    if (btn) btn.textContent = '⏸';
-    startAuto();
-  }, 50);
+    document.querySelectorAll('.role-tile').forEach(function(t){ t.classList.remove('active-tile'); });
+  }, 900);
 }
 
-function render() {
-  var s = SLIDES[current];
-  var el = document.getElementById('slide-content');
-  if (!el) return;
+function zoomIntoTile(tileId, screenKey, caption, cb) {
+  var hub  = document.getElementById('hub');
+  var tile = document.getElementById(tileId);
 
-  // Fade out → swap content → fade in
-  el.style.transition = 'opacity 0.4s';
-  el.style.opacity = '0';
+  // Clear previous highlights
+  document.querySelectorAll('.role-tile').forEach(function(t){ t.classList.remove('active-tile'); });
 
+  // Get zoom origin — aim at tile centre
+  var hubRect  = hub.getBoundingClientRect();
+  var tileRect = tile.getBoundingClientRect();
+  var originX  = (tileRect.left + tileRect.width  / 2) - hubRect.left;
+  var originY  = (tileRect.top  + tileRect.height / 2) - hubRect.top;
+  hub.style.transformOrigin = originX + 'px ' + originY + 'px';
+
+  // ── Beat 1: SLOW DRIFT toward the tile (1.4s, ease-in) ──────────────────
+  hub.style.transition = 'transform 1.4s cubic-bezier(0.2,0,0.6,1)';
+  hub.style.transform  = 'scale(2.4)';
+  hub.style.opacity    = '1';
+
+  // ── Beat 2: PAUSE — highlight tile visibly (700ms hold) ─────────────────
   setTimeout(function() {
-    var caption = '<div style="position:fixed;bottom:8px;left:0;right:0;z-index:40;padding:0 14px">'
-      + '<div style="background:rgba(10,61,46,.88);backdrop-filter:blur(6px);border-radius:12px;'
-      + 'padding:8px 14px;text-align:center;color:rgba(255,255,255,.9);font-size:11px;font-weight:500;'
-      + 'line-height:1.4">' + s.label + '</div></div>';
-    el.innerHTML = s.html + caption;
-    el.style.opacity = '1';
-  }, 300);
+    hub.style.transition = 'none'; // freeze — no movement during pause
+    tile.classList.add('active-tile');
 
-  // Update overlays safely
-  var ctr = document.getElementById('slide-counter-text');
-  if (ctr) ctr.textContent = (current + 1) + ' / ' + SLIDES.length;
-  var numEl = document.getElementById('slide-num-overlay');
-  if (numEl) numEl.textContent = (current + 1) + ' / ' + SLIDES.length;
+    // ── Beat 3: CLICK — ripple burst from tile ───────────────────────────
+    var ripple = document.createElement('div');
+    ripple.style.cssText = 'position:absolute;border-radius:50%;background:rgba(255,255,255,.5);'
+      + 'width:10px;height:10px;top:50%;left:50%;'
+      + 'transform:translate(-50%,-50%) scale(0);'
+      + 'animation:ripple-anim 0.55s ease-out forwards;'
+      + 'pointer-events:none;z-index:20;';
+    tile.appendChild(ripple);
+
+    // Tile scale-down + scale-back = physical press feel
+    tile.style.transition = 'transform 0.12s ease-in';
+    tile.style.transform  = 'scale(0.93)';
+    setTimeout(function() {
+      tile.style.transition = 'transform 0.18s ease-out';
+      tile.style.transform  = 'scale(1)';
+    }, 120);
+
+    // ── Beat 4: After click settles, zoom fully in and fade ──────────────
+    setTimeout(function() {
+      if(ripple.parentNode) ripple.parentNode.removeChild(ripple);
+      hub.style.transition = 'transform 1s cubic-bezier(0.4,0,1,1), opacity 0.65s';
+      hub.style.transform  = 'scale(5)';
+      hub.style.opacity    = '0';
+
+      setTimeout(function() {
+        showScreen(screenKey, caption, cb);
+      }, 750);
+    }, 500); // 500ms after click before zooming out
+
+  }, 1500); // 1500ms = drift duration (must match Beat 1 transition)
+}
+
+function showScreen(screenKey, caption, cb) {
+  var pw  = document.getElementById('phone-wrap');
+  var bar = document.getElementById('phone-bar');
+  var scr = document.getElementById('phone-screen');
+  var cap = document.getElementById('caption-bar');
+
+  // Set phone bar colour based on screen type
+  var barColors = {
+    hosp_home:'#0a3d2e',hosp_cases:'#0a3d2e',hosp_form:'#0a3d2e',
+    rehab_home:'#1a4a7a',rehab_session:'#1a4a7a',
+    dist_home:'#7a4f1a',dist_case:'#7a4f1a',dist_outcome:'#4a2a7a',dist_report:'#7a4f1a',
+    state_home:'#0a3d2e',state_hosp:'#0a3d2e',state_reports:'#0a3d2e',state_wa:'#128C7E'
+  };
+  bar.style.background = barColors[screenKey] || '#111';
+
+  scr.style.opacity = '0';
+  scr.style.transition = 'opacity 0.35s';
+  scr.innerHTML = SCREENS[screenKey];
+
+  pw.classList.add('visible');
+  setTimeout(function(){ scr.style.opacity = '1'; }, 50);
+
+  // Caption
+  document.getElementById('caption-text').textContent = caption;
+  cap.classList.add('show');
+
+  if (cb) setTimeout(cb, 300);
+}
+
+function updateProgress() {
+  var pct = Math.round((step / SEQ.length) * 100);
   var pf = document.getElementById('progress-fill');
-  if (pf) pf.style.width = Math.round(((current + 1) / SLIDES.length) * 100) + '%';
-  var dots = document.getElementById('dots');
-  if (dots) dots.innerHTML = SLIDES.map(function(_, i) {
-    return '<div class="' + (i === current ? 'dot active' : i < current ? 'dot done' : 'dot') + '" onclick="goTo(' + i + ')"></div>';
-  }).join('');
+  if (pf) pf.style.width = pct + '%';
+  var si = document.getElementById('slide-info');
+  if (si) si.textContent = 'Step ' + (step) + ' of ' + SEQ.length;
 }
 
+// ── MAIN SEQUENCER ────────────────────────────────────────────────────────────
+function runStep() {
+  if (!running || step >= SEQ.length) {
+    // End — zoom back to hub and loop
+    if (running) {
+      setTimeout(function() {
+        zoomToHub();
+        setTimeout(function() {
+          if (running) { step = 0; updateProgress(); runStep(); }
+        }, 3000);
+      }, 1000);
+    }
+    return;
+  }
 
-function nextSlide() {
-  if (current < SLIDES.length - 1) { current++; }
-  else { current = 0; }
-  render();
-  if (autoPlaying) startAuto();
+  var s = SEQ[step];
+  var tileId   = s[0];
+  var screenKey= s[1];
+  var caption  = s[2];
+  var duration = s[3];
+
+  updateProgress();
+
+  if (tileId) {
+    // First zoom back to hub, highlight tile, then zoom in
+    var hub = document.getElementById('hub');
+    var pw  = document.getElementById('phone-wrap');
+    var cap = document.getElementById('caption-bar');
+
+    // If phone is showing, zoom out first
+    if (pw.classList.contains('visible')) {
+      pw.classList.remove('visible');
+      cap.classList.remove('show');
+      hub.style.transition = 'transform 1s cubic-bezier(.4,0,.2,1), opacity 0.6s';
+      hub.style.transform  = 'scale(1)';
+      hub.style.opacity    = '1';
+
+      setTimeout(function() {
+        zoomIntoTile(tileId, screenKey, caption, null);
+      }, 1300);
+    } else {
+      hub.style.transform = 'scale(1)';
+      hub.style.opacity   = '1';
+      setTimeout(function() {
+        zoomIntoTile(tileId, screenKey, caption, null);
+      }, 900);
+    }
+  } else {
+    // Just swap the phone screen
+    showScreen(screenKey, caption, null);
+  }
+
+  step++;
+  timer = setTimeout(runStep, duration);
 }
-function prevSlide() {
-  if (current > 0) { current--; render(); }
-  if (autoPlaying) startAuto();
+
+function startWalkthrough() {
+  document.getElementById('splash').style.display = 'none';
+  running = true;
+  step = 0;
+  // Show hub first
+  var hub = document.getElementById('hub');
+  hub.style.transform = 'scale(1)';
+  hub.style.opacity = '1';
+  hub.style.pointerEvents = 'none';
+
+  setTimeout(runStep, 1200);
 }
-function goTo(i) { current = i; render(); if (autoPlaying) startAuto(); }
-
-// Keyboard (swipe still works on mobile)
-document.addEventListener('keydown', function(e) {
-  if (e.key==='ArrowRight'||e.key===' ') { e.preventDefault(); nextSlide(); }
-  if (e.key==='ArrowLeft') { e.preventDefault(); prevSlide(); }
-});
-
-// Swipe
-var tx = 0;
-document.addEventListener('touchstart', function(e) { tx = e.touches[0].clientX; });
-document.addEventListener('touchend', function(e) {
-  var diff = tx - e.changedTouches[0].clientX;
-  if (Math.abs(diff) > 50) { diff > 0 ? nextSlide() : prevSlide(); }
-});
-
-render();
 </script>
 </body>
 </html>

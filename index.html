@@ -4323,6 +4323,9 @@ function openRehabSession(cas) {
     +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-submit-btn">Save Monthly Log \u2192</button>'
     +'</div>';
 
+  var commonHTML =
+    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'    +'<div class="field" style="margin:0"><div class="field-label">Therapist name</div>'    +'<input class="field-input" id="rs-therapist" placeholder="Full name"></div>'    +'<div class="field" style="margin:0"><div class="field-label">Rehab stage</div>'    +'<div class="radio-group" id="rs-stage" style="flex-direction:row;gap:4px">'    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-stage\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>Part 1</div>'    +'<div class="radio-item" onclick="selectRadio(this,\'rs-stage\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>Part 2</div>'    +'</div></div>'    +'</div></div>';
+
   window._rs_sessStart   = sessStart;
   window._rs_slotCount   = rowCount;
   window._rs_sessYear    = sessYear;

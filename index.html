@@ -863,11 +863,15 @@ body {
   <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--green-dark);padding:40px 24px;text-align:center;">
     <div style="font-size:52px;margin-bottom:24px;">🦻</div>
     <div style="color:#fff;font-size:18px;font-weight:600;margin-bottom:8px;">Shravan Sanjeevini</div>
-    <div style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:40px;">Loading your cases...</div>
-    <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
+    <div id="loading-status" style="color:rgba(255,255,255,0.6);font-size:13px;margin-bottom:32px;">Loading data…</div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:32px;">
       <div style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.4);animation:pulse 1.2s ease-in-out infinite;"></div>
       <div style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.4);animation:pulse 1.2s ease-in-out 0.2s infinite;"></div>
       <div style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.4);animation:pulse 1.2s ease-in-out 0.4s infinite;"></div>
+    </div>
+    <div id="loading-retry" style="display:none;flex-direction:column;align-items:center;gap:12px;">
+      <div style="color:rgba(255,255,255,0.5);font-size:12px;">Taking longer than expected.</div>
+      <button onclick="location.reload()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:10px 24px;border-radius:10px;font-size:14px;cursor:pointer;">Refresh page</button>
     </div>
   </div>
 </div>
@@ -1712,15 +1716,30 @@ async function authenticateAndLogin() {
 
 // Load ALL cases from Firestore into SAMPLE_CASES
 async function loadCasesFromFirestore() {
+  const setStatus = (msg) => {
+    const el = document.getElementById('loading-status');
+    if (el) el.textContent = msg;
+  };
+  const retryTimer = setTimeout(() => {
+    const el = document.getElementById('loading-retry');
+    if (el) el.style.display = 'flex';
+    setStatus('Still loading — check your connection.');
+  }, 8000);
   try {
+    setStatus('Connecting to Shravan Sanjeevini…');
     const { collection, getDocs } = window._fbFns;
+    setStatus('Loading case data…');
     const snap = await getDocs(collection(window._fbDb, 'cases'));
     SAMPLE_CASES = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+    setStatus(`Loaded ${SAMPLE_CASES.length} cases.`);
     console.log('Loaded', SAMPLE_CASES.length, 'cases from Firestore');
   } catch(e) {
     console.error('loadCasesFromFirestore error:', e);
+    setStatus('Could not load data — using local copy.');
     // Fallback to cases.js if available
     if (typeof PRELOADED_CASES_DATA !== 'undefined') SAMPLE_CASES = PRELOADED_CASES_DATA;
+  } finally {
+    clearTimeout(retryTimer);
   }
 }
 
@@ -2825,21 +2844,43 @@ function buildHospitalForm(cas) {
 
 function buildRehabForm(cas) {
   const rehabUnit = currentUser ? currentUser.unit : 'Rehab Institute';
-
-  // Patient info card — same style as hospital form
   const patientBanner = buildPatientCard(cas, 'rehab');
-
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> This case is flagged at-risk. Last contact: ${cas.lastContact||'not recorded'}.</div>` : '';
 
-  // Session progress dots
-  const totalSess = cas ? cas.totalSessions : 54;
-  const sessionsDone = cas ? cas.sessions : 0;
-  const dotsHTML = cas ? Array.from({length: Math.min(18, totalSess)}, (_,i) => {
-    const n = i+1;
-    if (n <= sessionsDone) return `<div class="sdot sdot-done">${n}</div>`;
-    if (n === sessionsDone+1) return `<div class="sdot sdot-today">${n}</div>`;
-    return `<div class="sdot sdot-pending">${n}</div>`;
-  }).join('') : '';
+  // Determine current quarter (1-4) from sessions done
+  const sessionsDone = cas ? (cas.sessions || 0) : 0;
+  const qtr = sessionsDone < 26 ? 'I' : sessionsDone < 52 ? 'II' : sessionsDone < 78 ? 'III' : 'IV';
+  const qtrNum = sessionsDone < 26 ? 1 : sessionsDone < 52 ? 2 : sessionsDone < 78 ? 3 : 4;
+  const monthLabels = ['','Month 1–3','Month 4–6','Month 7–9','Month 10–12'];
+
+  // Build 14-row weekly attendance table matching the paper form exactly
+  const today = new Date().toISOString().split('T')[0];
+  const sessStart = (qtrNum-1)*26 + 1;
+  const weeks = ['Week 1','Week 1','Week 1','Week 1','Week 2','Week 2','Week 2','Week 3','Week 3','Week 3','Week 4','Week 4','Week 4','Week 4'];
+  const sessNums = Array.from({length:14}, (_,i) => sessStart + i);
+
+  const tableRows = weeks.map((w,i) => {
+    const sn = sessNums[i];
+    return `<tr>
+      <td style="padding:4px 6px;font-size:11px;color:var(--text-mid);text-align:center;border-bottom:1px solid var(--border)">${i+1}</td>
+      <td style="padding:4px 6px;font-size:11px;color:var(--text-mid);border-bottom:1px solid var(--border)">${w}</td>
+      <td style="padding:2px 4px;border-bottom:1px solid var(--border)"><input type="date" id="f-sess-date-${i}" style="font-size:11px;border:none;background:transparent;width:100%;color:var(--text)"></td>
+      <td style="padding:4px 6px;border-bottom:1px solid var(--border);text-align:center">
+        <select id="f-att-${i}" onchange="rsTableAtt(${i}, this.value)" style="font-size:11px;border:none;background:transparent;color:var(--text);width:100%">
+          <option value="">—</option>
+          <option value="P">P</option>
+          <option value="A">A</option>
+          <option value="H">Holiday</option>
+        </select>
+      </td>
+      <td style="padding:4px 6px;font-size:11px;color:var(--text-mid);text-align:center;border-bottom:1px solid var(--border)" id="f-sn-${i}"></td>
+      <td style="padding:2px 3px;border-bottom:1px solid var(--border);text-align:center"><span id="f-act-aud-${i}" onclick="rsToggle(this)" class="rs-act-dot">—</span></td>
+      <td style="padding:2px 3px;border-bottom:1px solid var(--border);text-align:center"><span id="f-act-spe-${i}" onclick="rsToggle(this)" class="rs-act-dot">—</span></td>
+      <td style="padding:2px 3px;border-bottom:1px solid var(--border);text-align:center"><span id="f-act-lan-${i}" onclick="rsToggle(this)" class="rs-act-dot">—</span></td>
+      <td style="padding:2px 3px;border-bottom:1px solid var(--border);text-align:center"><span id="f-act-cog-${i}" onclick="rsToggle(this)" class="rs-act-dot">—</span></td>
+      <td style="padding:2px 3px;border-bottom:1px solid var(--border);text-align:center"><span id="f-act-par-${i}" onclick="rsToggle(this)" class="rs-act-dot">—</span></td>
+    </tr>`;
+  }).join('');
 
   return `
     <div class="form-section">
@@ -2848,147 +2889,191 @@ function buildRehabForm(cas) {
       ${warnHTML}
     </div>
 
-    ${cas ? `<div class="form-section">
-      <div class="form-section-title">📊 Session Progress</div>
-      <div class="session-dots">${dotsHTML}</div>
-      <div style="font-size:11px;color:var(--text-light);margin:4px 0 0">${sessionsDone} completed · ${totalSess - sessionsDone} remaining</div>
-    </div>` : ''}
-
+    <!-- ── SECTION A: PATIENT PROFILE (mirrors paper form header) ── -->
     <div class="form-section">
-      <div class="form-section-title">🗓 Rehab Session Details</div>
-      <div class="field">
-        <div class="field-label">Rehab stage <span class="req">*</span></div>
-        <div class="radio-group" id="rg-rehab-stage">
-          <div class="radio-item ${cas&&cas.r1Admit&&!cas.r2Admit?'checked':''}" onclick="selectRadio(this,'rg-rehab-stage')"><div class="radio-dot"></div>Rehab Part 1 (2002GP)</div>
-          <div class="radio-item ${cas&&cas.r2Admit?'checked':''}" onclick="selectRadio(this,'rg-rehab-stage')"><div class="radio-dot"></div>Rehab Part 2 (2003GP)</div>
+      <div class="form-section-title">📋 Monthly Report Submission Form</div>
+      <div style="background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Quarter being reported</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${['I – Month 1–3','II – Month 4–6','III – Month 7–9','IV – Month 10–12'].map((lbl,i) =>
+            `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+               <input type="radio" name="rg-qtr" value="${i+1}" ${qtrNum===i+1?'checked':''} style="accent-color:var(--blue)"> ${lbl}
+             </label>`).join('')}
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Month &amp; Year <span class="req">*</span></div>
+          <input type="month" class="field-input has-value" id="f-report-month" value="${new Date().toISOString().slice(0,7)}">
+        </div>
+        <div class="field">
+          <div class="field-label">Rehab centre</div>
+          <input class="field-input has-value" id="f-rehab-centre" value="${rehabUnit}" readonly>
         </div>
       </div>
       <div class="field-row">
         <div class="field">
-          <div class="field-label">Session date <span class="req">*</span></div>
-          <input type="date" class="field-input has-value" id="f-sessdate" value="${new Date().toISOString().split('T')[0]}">
+          <div class="field-label">Surgical hospital</div>
+          <input class="field-input ${cas&&cas.hospital?'has-value':''}" id="f-surg-hosp" value="${cas?cas.hospital||'':''}">
+        </div>
+        <div class="field">
+          <div class="field-label">Type of surgery</div>
+          <input class="field-input ${cas&&cas.surgeryType?'has-value':''}" id="f-surg-type" value="${cas?cas.surgeryType||'':''}">
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECTION B: WEEKLY ATTENDANCE TABLE (exact paper form layout) ── -->
+    <div class="form-section">
+      <div class="form-section-title">📅 AVT Session Attendance Log</div>
+      <div style="font-size:11px;color:var(--text-light);margin-bottom:8px;">Tap the activity columns (Aud/Spe/Lan/Cog/Par) to toggle ✓ / NA</div>
+      <style>
+        .rs-act-dot { display:inline-block;min-width:20px;padding:2px 4px;border-radius:4px;font-size:11px;cursor:pointer;text-align:center;color:var(--text-light);background:var(--gray);transition:background .15s; }
+        .rs-act-dot.done { background:var(--green-light);color:var(--green);font-weight:700; }
+        .rs-act-dot.na { background:var(--amber-light);color:var(--amber);font-size:9px; }
+      </style>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <table style="width:100%;border-collapse:collapse;min-width:420px;">
+          <thead>
+            <tr style="background:var(--blue-light)">
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">#</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);border-bottom:2px solid var(--blue-mid)">Week</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);border-bottom:2px solid var(--blue-mid)">Date</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">P/A</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Sess#</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Aud</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Spe</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Lan</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Cog</th>
+              <th style="padding:5px 4px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:2px solid var(--blue-mid)">Par</th>
+            </tr>
+          </thead>
+          <tbody id="sess-table-body">${tableRows}</tbody>
+          <tfoot>
+            <tr style="background:var(--gray)">
+              <td colspan="4" style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--text-mid)">Total sessions attended</td>
+              <td colspan="6" style="padding:6px 8px;font-size:12px;font-weight:700;color:var(--blue)" id="sess-total">0 / 14</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:12px;font-size:10px;color:var(--text-light)">
+        <span>P = Present &nbsp; A = Absent &nbsp; Aud = Audition &nbsp; Spe = Speech &nbsp; Lan = Language &nbsp; Cog = Cognition &nbsp; Par = Parent guidance</span>
+      </div>
+    </div>
+
+    <!-- ── SECTION C: MAPPING SESSION ── -->
+    <div class="form-section">
+      <div class="form-section-title">🔊 Mapping Session</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Mapping session date</div>
+          <input type="date" class="field-input" id="f-mapping-date">
         </div>
         <div class="field">
           <div class="field-label">Session number</div>
-          <input type="number" class="field-input" id="f-sessnum" min="1" max="54" placeholder="e.g. 3" value="${cas?cas.sessions+1:''}">
+          <input type="number" class="field-input" id="f-mapping-sessnum" min="1" max="10" placeholder="e.g. 3">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        ${[
+          ['f-sftest','Sound field test done'],
+          ['f-ecap','ECAP done'],
+          ['f-magnet','Comfortable with magnet / coil'],
+          ['f-ent-ref','Referral to ENT surgeon required']
+        ].map(([id,lbl]) => `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:6px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface)">
+          <select id="${id}" style="font-size:11px;border:none;background:transparent;color:var(--text)">
+            <option value="">—</option><option value="yes">Yes</option><option value="no">No</option>
+          </select> ${lbl}</label>`).join('')}
+      </div>
+      <div class="field-label" style="margin-bottom:4px">Issues in mapping</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        ${[
+          ['f-map-issue-none','None'],
+          ['f-map-issue-processor','Use of Processor'],
+          ['f-map-issue-sutures','Status of sutures'],
+          ['f-map-issue-skin','Status of skin under coil']
+        ].map(([id,lbl]) => `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="${id}" style="accent-color:var(--blue)"> ${lbl}</label>`).join('')}
+      </div>
+      <div class="field">
+        <div class="field-label">Other mapping notes</div>
+        <textarea class="field-input" id="f-map-other" rows="2" placeholder="Any other issues or observations…"></textarea>
+      </div>
+    </div>
+
+    <!-- ── SECTION D: QUARTERLY UPDATE (filled once per quarter) ── -->
+    <div class="form-section">
+      <div class="form-section-title">📊 Rehabilitation Quarterly Update</div>
+      <div class="field">
+        <div class="field-label">Speech processor model</div>
+        <input class="field-input ${cas&&cas.processorModel?'has-value':''}" id="f-processor-model" value="${cas?cas.processorModel||'':''}" placeholder="e.g. CP802">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+        ${[
+          ['f-switch-on-video','Switch-on video (3 min) recorded'],
+          ['f-parent-guidance','Parents guidance done'],
+          ['f-warranty-card','Warranty card issued'],
+          ['f-daily-attendance','Daily attendance noted'],
+          ['f-weekly-reports','Weekly &amp; monthly reports submitted']
+        ].map(([id,lbl]) => `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:5px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface)">
+          <input type="checkbox" id="${id}" style="accent-color:var(--green)"> ${lbl}</label>`).join('')}
+      </div>
+    </div>
+
+    <!-- ── SECTION E: Q4 EVALUATION RESULTS (only for Quarter IV) ── -->
+    <div class="form-section" id="q4-section" style="${qtrNum===4?'':'display:none'}">
+      <div class="form-section-title">🏆 Q4 Evaluation Results</div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Aided audiogram result</div>
+          <input class="field-input" id="f-audiogram-result" placeholder="e.g. Upper border of speech spectrum">
+        </div>
+        <div class="field">
+          <div class="field-label">Speech perception (open set)</div>
+          <input class="field-input" id="f-speech-perception" placeholder="e.g. 20/25">
         </div>
       </div>
       <div class="field-row">
         <div class="field">
-          <div class="field-label">Duration <span class="req">*</span></div>
-          <select class="field-input" id="f-duration">
-            <option value="">Select</option>
-            <option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option>
-          </select>
+          <div class="field-label">MAIS score</div>
+          <input class="field-input" id="f-mais-score" placeholder="e.g. 40/40">
         </div>
         <div class="field">
-          <div class="field-label">Session type</div>
-          <select class="field-input" id="f-sesstype">
-            <option>AVT (Auditory Verbal Therapy)</option>
-            <option>Mapping / Programming</option>
-            <option>Counselling</option>
-            <option>Parent training</option>
-            <option>Assessment</option>
-          </select>
+          <div class="field-label">ACSLS result</div>
+          <input class="field-input" id="f-acsls" placeholder="ACSLS rating">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">RLA (Receptive Language Age)</div>
+          <input class="field-input" id="f-rla" placeholder="e.g. 3.7–4.6 years">
+        </div>
+        <div class="field">
+          <div class="field-label">ELA (Expressive Language Age)</div>
+          <input class="field-input" id="f-ela" placeholder="e.g. 2.7–2.9 years">
         </div>
       </div>
       <div class="field">
-        <div class="field-label">Audiologist / Therapist <span class="req">*</span></div>
-        <input class="field-input" id="f-therapist" placeholder="Name of AVT therapist / audiologist">
+        <div class="field-label">AV Therapy completed this quarter</div>
+        <div class="radio-group" id="rg-avt-complete">
+          <div class="radio-item" onclick="selectRadio(this,'rg-avt-complete')"><div class="radio-dot"></div>Yes — completed</div>
+          <div class="radio-item" onclick="selectRadio(this,'rg-avt-complete')"><div class="radio-dot"></div>No — not completed</div>
+        </div>
       </div>
     </div>
 
+    <!-- ── SECTION F: CLAIM & DISTRICT ── -->
     <div class="form-section">
-      <div class="form-section-title">✅ Attendance & Response</div>
-      <div class="field">
-        <div class="field-label">Attendance <span class="req">*</span></div>
-        <div class="radio-group" id="rg-attendance">
-          <div class="radio-item checked" onclick="selectRadio(this,'rg-attendance')"><div class="radio-dot"></div>Present — child + guardian attended</div>
-          <div class="radio-item" onclick="selectRadio(this,'rg-attendance')"><div class="radio-dot"></div>Absent — family informed</div>
-          <div class="radio-item" onclick="selectRadio(this,'rg-attendance')"><div class="radio-dot"></div>Absent — not reachable</div>
-        </div>
-      </div>
-      <div class="field">
-        <div class="field-label">Child's response / progress this session</div>
-        <div class="radio-group" id="rg-progress">
-          <div class="radio-item" onclick="selectRadio(this,'rg-progress')"><div class="radio-dot"></div>🌟 Excellent — exceeding expectations</div>
-          <div class="radio-item checked" onclick="selectRadio(this,'rg-progress')"><div class="radio-dot"></div>✅ Good — on track</div>
-          <div class="radio-item" onclick="selectRadio(this,'rg-progress')"><div class="radio-dot"></div>⚠ Fair — needs more attention</div>
-          <div class="radio-item" onclick="selectRadio(this,'rg-progress')"><div class="radio-dot"></div>❌ Poor — significant difficulty</div>
-        </div>
-      </div>
-      <div class="field">
-        <div class="field-label">Speech &amp; Language milestone</div>
-        <select class="field-input" id="f-milestone">
-          <option value="">Select current milestone...</option>
-          <option>Detection — responds to sounds</option>
-          <option>Discrimination — distinguishes sounds</option>
-          <option>Identification — recognises familiar words</option>
-          <option>Comprehension — understands spoken language</option>
-          <option>Verbal expression — producing speech</option>
-          <option>Age-appropriate communication</option>
-        </select>
-      </div>
-      <div class="field">
-        <div class="field-label">Session notes / observations</div>
-        <textarea class="field-input" id="f-remarks" rows="2" placeholder="Progress notes, parent feedback, observations..."></textarea>
-      </div>
-    </div>
-
-    <div class="form-section">
-      <div class="form-section-title">📍 Residential District (for District Officer)</div>
+      <div class="form-section-title">📍 District &amp; Claim</div>
       <div class="field">
         <div class="field-label">Child's home district <span class="req">*</span></div>
         <select class="field-input ${cas&&cas.district?'has-value':''}" id="f-res-district">
           <option value="">Select district...</option>
-          <option value="BAGALKOTE">Bagalkote</option>
-          <option value="BALLARI">Ballari</option>
-          <option value="BANGALORE - RURAL">Bangalore - Rural</option>
-          <option value="BANGALORE EAST">Bangalore East</option>
-          <option value="BANGALORE NORTH">Bangalore North</option>
-          <option value="BANGALORE SOUTH">Bangalore South</option>
-          <option value="BANGALORE WEST">Bangalore West</option>
-          <option value="BELAGAVI">Belagavi</option>
-          <option value="BENGALURU">Bengaluru</option>
-          <option value="BENGALURU RURAL">Bengaluru Rural</option>
-          <option value="BIDAR">Bidar</option>
-          <option value="CHAMARAJANAGARA">Chamarajanagara</option>
-          <option value="CHIKKABALLAPURA">Chikkaballapura</option>
-          <option value="CHIKKAMAGALURU">Chikkamagaluru</option>
-          <option value="CHITRADURGA">Chitradurga</option>
-          <option value="DAKSHINA KANNADA">Dakshina Kannada</option>
-          <option value="DAVANAGERE">Davanagere</option>
-          <option value="DHARWAR">Dharwar</option>
-          <option value="GADAG">Gadag</option>
-          <option value="HASSAN">Hassan</option>
-          <option value="HAVERI">Haveri</option>
-          <option value="KALABURAGI">Kalaburagi</option>
-          <option value="KODAGU">Kodagu</option>
-          <option value="KOLAR">Kolar</option>
-          <option value="KOPPAL">Koppal</option>
-          <option value="MANDYA">Mandya</option>
-          <option value="MYSORE">Mysore</option>
-          <option value="MYSURU">Mysuru</option>
-          <option value="RAICHUR">Raichur</option>
-          <option value="RAMANAGARA">Ramanagara</option>
-          <option value="SHIVAMOGGA">Shivamogga</option>
-          <option value="TUMAKURU">Tumakuru</option>
-          <option value="UDUPI">Udupi</option>
-          <option value="UTTARA KANNADA">Uttara Kannada</option>
-          <option value="VIJAYANAGAR">Vijayanagar</option>
-          <option value="VIJAYAPURA">Vijayapura</option>
-          <option value="YADGIR">Yadgir</option>
+          ${['Bagalkote','Ballari','Bangalore Rural','Belagavi','Bengaluru','Bidar','Chamarajanagara','Chikkaballapura','Chikkamagaluru','Chitradurga','Dakshina Kannada','Davanagere','Dharwar','Gadag','Hassan','Haveri','Kalaburagi','Kodagu','Kolar','Koppal','Mandya','Mysuru','Raichur','Ramanagara','Shivamogga','Tumakuru','Udupi','Uttara Kannada','Vijayanagar','Vijayapura','Yadgir'].map(d=>`<option value="${d.toUpperCase()}" ${cas&&cas.district===d.toUpperCase()?'selected':''}>${d}</option>`).join('')}
         </select>
-        <div class="field-hint">This determines which District Officer receives follow-up alerts for this child</div>
       </div>
-      <div class="field">
-        <div class="field-label">Next session date</div>
-        <input type="date" class="field-input" id="f-next-sess">
-      </div>
-    </div>
-
-    <div class="form-section">
-      <div class="form-section-title">📋 Claim & Documentation</div>
       <div class="field-row">
         <div class="field">
           <div class="field-label">Claim ref (SAST)</div>
@@ -2998,16 +3083,17 @@ function buildRehabForm(cas) {
           <div class="field-label">Claim status</div>
           <select class="field-input" id="f-claim-status">
             <option value="">Select...</option>
-            <option>Claims Paid</option>
-            <option>Approved</option>
-            <option>Need More Info</option>
-            <option>Submitted</option>
+            <option>Claims Paid</option><option>Approved</option><option>Need More Info</option><option>Submitted</option>
           </select>
         </div>
       </div>
       <div class="field">
-        <div class="field-label">Any issues to flag</div>
+        <div class="field-label">Issues to flag</div>
         <textarea class="field-input" id="f-issues" rows="2" placeholder="Device issues, family concerns, barriers to attendance..."></textarea>
+      </div>
+      <div class="field">
+        <div class="field-label">Next session date</div>
+        <input type="date" class="field-input" id="f-next-sess">
       </div>
     </div>`;
 }
@@ -4229,6 +4315,57 @@ function openRehabSession(cas) {
   showScreen('rehabsession');
 }
 
+// ── New table-form helpers ─────────────────────────────────────────────
+function rsToggle(el) {
+  if (el.classList.contains('done')) {
+    el.classList.remove('done'); el.classList.add('na'); el.textContent = 'NA';
+  } else if (el.classList.contains('na')) {
+    el.classList.remove('na'); el.textContent = '—';
+  } else {
+    el.classList.add('done'); el.textContent = '✓';
+  }
+}
+function rsTableAtt(rowIdx, val) {
+  // Update session number cell — only show number when Present
+  var snCell = document.getElementById('f-sn-'+rowIdx);
+  // Count all P rows to derive running session number
+  var sessStart = 1;
+  try {
+    var qtrRadio = document.querySelector('input[name="rg-qtr"]:checked');
+    if (qtrRadio) sessStart = (parseInt(qtrRadio.value)-1)*26 + 1;
+  } catch(e){}
+  var pCount = 0;
+  for (var i=0; i<=rowIdx; i++) {
+    var sel = document.getElementById('f-att-'+i);
+    if (sel && sel.value === 'P') pCount++;
+  }
+  if (snCell) snCell.textContent = (val === 'P') ? sessStart + pCount - 1 : '';
+  // Activity dots: clear on absent
+  ['aud','spe','lan','cog','par'].forEach(function(act) {
+    var dot = document.getElementById('f-act-'+act+'-'+rowIdx);
+    if (!dot) return;
+    if (val !== 'P') { dot.classList.remove('done','na'); dot.textContent = '—'; dot.style.opacity='0.3'; dot.style.pointerEvents='none'; }
+    else { dot.style.opacity='1'; dot.style.pointerEvents='auto'; }
+  });
+  // Update total
+  var total = 0, possible = 0;
+  for (var j=0; j<14; j++) {
+    var s2 = document.getElementById('f-att-'+j);
+    if (!s2 || s2.value === '') continue;
+    if (s2.value !== 'H') possible++;
+    if (s2.value === 'P') total++;
+  }
+  var totEl = document.getElementById('sess-total');
+  if (totEl) totEl.textContent = total + ' / ' + possible + ' attended';
+}
+// Q4 section visibility
+document.addEventListener('change', function(e) {
+  if (e.target && e.target.name === 'rg-qtr') {
+    var sec = document.getElementById('q4-section');
+    if (sec) sec.style.display = (e.target.value === '4') ? '' : 'none';
+  }
+});
+// ── Original slot-based rsSelectAtt (used in openRehabSession) ────────
 function rsSelectAtt(sid, val) {
   // val: 'P', 'AI' (Absent-Informed), 'ANR' (Absent-Not Reachable)
   var card = document.getElementById(sid+'-card');
@@ -6632,7 +6769,10 @@ window.addEventListener('load', async () => {
     try {
       currentUser = JSON.parse(saved);
       currentRole = currentUser.role;
+      // Show loading screen immediately — never leave a blank white page
       showScreen('loading', false);
+      const statusEl = document.getElementById('loading-status');
+      if (statusEl) statusEl.textContent = 'Restoring your session…';
       await loadCasesFromFirestore();
       buildHome();
       showScreen('home', false);

@@ -1996,6 +1996,46 @@ function buildHome() {
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
+    // Monthly AVT attendance summary for hospital
+    var now2 = new Date();
+    var thisMonthLabel = now2.toLocaleString('default',{month:'long'}) + ' ' + now2.getFullYear();
+    var prevMonth = new Date(now2.getFullYear(), now2.getMonth()-1, 1);
+    var prevMonthLabel = prevMonth.toLocaleString('default',{month:'long'}) + ' ' + prevMonth.getFullYear();
+    var thisMonthStr = now2.getFullYear() + '-' + String(now2.getMonth()+1).padStart(2,'0');
+    var prevMonthStr = prevMonth.getFullYear() + '-' + String(prevMonth.getMonth()+1).padStart(2,'0');
+
+    var postSurgery = allMyCases.filter(c => c.switchOnDate || c.surgAdmit);
+    if (postSurgery.length > 0) {
+      var thisMonthOk  = postSurgery.filter(c => c._lastSessionMonth === thisMonthStr && c._attendanceFlag !== 'red').length;
+      var thisMonthRed = postSurgery.filter(c => c._attendanceFlag === 'red').length;
+      var neverLogged  = postSurgery.filter(c => !c._lastRehabDate && c.rehabCentre).length;
+
+      html += `<div class="section-label">AVT Attendance — ${thisMonthLabel}</div>`;
+      html += `<div style="background:var(--surface);border:.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px">`;
+
+      postSurgery.slice(0,5).forEach(c => {
+        var thisM = (c._lastSessionMonth === thisMonthStr);
+        var flag  = c._attendanceFlag || '';
+        var dot   = flag === 'red' ? '#A32D2D' : flag === 'yellow' ? '#EF9F27' : '#1D9E75';
+        var label = !c.rehabCentre ? 'No rehab assigned'
+          : !c._lastRehabDate     ? 'Not yet started'
+          : flag === 'red'        ? '⚠ Missing sessions'
+          : flag === 'yellow'     ? '! 2 sessions missed'
+          : thisM                 ? '✓ Attending this month'
+          : 'Last: ' + (c._lastRehabDate||'—');
+        html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:.5px solid var(--border)">
+          <div style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>
+          <div style="flex:1;font-size:12px;font-weight:500">${isDemo() ? maskName(c.name) : c.name}</div>
+          <div style="font-size:11px;color:${dot};font-weight:500">${label}</div>
+        </div>`;
+      });
+      if (postSurgery.length > 5) {
+        html += `<div style="padding:8px 13px;font-size:11px;color:var(--text-light);text-align:center;cursor:pointer" onclick="buildCaseList('avt-concern');showScreen('cases')">
+          View all ${postSurgery.length} cases →</div>`;
+      }
+      html += `</div>`;
+    }
+
   } else if (currentRole === 'rehab') {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Update Rehab Sessions</div><div class="action-desc">Select a case to log today's session</div></div><div class="action-arrow">→</div></div>`;
     const qDue = allMyCases.filter(c => isQuarterlyDue(c)).length;
@@ -4180,6 +4220,38 @@ async function claimCase(caseId, updateOnly) {
   }
 }
 
+function activityCheck(id, label) {
+  return '<div style="display:flex;align-items:center;gap:8px;background:var(--gray);border-radius:8px;padding:9px 12px;cursor:pointer" onclick="toggleActivity(this,&quot;'+id+'&quot;,event)">'
+    +'<div id="'+id+'" style="width:18px;height:18px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;background:#fff"></div>'
+    +'<div style="font-size:12px;font-weight:500">'+label+'</div>'
+    +'</div>';
+}
+
+function toggleActivity(container, id, e) {
+  var box = document.getElementById(id);
+  if (!box) return;
+  var checked = box.getAttribute('data-checked') === '1';
+  if (checked) {
+    box.setAttribute('data-checked','0');
+    box.textContent = '';
+    box.style.background = '#fff';
+    box.style.borderColor = 'var(--border)';
+    container.style.background = 'var(--gray)';
+  } else {
+    box.setAttribute('data-checked','1');
+    box.textContent = '✓';
+    box.style.background = 'var(--blue)';
+    box.style.borderColor = 'var(--blue)';
+    box.style.color = '#fff';
+    container.style.background = 'var(--blue-light)';
+  }
+}
+
+function getActivityChecked(id) {
+  var el = document.getElementById(id);
+  return el && el.getAttribute('data-checked') === '1';
+}
+
 function openRehabSession(cas) {
   selectedCase = cas;
   document.getElementById('rs-title').textContent = cas.name || 'Log Session';
@@ -4236,56 +4308,124 @@ function openRehabSession(cas) {
     +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">Session Progress</div>'
     +'<div class="session-dots">'+dotsHTML+'</div>'
     +'<div style="font-size:11px;color:var(--text-light);margin-top:4px">'+sessionsDone+' completed &middot; '+(totalSess-sessionsDone)+' remaining</div></div>'
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Session Details</div>'
+
+    // ── Section 1: Session Details ───────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">📅 Session Details</div>'
     +'<div class="field-row">'
     +'<div class="field"><div class="field-label">Session date <span class="req">*</span></div><input type="date" class="field-input has-value" id="rs-sessdate" value="'+today+'"></div>'
-    +'<div class="field"><div class="field-label">Session number</div><input type="number" class="field-input" id="rs-sessnum" min="1" max="54" placeholder="e.g. 3" value="'+(sessionsDone+1)+'"></div>'
+    +'<div class="field"><div class="field-label">Session number</div><input type="number" class="field-input" id="rs-sessnum" min="1" max="200" placeholder="e.g. 91" value="'+(sessionsDone+1)+'"></div>'
+    +'</div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Month <span class="req">*</span></div>'
+    +'<select class="field-input" id="rs-month"><option value="">Select month</option>'
+    +'<option>January</option><option>February</option><option>March</option><option>April</option>'
+    +'<option>May</option><option>June</option><option>July</option><option>August</option>'
+    +'<option>September</option><option>October</option><option>November</option><option>December</option>'
+    +'</select></div>'
+    +'<div class="field"><div class="field-label">Quarter</div>'
+    +'<select class="field-input" id="rs-quarter"><option value="">Select</option>'
+    +'<option>Quarter I (Month 1-3)</option><option>Quarter II (Month 4-6)</option>'
+    +'<option>Quarter III (Month 7-9)</option><option>Quarter IV (Month 10-12)</option>'
+    +'</select></div>'
     +'</div>'
     +'<div class="field"><div class="field-label">Rehab stage <span class="req">*</span></div>'
     +'<div class="radio-group" id="rs-stage">'
     +'<div class="radio-item '+r1checked+'" onclick="selectRadio(this,&quot;rs-stage&quot;)"><div class="radio-dot"></div>Rehab Part 1 (2002GP)</div>'
     +'<div class="radio-item '+r2checked+'" onclick="selectRadio(this,&quot;rs-stage&quot;)"><div class="radio-dot"></div>Rehab Part 2 (2003GP)</div>'
     +'</div></div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Duration <span class="req">*</span></div>'
-    +'<select class="field-input" id="rs-duration"><option value="">Select</option><option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option></select></div>'
-    +'<div class="field"><div class="field-label">Session type</div>'
-    +'<select class="field-input" id="rs-sesstype"><option>AVT (Auditory Verbal Therapy)</option><option>Mapping / Programming</option><option>Counselling</option><option>Parent training</option><option>Assessment</option></select></div>'
+    +'<div class="field"><div class="field-label">Therapist / Audiologist name <span class="req">*</span></div>'
+    +'<input class="field-input" id="rs-therapist" placeholder="Name"></div>'
     +'</div>'
-    +'<div class="field"><div class="field-label">Therapist name <span class="req">*</span></div><input class="field-input" id="rs-therapist" placeholder="Name of AVT therapist / audiologist"></div>'
-    +'</div>'
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Attendance &amp; Response</div>'
+
+    // ── Section 2: Attendance ────────────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">✅ Attendance</div>'
     +'<div class="field"><div class="field-label">Attendance <span class="req">*</span></div>'
     +'<div class="radio-group" id="rs-attendance">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Present - child + guardian attended</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Absent - family informed</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Absent - not reachable</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>P — Present (child + guardian attended)</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>A — Absent (family informed)</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>A — Absent (not reachable)</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Holiday / Centre closed</div>'
     +'</div></div>'
-    +'<div class="field"><div class="field-label">Child&#39;s progress this session</div>'
+    +'</div>'
+
+    // ── Section 3: Session Activities (matches AIISH paper exactly) ──
+    +'<div class="form-section" style="margin:0 16px" id="rs-activities-section">'
+    +'<div class="form-section-title">📋 Session Activities</div>'
+    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:10px">Tick if completed — leave blank if not required (NA)</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +activityCheck('rs-act-audition',  '🦻 Audition')
+    +activityCheck('rs-act-speech',    '🗣️ Speech')
+    +activityCheck('rs-act-language',  '📖 Language')
+    +activityCheck('rs-act-cognition', '🧠 Cognition')
+    +activityCheck('rs-act-parent',    '👨‍👩‍👧 Parent guidance')
+    +'</div></div>'
+
+    // ── Section 4: Mapping (shown only if session type = mapping) ──
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">🔧 Mapping / Programming</div>'
+    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:8px">Complete only if a mapping session was done today</div>'
+    +'<div class="field"><div class="field-label">Mapping done today?</div>'
+    +'<div class="radio-group" id="rs-mapping-done">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-mapping-done&quot;)"><div class="radio-dot"></div>No mapping today</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-mapping-done&quot;)"><div class="radio-dot"></div>Yes — mapping done</div>'
+    +'</div></div>'
+    +'<div id="rs-mapping-details" style="display:none">'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">ECAP done?</div>'
+    +'<div class="radio-group" id="rs-ecap">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-ecap&quot;)"><div class="radio-dot"></div>Yes</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-ecap&quot;)"><div class="radio-dot"></div>No</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Sound field test done?</div>'
+    +'<div class="radio-group" id="rs-soundfield">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-soundfield&quot;)"><div class="radio-dot"></div>Yes</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-soundfield&quot;)"><div class="radio-dot"></div>No</div>'
+    +'</div></div></div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Comfort with coil magnet?</div>'
+    +'<div class="radio-group" id="rs-coilcomfort">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-coilcomfort&quot;)"><div class="radio-dot"></div>Yes</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-coilcomfort&quot;)"><div class="radio-dot"></div>No</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Referred to ENT surgeon?</div>'
+    +'<div class="radio-group" id="rs-ent-ref">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-ent-ref&quot;)"><div class="radio-dot"></div>No</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-ent-ref&quot;)"><div class="radio-dot"></div>Yes</div>'
+    +'</div></div></div>'
+    +'<div class="field"><div class="field-label">Status of sutures / skin under coil</div>'
+    +'<input class="field-input" id="rs-sutures" placeholder="Good / Healed / Issue (describe)"></div>'
+    +'<div class="field"><div class="field-label">Mapping issues</div>'
+    +'<input class="field-input" id="rs-mapping-issues" placeholder="None / describe any issues"></div>'
+    +'</div></div>'
+
+    // ── Section 5: Progress ──────────────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">📈 Progress &amp; Milestone</div>'
+    +'<div class="field"><div class="field-label">Child progress this session</div>'
     +'<div class="radio-group" id="rs-progress">'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Excellent - exceeding expectations</div>'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Good - on track</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Fair - needs more attention</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Poor - significant difficulty</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>🌟 Excellent</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>✅ Good — on track</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>⚠️ Fair — needs attention</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>❌ Poor — significant difficulty</div>'
     +'</div></div>'
     +'<div class="field"><div class="field-label">Speech &amp; Language milestone</div>'
-    +'<select class="field-input" id="rs-milestone"><option value="">Select milestone...</option>'
-    +'<option>Detection - responds to sounds</option><option>Discrimination - distinguishes sounds</option>'
-    +'<option>Identification - recognises familiar words</option><option>Comprehension - understands spoken language</option>'
-    +'<option>Verbal expression - producing speech</option><option>Age-appropriate communication</option>'
-    +'</select></div></div>'
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Claim &amp; Follow-up</div>'
+    +'<select class="field-input" id="rs-milestone"><option value="">Select...</option>'
+    +'<option>Detection</option><option>Discrimination</option>'
+    +'<option>Identification</option><option>Comprehension</option>'
+    +'<option>Verbal expression</option><option>Age-appropriate communication</option>'
+    +'</select></div>'
+    +'<div class="field"><div class="field-label">Session notes</div>'
+    +'<textarea class="field-input" id="rs-notes" rows="2" placeholder="Progress notes, observations..."></textarea></div>'
+    +'</div>'
+
+    // ── Section 6: Claim ─────────────────────────────────────────
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">💰 Claim Details</div>'
     +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Claim reference no.</div><input class="field-input" id="rs-claimref" placeholder="e.g. COC_H_..."></div>'
+    +'<div class="field"><div class="field-label">Claim reference no.</div>'
+    +'<input class="field-input" id="rs-claimref" placeholder="COC_H_..."></div>'
     +'<div class="field"><div class="field-label">Claim status</div>'
     +'<select class="field-input" id="rs-claimstatus"><option value="">Select</option>'
-    +'<option>CLAIMS PAID</option><option>SUBMITTED</option><option>PENDING</option><option>NEED MORE INFO</option><option>REJECTED</option>'
+    +'<option>CLAIMS PAID</option><option>SUBMITTED</option><option>PENDING</option>'
+    +'<option>NEED MORE INFO</option><option>REJECTED</option>'
     +'</select></div></div>'
-    +'<div class="field"><div class="field-label">Next session date</div><input type="date" class="field-input" id="rs-nextsess"></div>'
-    +'</div>'
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Notes</div>'
-    +'<div class="field"><div class="field-label">Session notes / observations</div><textarea class="field-input" id="rs-notes" rows="3" placeholder="Progress notes, parent feedback, observations..."></textarea></div>'
-    +'<div class="field"><div class="field-label">Issues flagged</div><textarea class="field-input" id="rs-issues" rows="2" placeholder="Device issues, attendance concerns, any flags..."></textarea></div>'
     +'</div>'
     +'<div style="padding:0 16px 40px">'
     +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
@@ -4293,6 +4433,31 @@ function openRehabSession(cas) {
     +'</div>';
 
   showScreen('rehabsession');
+
+  // Toggle mapping details when mapping is selected
+  setTimeout(function() {
+    var mappingGroup = document.getElementById('rs-mapping-done');
+    if (mappingGroup) {
+      mappingGroup.addEventListener('click', function() {
+        var checked = document.querySelector('#rs-mapping-done .radio-item.checked');
+        var details = document.getElementById('rs-mapping-details');
+        if (details) details.style.display = (checked && checked.textContent.includes('Yes')) ? 'block' : 'none';
+      });
+    }
+    // Auto-select current month
+    var monthEl = document.getElementById('rs-month');
+    if (monthEl) {
+      var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      monthEl.value = months[new Date().getMonth()];
+    }
+    // Auto-select quarter
+    var qEl = document.getElementById('rs-quarter');
+    if (qEl) {
+      var m = new Date().getMonth();
+      var q = m < 3 ? 'Quarter I (Month 1-3)' : m < 6 ? 'Quarter II (Month 4-6)' : m < 9 ? 'Quarter III (Month 7-9)' : 'Quarter IV (Month 10-12)';
+      qEl.value = q;
+    }
+  }, 100);
 }
 
 async function submitRehabSession() {
@@ -4320,27 +4485,45 @@ async function submitRehabSession() {
   var progress = document.querySelector('#rs-progress .radio-item.checked');
   var now      = new Date().toISOString();
 
+  var mappingDone = document.querySelector('#rs-mapping-done .radio-item.checked');
+  var mappingYes  = mappingDone && mappingDone.textContent.includes('Yes');
+
   var sessionEntry = {
-    caseId: String(selectedCase.id),
-    caseName: selectedCase.name || '',
+    caseId:       String(selectedCase.id),
+    caseName:     selectedCase.name || '',
     caseDistrict: selectedCase.district || '',
-    rehabCentre: currentUser ? currentUser.unit : '',
-    submittedBy: currentUser ? currentUser.username : '',
-    sessdate: sessdate, sessNum: sessNum,
-    stage: stage.textContent.trim(),
-    duration: duration,
-    sesstype: document.getElementById('rs-sesstype').value,
-    therapist: therapist,
-    attendance: attendance.textContent.trim(),
-    progress: progress ? progress.textContent.trim() : '',
-    milestone: document.getElementById('rs-milestone').value,
-    claimRef:    document.getElementById('rs-claimref').value.trim(),
-    claimStatus: document.getElementById('rs-claimstatus').value,
-    nextSess:    document.getElementById('rs-nextsess').value,
-    notes:       document.getElementById('rs-notes').value.trim(),
-    issues:      document.getElementById('rs-issues').value.trim(),
-    timestamp: now,
-    entryId: 'RS-' + Date.now()
+    rehabCentre:  currentUser ? currentUser.unit : '',
+    submittedBy:  currentUser ? currentUser.username : '',
+    sessdate:     sessdate,
+    sessNum:      sessNum,
+    month:        (document.getElementById('rs-month') ? document.getElementById('rs-month').value : ''),
+    quarter:      (document.getElementById('rs-quarter') ? document.getElementById('rs-quarter').value : ''),
+    stage:        stage.textContent.trim(),
+    therapist:    therapist,
+    attendance:   attendance.textContent.trim(),
+    // Activities checklist
+    actAudition:  getActivityChecked('rs-act-audition'),
+    actSpeech:    getActivityChecked('rs-act-speech'),
+    actLanguage:  getActivityChecked('rs-act-language'),
+    actCognition: getActivityChecked('rs-act-cognition'),
+    actParent:    getActivityChecked('rs-act-parent'),
+    // Progress
+    progress:     progress ? progress.textContent.trim() : '',
+    milestone:    document.getElementById('rs-milestone').value,
+    notes:        document.getElementById('rs-notes').value.trim(),
+    // Mapping
+    mappingDone:  mappingYes,
+    ecapDone:     mappingYes ? (document.querySelector('#rs-ecap .radio-item.checked') ? document.querySelector('#rs-ecap .radio-item.checked').textContent.trim() : '') : '',
+    soundField:   mappingYes ? (document.querySelector('#rs-soundfield .radio-item.checked') ? document.querySelector('#rs-soundfield .radio-item.checked').textContent.trim() : '') : '',
+    coilComfort:  mappingYes ? (document.querySelector('#rs-coilcomfort .radio-item.checked') ? document.querySelector('#rs-coilcomfort .radio-item.checked').textContent.trim() : '') : '',
+    entRef:       mappingYes ? (document.querySelector('#rs-ent-ref .radio-item.checked') ? document.querySelector('#rs-ent-ref .radio-item.checked').textContent.trim() : '') : '',
+    sutures:      mappingYes ? document.getElementById('rs-sutures').value.trim() : '',
+    mappingIssues:mappingYes ? document.getElementById('rs-mapping-issues').value.trim() : '',
+    // Claim
+    claimRef:     document.getElementById('rs-claimref').value.trim(),
+    claimStatus:  document.getElementById('rs-claimstatus').value,
+    timestamp:    now,
+    entryId:      'RS-' + Date.now()
   };
 
   try {

@@ -4121,16 +4121,32 @@ function openRehabSession(cas) {
   if (isDemo()) { demoBanner(); return; }
 
   var sessionsDone = cas.sessions || 0;
-  var sessYear = sessionsDone < 104 ? 1 : 2;
-  var sessPerWeek = sessYear === 1 ? 2 : 1;
-  var today = new Date();
-  var todayStr = today.toISOString().split('T')[0];
-  var monthName = today.toLocaleString('en-IN', {month:'long', year:'numeric'});
-  var quarterNum = Math.ceil((today.getMonth()+1)/3);
-  var quarterLabel = ['I','II','III','IV'][quarterNum-1];
+
+  // 156 sessions over 2 years: Year 1 = 104 (2/week), Year 2 = 52 (1/week)
+  // 8 quarters total: Y1-Q1..Q4 (26 each), Y2-Q1..Q4 (13 each)
+  var QTRS = [
+    {id:1, label:'Year 1 — Q1 (Month 1–3)',   year:1, spw:2, rows:26, start:1},
+    {id:2, label:'Year 1 — Q2 (Month 4–6)',   year:1, spw:2, rows:26, start:27},
+    {id:3, label:'Year 1 — Q3 (Month 7–9)',   year:1, spw:2, rows:26, start:53},
+    {id:4, label:'Year 1 — Q4 (Month 10–12)', year:1, spw:2, rows:26, start:79},
+    {id:5, label:'Year 2 — Q1 (Month 13–15)', year:2, spw:1, rows:13, start:105},
+    {id:6, label:'Year 2 — Q2 (Month 16–18)', year:2, spw:1, rows:13, start:118},
+    {id:7, label:'Year 2 — Q3 (Month 19–21)', year:2, spw:1, rows:13, start:131},
+    {id:8, label:'Year 2 — Q4 (Month 22–24)', year:2, spw:1, rows:13, start:144},
+  ];
+  // Auto-detect quarter from sessions done
+  var curQtr = QTRS[0];
+  for (var qi = 0; qi < QTRS.length; qi++) {
+    if (sessionsDone >= QTRS[qi].start - 1) curQtr = QTRS[qi];
+  }
+  var sessYear     = curQtr.year;
+  var sessPerWeek  = curQtr.spw;
+  var today        = new Date();
+  var todayStr     = today.toISOString().split('T')[0];
+  var monthName    = today.toLocaleString('en-IN', {month:'long', year:'numeric'});
 
   document.getElementById('rs-title').textContent = cas.name || 'Weekly Session Log';
-  document.getElementById('rs-sub').textContent = (currentUser.unit||'') + '  ·  ' + monthName + '  ·  Quarter ' + quarterLabel;
+  document.getElementById('rs-sub').textContent = (currentUser.unit||'') + '  ·  ' + monthName + '  ·  ' + curQtr.label;
 
   // ── Attendance flag banner ──────────────────────────────────
   var flag = cas._attendanceFlag || '';
@@ -4162,39 +4178,55 @@ function openRehabSession(cas) {
     +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Rehab centre</span><div style="color:#0a3d2e">'+(currentUser.unit||'—')+'</div></div>'
     +'</div></div>';
 
-  var qtrFromSessions = sessionsDone < 26 ? 1 : sessionsDone < 52 ? 2 : sessionsDone < 78 ? 3 : 4;
+  // ── Quarter selector — 8 quarters across 2 years ─────────────
   var qtrHTML =
     '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
-    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">TICK ONE ONLY</div>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px">'
-    +['Quarter I — Month 1 to 3','Quarter II — Month 4 to 6','Quarter III — Month 7 to 9','Quarter IV — Month 10 to 12'].map(function(lbl,i){
-      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">'
-        +'<input type="radio" name="rs-qtr" value="'+(i+1)+'" '+(qtrFromSessions===i+1?'checked ':'')+'style="accent-color:var(--blue);width:14px;height:14px" onchange="rsUpdateQtrMonth()"> '+lbl+'</label>';
+    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">TICK ONE ONLY — Select quarter being submitted</div>'
+    // Year 1 label
+    +'<div style="font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;margin:4px 0 4px">Year 1 &mdash; 2 sessions per week (104 total)</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;margin-bottom:8px">'
+    +QTRS.filter(function(q){return q.year===1;}).map(function(q){
+      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface)">'
+        +'<input type="radio" name="rs-qtr" value="'+q.id+'" '+(curQtr.id===q.id?'checked ':'')+'style="accent-color:var(--green);width:14px;height:14px;flex-shrink:0" onchange="rsUpdateQtrMonth()"> '
+        +'<span><strong>Q'+q.id+'</strong> '+q.label.replace('Year 1 \u2014 ','')+'<br><span style="font-size:10px;color:var(--text-light)">Sessions '+q.start+'\u2013'+(q.start+q.rows-1)+'</span></span>'
+        +'</label>';
     }).join('')
     +'</div>'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
-    +'<span style="font-size:12px;color:var(--text-mid)">Month:</span>'
-    +'<input type="month" id="rs-month" value="'+new Date().toISOString().slice(0,7)+'" style="font-size:12px;border:0.5px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface);color:var(--text)">'
+    // Year 2 label
+    +'<div style="font-size:10px;font-weight:600;color:var(--blue);text-transform:uppercase;margin:4px 0 4px">Year 2 &mdash; 1 session per week (52 total)</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px">'
+    +QTRS.filter(function(q){return q.year===2;}).map(function(q){
+      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface)">'
+        +'<input type="radio" name="rs-qtr" value="'+q.id+'" '+(curQtr.id===q.id?'checked ':'')+'style="accent-color:var(--blue);width:14px;height:14px;flex-shrink:0" onchange="rsUpdateQtrMonth()"> '
+        +'<span><strong>Q'+(q.id-4)+'</strong> '+q.label.replace('Year 2 \u2014 ','')+'<br><span style="font-size:10px;color:var(--text-light)">Sessions '+q.start+'\u2013'+(q.start+q.rows-1)+'</span></span>'
+        +'</label>';
+    }).join('')
     +'</div>'
     +'</div>';
 
-  var commonHTML =
-    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
-    +'<div class="field-row" style="margin-bottom:0">'
-    +'<div class="field"><div class="field-label">Audiologist / AVT Therapist <span class="req">*</span></div>'
-    +'<input class="field-input" id="rs-therapist" placeholder="Name of therapist"></div>'
-    +'<div class="field"><div class="field-label">Rehab stage <span class="req">*</span></div>'
-    +'<div class="radio-group" id="rs-stage" style="flex-direction:row;gap:6px">'
-    +'<div class="radio-item '+(cas.r1Admit&&!cas.r2Admit?'checked':'')+'" onclick="selectRadio(this,\'rs-stage\')" style="flex:1"><div class="radio-dot"></div>Part 1</div>'
-    +'<div class="radio-item '+(cas.r2Admit?'checked':'')+'" onclick="selectRadio(this,\'rs-stage\')" style="flex:1"><div class="radio-dot"></div>Part 2</div>'
-    +'</div></div>'
-    +'</div></div>';
-
-  var weeks14 = ['Week-1','Week-1','Week-1','Week-1','Week-2','Week-2','Week-2','Week-3','Week-3','Week-3','Week-4','Week-4','Week-4','Week-4'];
-  var sessStart = (qtrFromSessions-1)*26 + 1;
+  // ── Build table rows dynamically for selected quarter ────────
+  // Year 1: 26 rows (2/week x 13 weeks), Year 2: 13 rows (1/week x 13 weeks)
+  function buildRsRows(qtr) {
+    var rows = [];
+    var rowCount = qtr.rows;  // 26 or 13
+    var spw = qtr.spw;
+    // Generate week labels: 13 weeks, spw slots each
+    for (var w = 1; w <= 13; w++) {
+      for (var s = 0; s < spw; s++) {
+        var label = 'Week-' + w;
+        rows.push(label);
+        if (rows.length >= rowCount) break;
+      }
+      if (rows.length >= rowCount) break;
+    }
+    return rows;
+  }
+  var weekLabels = buildRsRows(curQtr);
+  var rowCount   = curQtr.rows;
+  var sessStart  = curQtr.start;
 
   // Data rows — P/A only, session# counts only on P rows
-  var tableRows = weeks14.map(function(w,i){
+  var tableRows = weekLabels.map(function(w,i){
     return '<tr id="rs-row-'+i+'">'
       +'<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">'+(i+1)+'</td>'
       +'<td style="padding:5px 3px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">'+w+'</td>'
@@ -4220,8 +4252,9 @@ function openRehabSession(cas) {
     +'.rs-dot.na{background:#faeeda;color:#633806;font-size:9px}'
     +'.rs-dot.off{opacity:.2;pointer-events:none;color:var(--text-light);background:transparent}'
     +'</style>'
+    +'<div id="rs-sess-badge" style="font-size:11px;color:var(--blue);font-weight:600;padding:4px 0 6px">'+curQtr.label+' — Sessions '+curQtr.start+'–'+(curQtr.start+curQtr.rows-1)+' — '+curQtr.spw+'x per week</div>'
     +'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--blue-mid);border-radius:0 0 10px 10px">'
-    +'<table style="width:100%;border-collapse:collapse;min-width:400px">'
+    +'<table id="rs-avt-table" style="width:100%;border-collapse:collapse;min-width:400px">'
     +'<thead>'
     +'<tr style="background:var(--blue-light)">'
     // Sl.No — rowspan 2
@@ -4291,11 +4324,11 @@ function openRehabSession(cas) {
     +'</div>';
 
   window._rs_sessStart   = sessStart;
-  window._rs_slotCount   = 14;
+  window._rs_slotCount   = rowCount;
   window._rs_sessYear    = sessYear;
   window._rs_sessPerWeek = sessPerWeek;
-  window._rs_sessionsDone = sessionsDone;
-
+  window._rs_qtrs        = QTRS;
+  window._rs_curQtrId    = curQtr.id;
   document.getElementById('rs-body').innerHTML =
     alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + mappingHTML + submitHTML;
 
@@ -4385,7 +4418,8 @@ function rsRowAtt(rowIdx, val) {
   // Recalculate ALL session numbers in one pass — only P rows get a number
   var sessStart = window._rs_sessStart || 1;
   var runningP = 0;
-  for (var j = 0; j < 14; j++) {
+  var slotCount = window._rs_slotCount || 14;
+  for (var j = 0; j < slotCount; j++) {
     var pa = document.getElementById('rs-pa-'+j);
     var sn = document.getElementById('rs-snum-'+j);
     if (!pa || !sn) continue;
@@ -4407,7 +4441,8 @@ function rsDotTap(el) {
 }
 function rsUpdateTotal() {
   var present = 0, total = 0;
-  for (var i = 0; i < 14; i++) {
+  var slotCount = window._rs_slotCount || 14;
+  for (var i = 0; i < slotCount; i++) {
     var pa = document.getElementById('rs-pa-'+i);
     if (!pa) continue;
     var v = pa.getAttribute('data-val') || '';
@@ -4422,16 +4457,49 @@ function rsUpdateTotal() {
 function rsUpdateQtrMonth() {
   var radio = document.querySelector('input[name="rs-qtr"]:checked');
   if (!radio) return;
-  var qtr = parseInt(radio.value);
-  window._rs_sessStart = (qtr-1)*26 + 1;
-  var runningP = 0;
-  for (var j = 0; j < 14; j++) {
-    var pa = document.getElementById('rs-pa-'+j);
-    var sn = document.getElementById('rs-snum-'+j);
-    if (!pa || !sn) continue;
-    if ((pa.getAttribute('data-val')||'') === 'P') { runningP++; sn.textContent = window._rs_sessStart + runningP - 1; }
-    else sn.textContent = '';
+  var qtrId = parseInt(radio.value);
+  var qtrs  = window._rs_qtrs || [];
+  var qtr   = qtrs.find(function(q){return q.id===qtrId;}) || qtrs[0];
+  if (!qtr) return;
+
+  // Update session start and row count
+  window._rs_sessStart  = qtr.start;
+  window._rs_slotCount  = qtr.rows;
+  window._rs_curQtrId   = qtrId;
+
+  // Rebuild table rows for new row count (26 or 13)
+  var tbody = document.querySelector('#rs-avt-table tbody');
+  if (tbody) {
+    // Generate week labels for the selected quarter
+    var weekLabels = [];
+    for (var w = 1; w <= 13; w++) {
+      for (var s = 0; s < qtr.spw; s++) {
+        weekLabels.push('Week-'+w);
+        if (weekLabels.length >= qtr.rows) break;
+      }
+      if (weekLabels.length >= qtr.rows) break;
+    }
+    var newHTML = weekLabels.map(function(wlbl, i){
+      return '<tr id="rs-row-'+i+'">'
+        +'<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">'+(i+1)+'</td>'
+        +'<td style="padding:5px 3px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">'+wlbl+'</td>'
+        +'<td style="padding:3px 3px;border-bottom:1px solid var(--border)"><input type="date" id="rs-date-'+i+'" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
+        +'<td style="padding:3px 3px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-pa-'+i+'" onclick="rsTogglePA('+i+')" style="display:inline-block;min-width:28px;padding:4px 5px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;background:var(--gray);color:var(--text-light);">\u2014</span></td>'
+        +'<td style="padding:5px 3px;font-size:12px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;color:var(--text)" id="rs-snum-'+i+'"></td>'
+        +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-aud-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-spe-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-lan-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-cog-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-par-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        +'</tr>';
+    }).join('');
+    tbody.innerHTML = newHTML;
   }
+  // Update session info badge
+  var badge = document.getElementById('rs-sess-badge');
+  if (badge) badge.textContent = qtr.label + ' \u2014 Sessions ' + qtr.start + '\u2013' + (qtr.start+qtr.rows-1) + ' \u2014 ' + qtr.spw + 'x per week';
+  // Reset total
+  rsUpdateTotal();
 }
 
 

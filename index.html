@@ -4538,109 +4538,123 @@ function rsSelectAtt(sid, val) {
 }
 
 async function submitRehabSession() {
-  if (isDemo()) { alert('🔒 Demo account — submissions are disabled.'); return; }
+  if (isDemo()) { alert('\uD83D\uDD12 Demo account \u2014 submissions are disabled.'); return; }
   var errEl = document.getElementById('rs-error');
   var btn   = document.getElementById('rs-submit-btn');
   errEl.style.display = 'none';
 
-  // ── Validate common fields ──────────────────────────────────
+  // ── Validate ────────────────────────────────────────────────
   var therapist = document.getElementById('rs-therapist').value.trim();
   var stage     = document.querySelector('#rs-stage .radio-item.checked');
   if (!therapist) { errEl.textContent='Therapist name is required.'; errEl.style.display='block'; return; }
   if (!stage)     { errEl.textContent='Rehab stage is required.';    errEl.style.display='block'; return; }
 
-  // ── Collect slot data ────────────────────────────────────────
-  var slotCount = window._rs_slotCount || 2;
-  var sessYear  = window._rs_sessYear  || 1;
-  var sessPerWeek = window._rs_sessPerWeek || 2;
+  // ── Collect rows from new table form ────────────────────────
+  var slotCount    = window._rs_slotCount    || 14;
+  var sessYear     = window._rs_sessYear     || 1;
+  var sessPerWeek  = window._rs_sessPerWeek  || 2;
+  var sessStart    = window._rs_sessStart    || 1;
   var sessionsDone = window._rs_sessionsDone || selectedCase.sessions || 0;
+  var curQtrId     = window._rs_curQtrId     || 1;
+
+  // Get selected quarter label for record
+  var qtrRadio = document.querySelector('input[name="rs-qtr"]:checked');
+  var qtrLabel = qtrRadio ? qtrRadio.parentElement.textContent.trim() : '';
 
   var slots = [];
   var presentCount = 0;
   var absentCount  = 0;
   var atLeastOne   = false;
+  var runningP     = 0;
 
-  for (var s=0; s<slotCount; s++) {
-    var sid  = 'rs-slot-'+s;
-    var card = document.getElementById(sid+'-card');
-    if (!card) continue;
-    var att = card.getAttribute('data-att');
-    if (!att) continue; // slot not filled — skip
+  for (var s = 0; s < slotCount; s++) {
+    var paEl   = document.getElementById('rs-pa-'+s);
+    var dateEl = document.getElementById('rs-date-'+s);
+    if (!paEl) continue;
+    var att = paEl.getAttribute('data-val') || '';
+    if (att === '') continue; // row not filled — skip
     atLeastOne = true;
 
-    var sDate = document.getElementById(sid+'-date');
-    var sNum  = sessionsDone + s + 1;
-    var slot  = {
-      slotIndex: s,
-      sessdate:  sDate ? sDate.value : new Date().toISOString().split('T')[0],
-      sessNum:   sNum,
+    var slot = {
+      rowIndex:   s,
+      sessdate:   dateEl ? dateEl.value : '',
       attendance: att,
       isPresent:  att === 'P',
-      isAbsent:   att !== 'P'
+      isAbsent:   att === 'A'
     };
+
     if (att === 'P') {
+      runningP++;
+      slot.sessNum     = sessStart + runningP - 1;
+      slot.audition    = document.getElementById('rs-aud-'+s) ? document.getElementById('rs-aud-'+s).classList.contains('tick') : false;
+      slot.speech      = document.getElementById('rs-spe-'+s) ? document.getElementById('rs-spe-'+s).classList.contains('tick') : false;
+      slot.language    = document.getElementById('rs-lan-'+s) ? document.getElementById('rs-lan-'+s).classList.contains('tick') : false;
+      slot.cognition   = document.getElementById('rs-cog-'+s) ? document.getElementById('rs-cog-'+s).classList.contains('tick') : false;
+      slot.parentGuide = document.getElementById('rs-par-'+s) ? document.getElementById('rs-par-'+s).classList.contains('tick') : false;
       presentCount++;
-      slot.audition      = document.getElementById(sid+'-aud')  ? document.getElementById(sid+'-aud').checked  : false;
-      slot.speech        = document.getElementById(sid+'-spe')  ? document.getElementById(sid+'-spe').checked  : false;
-      slot.language      = document.getElementById(sid+'-lan')  ? document.getElementById(sid+'-lan').checked  : false;
-      slot.cognition     = document.getElementById(sid+'-cog')  ? document.getElementById(sid+'-cog').checked  : false;
-      slot.parentGuide   = document.getElementById(sid+'-par')  ? document.getElementById(sid+'-par').checked  : false;
     } else {
+      slot.sessNum = null;
       absentCount++;
     }
     slots.push(slot);
   }
 
   if (!atLeastOne) {
-    errEl.textContent = 'Please mark attendance for at least one session slot.';
+    errEl.textContent = 'Please mark attendance for at least one row.';
     errEl.style.display = 'block';
     return;
   }
 
-  btn.textContent = 'Saving...';
+  btn.textContent = 'Saving\u2026';
   btn.disabled = true;
 
-  var now       = new Date().toISOString();
-  var lastDate  = slots.filter(function(s){return s.sessdate;}).map(function(s){return s.sessdate;}).sort().pop() || '';
-  var monthStr  = lastDate.substring(0,7);
-  var progress  = document.querySelector('#rs-progress .radio-item.checked');
-  var parentG   = document.querySelector('#rs-parentguidance .radio-item.checked');
-  var videoR    = document.querySelector('#rs-video .radio-item.checked');
-  var soundF    = document.querySelector('#rs-soundfield .radio-item.checked');
-  var ecap      = document.querySelector('#rs-ecap .radio-item.checked');
+  var now      = new Date().toISOString();
+  var allDates = slots.filter(function(s){return s.sessdate;}).map(function(s){return s.sessdate;}).sort();
+  var lastDate = allDates[allDates.length-1] || '';
+  var firstDate= allDates[0] || '';
+  var monthStr = lastDate.substring(0,7);
 
-  // ── Build Firestore entry ────────────────────────────────────
+  var sfEl   = document.querySelector('#rs-soundfield .radio-item.checked');
+  var ecapEl = document.querySelector('#rs-ecap .radio-item.checked');
+  var magEl  = document.querySelector('#rs-magnet .radio-item.checked');
+  var entEl  = document.querySelector('#rs-entref .radio-item.checked');
+
+  // ── Build Firestore quarterly entry ─────────────────────────
   var weekEntry = {
-    type:          'weekly_sheet',
-    caseId:        String(selectedCase.id),
-    caseName:      selectedCase.name || '',
-    caseDistrict:  selectedCase.district || '',
-    caseHospital:  selectedCase.hospital || '',
-    rehabCentre:   currentUser ? currentUser.unit : '',
-    submittedBy:   currentUser ? currentUser.username : '',
-    therapist:     therapist,
-    stage:         stage.textContent.trim(),
-    sessYear:      sessYear,
-    sessPerWeek:   sessPerWeek,
-    month:         monthStr,
-    slots:         slots,
-    totalSlots:    slots.length,
-    presentCount:  presentCount,
-    absentCount:   absentCount,
-    attendancePct: slots.length > 0 ? Math.round(presentCount/slots.length*100) : 0,
-    progress:      progress  ? progress.textContent.trim()  : '',
-    milestone:     document.getElementById('rs-milestone')    ? document.getElementById('rs-milestone').value    : '',
-    parentGuidance:parentG   ? parentG.textContent.trim()   : '',
-    videoRecorded: videoR    ? videoR.textContent.trim()    : '',
-    mapDate:       document.getElementById('rs-mapdate')      ? document.getElementById('rs-mapdate').value      : '',
-    mapCount:      document.getElementById('rs-mapcount')     ? document.getElementById('rs-mapcount').value     : '',
-    soundField:    soundF    ? soundF.textContent.trim()    : '',
-    ecap:          ecap      ? ecap.textContent.trim()      : '',
-    deviceStatus:  document.getElementById('rs-devicestatus') ? document.getElementById('rs-devicestatus').value.trim() : '',
-    notes:         document.getElementById('rs-notes')        ? document.getElementById('rs-notes').value.trim()        : '',
-    issues:        document.getElementById('rs-issues')       ? document.getElementById('rs-issues').value.trim()       : '',
-    timestamp:     now,
-    entryId:       'RSW-' + Date.now()
+    type:           'quarterly_sheet',
+    quarter:        qtrLabel,
+    quarterNum:     curQtrId,
+    year:           sessYear,
+    sessPerWeek:    sessPerWeek,
+    sessStart:      sessStart,
+    sessEnd:        sessStart + runningP - 1,
+    caseId:         String(selectedCase.id),
+    caseName:       selectedCase.name || '',
+    caseDistrict:   selectedCase.district || '',
+    caseHospital:   selectedCase.hospital || '',
+    rehabCentre:    currentUser ? currentUser.unit : '',
+    submittedBy:    currentUser ? currentUser.username : '',
+    therapist:      therapist,
+    stage:          stage.textContent.trim(),
+    month:          monthStr,
+    dateFrom:       firstDate,
+    dateTo:         lastDate,
+    slots:          slots,
+    totalRows:      slots.length,
+    presentCount:   presentCount,
+    absentCount:    absentCount,
+    attendancePct:  slots.length > 0 ? Math.round(presentCount/slots.length*100) : 0,
+    mapDate:        (document.getElementById('rs-mapdate')      ||{}).value     || '',
+    mapCount:       (document.getElementById('rs-mapcount')     ||{}).value     || '',
+    soundField:     sfEl   ? sfEl.textContent.trim()   : '',
+    ecap:           ecapEl ? ecapEl.textContent.trim()  : '',
+    magnetOk:       magEl  ? magEl.textContent.trim()   : '',
+    entReferral:    entEl  ? entEl.textContent.trim()   : '',
+    deviceStatus:   (document.getElementById('rs-devicestatus') ||{}).value     || '',
+    notes:          (document.getElementById('rs-notes')        ||{}).value     || '',
+    issues:         (document.getElementById('rs-issues')       ||{}).value     || '',
+    timestamp:      now,
+    entryId:        'RSQ-' + Date.now()
   };
 
   // ── Compute attendance flags ─────────────────────────────────
@@ -4671,8 +4685,8 @@ async function submitRehabSession() {
     if (dayGap > 14) newFlag = 'red';
   }
 
-  // New total session count
-  var newTotalSessions = sessionsDone + presentCount;
+  // New total session count — sessStart is first session of this quarter
+  var newTotalSessions = (weekEntry.sessStart - 1) + weekEntry.presentCount;
 
   var caseUpdates = {
     sessions:          newTotalSessions,
@@ -4708,10 +4722,10 @@ async function submitRehabSession() {
     var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(selectedCase.id); });
     if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
 
-    btn.textContent = 'Save Weekly Log →';
+    btn.textContent = 'Save Monthly Log →';
     btn.disabled = false;
 
-    var presentMsg = presentCount === 0 ? 'All sessions absent — flagged for follow-up' : presentCount+' session'+(presentCount>1?'s':'')+' logged for '+selectedCase.name;
+    var presentMsg = presentCount === 0 ? 'All sessions absent — flagged for follow-up' : presentCount+' session'+(presentCount>1?'s':'')+' recorded for '+selectedCase.name+' ('+weekEntry.quarter+')';
     if (newFlag === 'red') presentMsg += ' · 🔴 District Officer alert triggered';
     else if (newFlag === 'yellow') presentMsg += ' · ⚠️ Follow-up recommended';
 
@@ -4724,7 +4738,7 @@ async function submitRehabSession() {
   } catch(e) {
     errEl.textContent = 'Error saving: ' + e.message;
     errEl.style.display = 'block';
-    btn.textContent = 'Save Weekly Log →';
+    btn.textContent = 'Save Monthly Log →';
     btn.disabled = false;
   }
 }

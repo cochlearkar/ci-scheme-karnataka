@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seed Demo Users — Shravan Sanjeevini</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f3ef; padding: 20px; }
+.card { background: #fff; border-radius: 14px; padding: 24px; max-width: 600px; margin: 0 auto; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+h2 { font-size: 18px; color: #0a3d2e; margin-bottom: 6px; }
+p { font-size: 13px; color: #666; margin-bottom: 20px; }
+.user-row { background: #f0f9f5; border: 1px solid #9FE1CB; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.user-row .role { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #1a6b4a; margin-bottom: 4px; }
+.user-row .name { font-size: 14px; font-weight: 600; color: #0a3d2e; margin-bottom: 2px; }
+.user-row .creds { font-size: 12px; color: #555; font-family: monospace; }
+.warn { background: #fff8e1; border: 1px solid #f59e0b; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #92400e; margin-bottom: 16px; }
+.admin-box { background: #f0f4ff; border: 1px solid #c0cff8; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+.admin-box .label { font-size: 12px; font-weight: 600; color: #1a3a8a; margin-bottom: 8px; }
+input { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; font-family: inherit; margin-bottom: 8px; }
+button { width: 100%; padding: 14px; background: #0a3d2e; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 8px; }
+button:disabled { opacity: .5; }
+#log { margin-top: 16px; font-size: 12px; font-family: monospace; background: #1a1a1a; color: #4ade80; padding: 14px; border-radius: 8px; min-height: 80px; white-space: pre-wrap; display: none; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: 700; margin-right: 4px; }
+.chip-h { background: #e1f5ee; color: #0a3d2e; }
+.chip-r { background: #e6f1fb; color: #1a4a7a; }
+.chip-d { background: #faeeda; color: #8a5a0a; }
+.chip-s { background: #eeedfe; color: #4a2a7a; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🦻 Shravan Sanjeevini — Demo Users</h2>
+  <p>Creates one demo account for each role so authorities can explore the application.</p>
+
+  <div class="warn">⚠️ Run only once. If accounts already exist, they will be skipped safely.</div>
+
+  <div style="margin-bottom:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+
+      <div class="user-row">
+        <div class="role"><span class="chip chip-h">Hospital</span></div>
+        <div class="name">JSS Hospital Demo</div>
+        <div class="creds">demo_hospital<br>Demo@2025</div>
+      </div>
+
+      <div class="user-row">
+        <div class="role"><span class="chip chip-r">Rehab</span></div>
+        <div class="name">AIISH Bengaluru Demo</div>
+        <div class="creds">demo_rehab<br>Demo@2025</div>
+      </div>
+
+      <div class="user-row">
+        <div class="role"><span class="chip chip-d">District</span></div>
+        <div class="name">Belagavi District Demo</div>
+        <div class="creds">demo_district<br>Demo@2025</div>
+      </div>
+
+      <div class="user-row">
+        <div class="role"><span class="chip chip-s">State</span></div>
+        <div class="name">State Programme Demo</div>
+        <div class="creds">demo_state<br>Demo@2025</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="admin-box">
+    <div class="label">🔐 Sign in with your admin account first</div>
+    <input id="admin-user" type="text" placeholder="Your username (e.g. cochlearkar)">
+    <input id="admin-pass" type="password" placeholder="Your password">
+  </div>
+
+  <button id="seed-btn" onclick="seedUsers()">Create Demo Users in Firebase</button>
+  <div id="log"></div>
+</div>
+
+<script type="module">
+import { initializeApp }                    from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword,
+         signInWithEmailAndPassword }       from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, doc, setDoc }        from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const app  = initializeApp({
+  apiKey:            "AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI",
+  authDomain:        "shravan-sanjeevini.firebaseapp.com",
+  projectId:         "shravan-sanjeevini",
+  storageBucket:     "shravan-sanjeevini.firebasestorage.app",
+  messagingSenderId: "130742586600",
+  appId:             "1:130742586600:web:1618bb56710c6fbbcc8d5d"
+});
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+const DEMO_USERS = [
+  {
+    username: 'demo_hospital',
+    password: 'Demo@2025',
+    role: 'hospital',
+    unit: 'JSS Hospital Mysuru',
+    district: 'MYSURU',
+    zone: 'Mysore',
+    status: 'active',
+    mustChangePassword: false,
+    isDemo: true
+  },
+  {
+    username: 'demo_rehab',
+    password: 'Demo@2025',
+    role: 'rehab',
+    unit: 'AIISH Bengaluru',
+    district: 'BENGALURU',
+    zone: 'Bengaluru',
+    status: 'active',
+    mustChangePassword: false,
+    isDemo: true
+  },
+  {
+    username: 'demo_district',
+    password: 'Demo@2025',
+    role: 'district',
+    unit: 'BELAGAVI',
+    district: 'BELAGAVI',
+    zone: 'Belgaum',
+    status: 'active',
+    mustChangePassword: false,
+    isDemo: true
+  },
+  {
+    username: 'demo_state',
+    password: 'Demo@2025',
+    role: 'state',
+    unit: 'State Programme Office',
+    district: 'BENGALURU',
+    zone: 'Bengaluru',
+    status: 'active',
+    mustChangePassword: false,
+    isDemo: true
+  }
+];
+
+window.seedUsers = async function() {
+  const btn = document.getElementById('seed-btn');
+  const log = document.getElementById('log');
+  btn.disabled = true;
+  log.style.display = 'block';
+  log.textContent = 'Starting...\n';
+
+  const print = msg => { log.textContent += msg + '\n'; };
+
+  // Sign in as admin
+  const adminUser = document.getElementById('admin-user').value.trim();
+  const adminPass = document.getElementById('admin-pass').value.trim();
+  if (!adminUser || !adminPass) {
+    print('✗ Please enter your admin username and password.');
+    btn.disabled = false;
+    return;
+  }
+  try {
+    const email = adminUser.includes('@') ? adminUser : adminUser + '@shravan.app';
+    await signInWithEmailAndPassword(auth, email, adminPass);
+    print('✓ Signed in as ' + adminUser);
+  } catch(e) {
+    print('✗ Sign-in failed: ' + e.message);
+    btn.disabled = false;
+    return;
+  }
+
+  for (const u of DEMO_USERS) {
+    print('\nCreating: ' + u.username + ' (' + u.role + ')...');
+    const email = u.username + '@shravan.app';
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, u.password);
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        ...u, email, createdAt: new Date().toISOString()
+      });
+      print('  ✓ Created — ' + u.username);
+    } catch(e) {
+      if (e.code === 'auth/email-already-in-use') {
+        print('  ⚠ Already exists — skipping');
+      } else {
+        print('  ✗ Error: ' + e.message);
+      }
+    }
+  }
+
+  print('\n\n✅ Done! Demo credentials:\n');
+  print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  DEMO_USERS.forEach(u => {
+    print(`Role: ${u.role.toUpperCase().padEnd(10)} | Username: ${u.username.padEnd(16)} | Password: ${u.password}`);
+  });
+  print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  print('\nShare these credentials with authorities for demo access.');
+  print('App URL: https://cochlearkar.github.io/ci-scheme-karnataka/');
+
+  btn.textContent = '✓ Done';
+};
+</script>
+</body>
+</html>

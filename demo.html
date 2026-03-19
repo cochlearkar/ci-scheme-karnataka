@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Shravan Sanjeevini — Application Demo</title>
+<style>
+:root {
+  --green-dark: #0a3d2e;
+  --green: #1a6b4a;
+  --green-mid: #1D9E75;
+  --green-light: #E1F5EE;
+  --blue: #1a4a7a;
+  --blue-mid: #378ADD;
+  --blue-light: #E6F1FB;
+  --amber: #8a5a0a;
+  --amber-mid: #EF9F27;
+  --red: #A32D2D;
+  --purple: #4a2a7a;
+  --surface: #fffcf8;
+  --border: #e8e4dc;
+  --text: #1a1612;
+  --text-light: #8a8278;
+  --gray: #f5f3ef;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--green-dark); min-height: 100vh; overflow-x: hidden; }
+
+/* ── OUTER LAYOUT ── */
+.outer { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px 16px 40px; }
+
+/* ── HEADER ── */
+.demo-header { text-align: center; padding: 20px 0 24px; color: #fff; }
+.demo-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+.demo-header p { font-size: 13px; color: rgba(255,255,255,.6); margin-top: 5px; }
+
+/* ── SLIDE COUNTER ── */
+.slide-counter { font-size: 11px; color: rgba(255,255,255,.5); margin-bottom: 12px; }
+
+/* ── PHONE FRAME ── */
+.phone { width: 100%; max-width: 360px; background: var(--surface); border-radius: 32px; overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,.5); min-height: 600px; position: relative; }
+.phone-notch { height: 28px; background: #111; display: flex; align-items: center; justify-content: center; }
+.phone-notch-pill { width: 80px; height: 8px; background: #333; border-radius: 4px; }
+.phone-content { min-height: 572px; }
+
+/* ── NAVIGATION ── */
+.nav-row { display: flex; gap: 12px; margin-top: 20px; max-width: 360px; width: 100%; }
+.nav-btn { flex: 1; padding: 13px; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: opacity .15s; }
+.nav-prev { background: rgba(255,255,255,.15); color: #fff; }
+.nav-next { background: #fff; color: var(--green-dark); }
+.nav-btn:disabled { opacity: .3; cursor: not-allowed; }
+
+/* ── PROGRESS DOTS ── */
+.dots { display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap; justify-content: center; max-width: 360px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.25); transition: background .2s, transform .2s; cursor: pointer; }
+.dot.active { background: #fff; transform: scale(1.3); }
+.dot.done { background: rgba(255,255,255,.6); }
+
+/* ── SLIDE LABEL ── */
+.slide-label { color: rgba(255,255,255,.7); font-size: 12px; margin-top: 12px; text-align: center; max-width: 360px; }
+
+/* ── CREDENTIALS BOX ── */
+.creds-box { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); border-radius: 12px; padding: 14px 16px; margin-top: 20px; max-width: 360px; width: 100%; }
+.creds-title { color: rgba(255,255,255,.7); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+.creds-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 0.5px solid rgba(255,255,255,.1); }
+.creds-row:last-child { border-bottom: none; }
+.creds-role { font-size: 12px; color: rgba(255,255,255,.8); }
+.creds-val { font-size: 11px; color: #fff; font-family: monospace; background: rgba(255,255,255,.1); padding: 2px 8px; border-radius: 4px; }
+.app-link { display: block; text-align: center; margin-top: 16px; color: #fff; font-size: 13px; text-decoration: none; background: var(--green-mid); padding: 12px; border-radius: 10px; font-weight: 600; max-width: 360px; width: 100%; }
+.app-link:hover { opacity: .9; }
+
+/* ── SCREEN COMPONENTS (mini versions for demo) ── */
+.screen-header { padding: 14px 16px 12px; color: #fff; }
+.screen-header.green { background: var(--green-dark); }
+.screen-header.blue  { background: var(--blue); }
+.screen-header.amber { background: #7a4f1a; }
+.screen-header.purple{ background: var(--purple); }
+.screen-header.wa    { background: #128C7E; }
+.sh-title { font-size: 16px; font-weight: 600; }
+.sh-sub   { font-size: 11px; opacity: .65; margin-top: 2px; }
+.chip-badge { display: inline-block; background: rgba(255,255,255,.2); color: #fff; padding: 2px 10px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-top: 6px; }
+
+.body-pad { padding: 14px 16px; }
+.section-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--text-light); margin: 12px 0 8px; }
+.section-lbl:first-child { margin-top: 0; }
+
+.action-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 13px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+.action-card.primary-red  { background: var(--red); border-color: var(--red); }
+.action-card.primary-green{ background: var(--green-dark); border-color: var(--green-dark); }
+.action-card.primary-blue { background: var(--blue); border-color: var(--blue); }
+.action-card.primary-purp { background: var(--purple); border-color: var(--purple); }
+.action-card.grad-dash { background: linear-gradient(135deg,#1d4ed8,#4338ca); border: none; }
+.action-card.grad-rep  { background: linear-gradient(135deg,#0a3d2e,#1a6b4a); border: none; }
+.action-card.grad-wa   { background: linear-gradient(135deg,#128C7E,#25D366); border: none; }
+.action-card.grad-rep2 { background: linear-gradient(135deg,#7a4f1a,#b87333); border: none; }
+.ac-icon  { font-size: 22px; flex-shrink: 0; }
+.ac-title { font-size: 13px; font-weight: 600; }
+.ac-desc  { font-size: 11px; opacity: .7; margin-top: 1px; }
+.ac-arr   { margin-left: auto; font-size: 16px; opacity: .5; }
+.ac-title.white, .ac-desc.white { color: #fff; }
+.ac-desc.white { opacity: .8; }
+
+.stat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.stat-box { background: var(--surface); border: 0.5px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; }
+.stat-num { font-size: 20px; font-weight: 700; }
+.stat-lbl { font-size: 9px; color: var(--text-light); text-transform: uppercase; font-weight: 600; margin-top: 2px; }
+
+.case-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 10px; padding: 11px 12px; margin-bottom: 7px; border-left: 4px solid transparent; }
+.case-card.red   { border-left-color: var(--red); }
+.case-card.green { border-left-color: var(--green-mid); }
+.case-name { font-size: 13px; font-weight: 500; }
+.case-sub  { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: 600; margin-top: 4px; }
+.pill-red   { background: #FCEBEB; color: var(--red); }
+.pill-green { background: var(--green-light); color: var(--green); }
+.pill-blue  { background: var(--blue-light); color: var(--blue); }
+.pill-amber { background: #FAEEDA; color: var(--amber); }
+
+.info-card { background: var(--green-light); border: 1px solid #9FE1CB; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.info-card.blue { background: var(--blue-light); border-color: #B5D4F4; }
+.info-card.amber { background: #FFF8EE; border-color: #FAC775; }
+.info-card.purple { background: #EEEDFE; border-color: #c4b8f8; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-top: 8px; }
+.info-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: inherit; opacity: .7; }
+.info-val   { font-size: 12px; font-weight: 500; margin-top: 1px; }
+
+.form-section { background: var(--surface); border: 0.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.fs-title { font-size: 11px; font-weight: 700; color: var(--text-light); text-transform: uppercase; margin-bottom: 8px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.field-lbl { font-size: 10px; color: var(--text-light); margin-bottom: 3px; }
+.field-val { font-size: 12px; font-weight: 500; }
+
+.tab-strip { display: flex; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--border); }
+.tab { padding: 9px 12px; font-size: 11px; color: var(--text-light); white-space: nowrap; border-bottom: 2px solid transparent; }
+.tab.active { color: var(--green-dark); border-bottom-color: var(--green-dark); font-weight: 600; }
+
+.prog-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
+.prog-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.prog-bar-wrap { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.prog-bar { height: 100%; border-radius: 2px; }
+
+.journey { display: flex; align-items: center; gap: 0; overflow-x: auto; padding: 8px 0; }
+.j-step { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.j-circle { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 11px; background: var(--surface); }
+.j-circle.done { background: var(--green-mid); border-color: var(--green-mid); color: #fff; }
+.j-circle.active { background: var(--blue-light); border-color: var(--blue-mid); color: var(--blue); }
+.j-label { font-size: 8px; color: var(--text-light); margin-top: 3px; text-align: center; max-width: 36px; }
+.j-line { width: 20px; height: 2px; background: var(--border); flex-shrink: 0; margin-top: -10px; }
+.j-line.done { background: var(--green-mid); }
+
+.score-section { background: var(--surface); border: 1px solid #c4b8f8; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.score-title { font-size: 10px; font-weight: 700; color: var(--purple); text-transform: uppercase; margin-bottom: 6px; }
+.score-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin: 3px 0; }
+.score-fill { height: 100%; border-radius: 3px; }
+.score-num { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-light); }
+
+.hosp-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 0.5px solid var(--border); gap: 8px; }
+.hosp-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.hosp-name { flex: 1; font-size: 11px; font-weight: 500; }
+.hosp-badges { display: flex; gap: 4px; flex-shrink: 0; }
+.badge-sm { font-size: 9px; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
+
+.wa-preview { background: #ECE5DD; padding: 12px; border-radius: 10px; margin: 8px 0; }
+.wa-bubble { background: #fff; border-radius: 8px 8px 8px 0; padding: 10px 12px; font-size: 12px; line-height: 1.5; color: #1a1a1a; max-width: 90%; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.wa-time { font-size: 10px; color: #667781; margin-top: 4px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="outer">
+
+  <div class="demo-header">
+    <div style="font-size:40px;margin-bottom:10px">🦻</div>
+    <h1>Shravan Sanjeevini</h1>
+    <p>Karnataka Cochlear Implant Programme · NPPCD<br>Interactive Application Demo</p>
+  </div>
+
+  <div class="slide-counter" id="slide-counter">Slide 1 of 12</div>
+
+  <!-- PHONE FRAME -->
+  <div class="phone">
+    <div class="phone-notch"><div class="phone-notch-pill"></div></div>
+    <div class="phone-content" id="slide-content"></div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav-row">
+    <button class="nav-btn nav-prev" id="btn-prev" onclick="prevSlide()">← Previous</button>
+    <button class="nav-btn nav-next" id="btn-next" onclick="nextSlide()">Next →</button>
+  </div>
+
+  <div class="dots" id="dots"></div>
+  <div class="slide-label" id="slide-label"></div>
+
+  <!-- CREDENTIALS -->
+  <div class="creds-box">
+    <div class="creds-title">🔑 Demo Login Credentials</div>
+    <div class="creds-row"><span class="creds-role">🏥 Hospital</span><span class="creds-val">demo_hospital / Demo@2025</span></div>
+    <div class="creds-row"><span class="creds-role">🎧 Rehab</span><span class="creds-val">demo_rehab / Demo@2025</span></div>
+    <div class="creds-row"><span class="creds-role">📍 District</span><span class="creds-val">demo_district / Demo@2025</span></div>
+    <div class="creds-row"><span class="creds-role">🌐 State</span><span class="creds-val">demo_state / Demo@2025</span></div>
+  </div>
+  <a class="app-link" href="https://cochlearkar.github.io/ci-scheme-karnataka/" target="_blank">
+    🚀 Open Live Application
+  </a>
+
+</div>
+
+<script>
+const SLIDES = [
+
+  // ── 1. WELCOME ──────────────────────────────────────────────────────────────
+  {
+    label: 'Login — Select your role',
+    html: `<div style="background:var(--green-dark);min-height:572px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px">
+      <div style="font-size:48px;margin-bottom:14px">🦻</div>
+      <div style="color:#fff;font-size:20px;font-weight:700;margin-bottom:4px">Shravan Sanjeevini</div>
+      <div style="color:rgba(255,255,255,.55);font-size:12px;margin-bottom:32px">Cochlear Implant Programme · NPPCD</div>
+      <div style="background:var(--surface);border-radius:18px;padding:20px;width:100%">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">Select your role</div>
+        <div style="font-size:11px;color:var(--text-light);margin-bottom:16px">Choose how you are connected to the programme</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          ${roleBtn('🏥','Hospital','Surgery & device data','#e1f5ee','#0a3d2e')}
+          ${roleBtn('🎧','Rehab Institute','AVT session logs','#e6f1fb','#1a4a7a')}
+          ${roleBtn('📍','District Officer','Follow-up & outcomes','#faeeda','#8a5a0a')}
+          ${roleBtn('🌐','State Team','Programme monitoring','#eeedfe','#4a2a7a')}
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 2. HOSPITAL HOME ────────────────────────────────────────────────────────
+  {
+    label: 'Hospital Login — Home screen',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header green">
+        <div class="sh-title">🏥 JSS Hospital Mysuru</div>
+        <div class="sh-sub">Hospital · Shravan Sanjeevini</div>
+        <div class="chip-badge">Hospital</div>
+      </div>
+      <div class="body-pad">
+        <div class="stat-row">
+          <div class="stat-box"><div class="stat-num">34</div><div class="stat-lbl">Total Cases</div></div>
+          <div class="stat-box"><div class="stat-num" style="color:var(--red)">29</div><div class="stat-lbl">Pending</div></div>
+          <div class="stat-box"><div class="stat-num" style="color:var(--green)">5</div><div class="stat-lbl">Updated</div></div>
+        </div>
+        <div class="section-lbl">Quick Action</div>
+        <div class="action-card primary-red">
+          <div class="ac-icon">🔴</div>
+          <div><div class="ac-title white">29 cases need your update</div><div class="ac-desc white">Surgery & device details not yet submitted</div></div>
+          <div class="ac-arr" style="color:#fff">→</div>
+        </div>
+        <div class="action-card">
+          <div class="ac-icon">✅</div>
+          <div><div class="ac-title">5 updated</div><div class="ac-desc">Surgery details submitted</div></div>
+        </div>
+        <div class="action-card">
+          <div class="ac-icon">📋</div>
+          <div><div class="ac-title">Browse cases</div><div class="ac-desc">All cases</div></div>
+          <div class="ac-arr">→</div>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 3. HOSPITAL CASE LIST ───────────────────────────────────────────────────
+  {
+    label: 'Hospital — Pending cases (tap any case to update)',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header green">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="background:rgba(255,255,255,.2);border-radius:8px;padding:4px 10px;font-size:18px;cursor:pointer">←</div>
+          <div><div class="sh-title">JSS Hospital Mysuru — Cases</div><div class="sh-sub">Tap a case to view or update</div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--surface);padding:10px 14px;gap:10px;border-bottom:1px solid var(--border)">
+        <div style="background:var(--red-light);border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--red)">29</div>
+          <div style="font-size:9px;color:var(--red);font-weight:600;text-transform:uppercase">Pending Update</div>
+        </div>
+        <div style="background:var(--green-light);border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:18px;font-weight:700;color:var(--green)">5</div>
+          <div style="font-size:9px;color:var(--green);font-weight:600;text-transform:uppercase">Updated ✓</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border)">
+        <div style="padding:5px 12px;border-radius:16px;font-size:11px;background:var(--green-dark);color:#fff;font-weight:600">All</div>
+        <div style="padding:5px 12px;border-radius:16px;font-size:11px;border:1px solid var(--border)">Needs update</div>
+        <div style="padding:5px 12px;border-radius:16px;font-size:11px;border:1px solid var(--border)">Updated</div>
+      </div>
+      <div style="padding:10px 14px">
+        <div class="case-card red">
+          <div class="case-name">Vainavi K Gowda</div>
+          <div class="case-sub">Card: 1 · 2022-2023</div>
+          <span class="pill pill-red">⚠ Needs update</span>
+        </div>
+        <div class="case-card red">
+          <div class="case-name">Faiza Abdul Aziz</div>
+          <div class="case-sub">Card: 2 · 2024-2025</div>
+          <span class="pill pill-red">⚠ Needs update</span>
+        </div>
+        <div class="case-card green">
+          <div class="case-name">Sanvi S</div>
+          <div class="case-sub">Card: 3 · 2024-2025</div>
+          <span class="pill pill-green">✓ Updated</span>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 4. HOSPITAL UPDATE FORM ─────────────────────────────────────────────────
+  {
+    label: 'Hospital — Submit surgery & device details',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header green">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="background:rgba(255,255,255,.2);border-radius:8px;padding:4px 10px;font-size:18px">←</div>
+          <div><div class="sh-title">Vainavi K Gowda</div><div class="sh-sub">Card: 1</div></div>
+        </div>
+      </div>
+      <div style="padding:12px 14px;background:#fff8e1;border-bottom:1px solid #FAC775;font-size:11px;color:var(--amber)">
+        ⚠️ Once submitted this form is <strong>locked permanently</strong>.
+      </div>
+      <div style="padding:10px 14px">
+        <div class="info-card">
+          <div style="font-size:9px;font-weight:700;color:var(--green);text-transform:uppercase">Patient Information</div>
+          <div class="info-grid">
+            ${infoRow('SAST Ref','COC-2022-001')}
+            ${infoRow('FY','2022-2023')}
+            ${infoRow('Name','Vainavi K Gowda')}
+            ${infoRow('Gender','Female')}
+            ${infoRow('District','MYSURU')}
+            ${infoRow('Hospital','JSS Hospital')}
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="fs-title">Surgery Dates</div>
+          <div class="field-row">
+            ${fieldDisplay('Admission','12-Nov-2022')}
+            ${fieldDisplay('Surgery','15-Nov-2022')}
+          </div>
+          <div class="field-row">
+            ${fieldDisplay('Discharge','18-Nov-2022')}
+            ${fieldDisplay('Switch-on','22-Dec-2022')}
+          </div>
+        </div>
+        <div class="form-section">
+          <div class="fs-title">Device Details</div>
+          <div class="field-row">
+            ${fieldDisplay('Manufacturer','Cochlear Ltd')}
+            ${fieldDisplay('Serial No.','CI-20221115')}
+          </div>
+        </div>
+        <div style="padding:8px 0">
+          <div style="background:var(--green-dark);color:#fff;padding:12px;border-radius:10px;text-align:center;font-size:13px;font-weight:600">Submit & Lock →</div>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 5. REHAB HOME ───────────────────────────────────────────────────────────
+  {
+    label: 'Rehab Login — Session logging',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header blue">
+        <div class="sh-title">🎧 AIISH Bengaluru</div>
+        <div class="sh-sub">Rehab Institute · Shravan Sanjeevini</div>
+        <div class="chip-badge">Rehab</div>
+      </div>
+      <div class="body-pad">
+        <div class="stat-row">
+          <div class="stat-box"><div class="stat-num">18</div><div class="stat-lbl">Assigned</div></div>
+          <div class="stat-box"><div class="stat-num" style="color:var(--green)">11</div><div class="stat-lbl">Active</div></div>
+          <div class="stat-box"><div class="stat-num" style="color:var(--amber)">7</div><div class="stat-lbl">Not started</div></div>
+        </div>
+        <div class="section-lbl">Quick Action</div>
+        <div class="action-card primary-blue">
+          <div class="ac-icon">🔴</div>
+          <div><div class="ac-title white">Update Rehab Sessions</div><div class="ac-desc white">Select a case to log today's session</div></div>
+          <div class="ac-arr" style="color:#fff">→</div>
+        </div>
+        <div class="section-lbl">Recent Session</div>
+        <div class="case-card" style="border-left:4px solid var(--blue-mid)">
+          <div class="case-name">Vainavi K Gowda</div>
+          <div class="case-sub">Session 8 of 54 · Last: 12-Mar-2025</div>
+          <span class="pill pill-blue">Rehab 1</span>
+        </div>
+        <div class="case-card" style="border-left:4px solid var(--green-mid)">
+          <div class="case-name">Arjun Patil</div>
+          <div class="case-sub">Session 42 of 54 · Last: 10-Mar-2025</div>
+          <span class="pill pill-green">Rehab 2</span>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 6. DISTRICT UNIFIED ─────────────────────────────────────────────────────
+  {
+    label: 'District — Unified case screen (follow-up + assessment)',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header amber">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="background:rgba(255,255,255,.2);border-radius:8px;padding:4px 10px;font-size:18px">←</div>
+          <div><div class="sh-title">Vainavi K Gowda</div><div class="sh-sub">Card: 1 · BELAGAVI</div></div>
+        </div>
+      </div>
+      <div style="padding:10px 14px">
+        <div class="journey" style="justify-content:center;gap:2px;margin-bottom:10px">
+          ${jStep('🩺','Pre-auth',true,false)}${jLine(true)}${jStep('🔪','Surgery',true,false)}${jLine(true)}${jStep('🎧','Rehab 1',false,true)}${jLine(false)}${jStep('✓','Rehab 2',false,false)}${jLine(false)}${jStep('🏆','Done',false,false)}
+        </div>
+        <div class="info-card amber">
+          <div style="font-size:9px;font-weight:700;color:#7a4f1a;text-transform:uppercase;margin-bottom:8px">Patient Information · ರೋಗಿಯ ಮಾಹಿತಿ</div>
+          <div class="info-grid">
+            ${infoRowColor('Name','Vainavi K Gowda','#7a4f1a')}
+            ${infoRowColor('Age at Surgery','12 months','#7a4f1a')}
+            ${infoRowColor('Current Age','2 yrs 4 mo','#7a4f1a')}
+            ${infoRowColor('Surgery Date','15-Nov-2022','#7a4f1a')}
+            ${infoRowColor('Hospital','JSS Hospital Mysuru','#7a4f1a')}
+            ${infoRowColor('Rehab Centre','AIISH Bengaluru','#7a4f1a')}
+          </div>
+        </div>
+        <div style="border-radius:10px;overflow:hidden;margin-bottom:8px">
+          <div style="background:#1a4a7a;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="color:#fff;font-size:12px;font-weight:600">📞 Telephonic Follow-up · ದೂರವಾಣಿ</div>
+              <div style="color:rgba(255,255,255,.6);font-size:10px">~3 min · Alternate month</div>
+            </div>
+            <div style="color:#fff;font-size:16px">▼</div>
+          </div>
+        </div>
+        <div style="border-radius:10px;overflow:hidden">
+          <div style="background:#4a2a7a;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="color:#fff;font-size:12px;font-weight:600">🎯 Structured Outcome Assessment</div>
+              <div style="color:rgba(255,255,255,.6);font-size:10px">~8 min · IT-MAIS + CAP + SIR + PEACH</div>
+            </div>
+            <div style="color:#fff;font-size:16px">▼</div>
+          </div>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 7. OUTCOME ASSESSMENT ───────────────────────────────────────────────────
+  {
+    label: 'District — Structured outcome assessment (bilingual)',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header purple">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="background:rgba(255,255,255,.2);border-radius:8px;padding:4px 10px;font-size:18px">←</div>
+          <div><div class="sh-title">Outcome Assessment · ಮೌಲ್ಯಮಾಪನ</div><div class="sh-sub">Vainavi K Gowda · IT-MAIS</div></div>
+        </div>
+      </div>
+      <div style="padding:10px 14px">
+        <div class="score-section">
+          <div class="score-title">📊 IT-MAIS Score · ಒಟ್ಟು ಅಂಕ</div>
+          <div class="score-bar"><div class="score-fill" style="width:72%;background:#4a2a7a"></div></div>
+          <div class="score-num"><span>29 / 40</span><span style="color:#4a2a7a;font-weight:600">Good (72%)</span></div>
+        </div>
+        <div style="background:#fff;border:1px solid #c4b8f8;border-radius:10px;padding:10px 12px;margin-bottom:8px">
+          <div style="font-size:10px;font-weight:700;color:#4a2a7a;margin-bottom:6px">Q3 · Does child alert to environmental sounds?<br><span style="color:#7a4f1a;font-weight:400">ಮಗು ಪರಿಸರ ಶಬ್ದಗಳಿಗೆ ಸ್ಪಂದಿಸುತ್ತದೆಯೇ?</span></div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px">
+            ${scoreCell('0','Never','ಎಂದಿಗೂ ಇಲ್ಲ',false)}
+            ${scoreCell('1','Rarely','ವಿರಳ',false)}
+            ${scoreCell('2','Sometimes','ಕೆಲವೊಮ್ಮೆ',false)}
+            ${scoreCell('3','Often','ಹೆಚ್ಚಾಗಿ',true)}
+            ${scoreCell('4','Always','ಯಾವಾಗಲೂ',false)}
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="score-section">
+            <div class="score-title">🎯 CAP Level</div>
+            <div style="font-size:18px;font-weight:700;color:#4a2a7a;margin:4px 0">Level 5</div>
+            <div style="font-size:10px;color:var(--text-light)">Understands common phrases</div>
+          </div>
+          <div class="score-section">
+            <div class="score-title">🗣️ SIR Level</div>
+            <div style="font-size:18px;font-weight:700;color:#4a2a7a;margin:4px 0">Level 3</div>
+            <div style="font-size:10px;color:var(--text-light)">Intelligible to familiar listener</div>
+          </div>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 8. STATE HOME ───────────────────────────────────────────────────────────
+  {
+    label: 'State Login — Programme overview',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header green">
+        <div class="sh-title">🌐 State Programme Office</div>
+        <div class="sh-sub">State · Shravan Sanjeevini</div>
+        <div class="chip-badge">State</div>
+      </div>
+      <div class="body-pad">
+        <div class="stat-row">
+          <div class="stat-box"><div class="stat-num">651</div><div class="stat-lbl">Total Cases</div></div>
+          <div class="stat-box"><div class="stat-num" style="color:var(--green)">47</div><div class="stat-lbl">Updated</div></div>
+          <div class="stat-box"><div class="stat-num" style="color:var(--red)">604</div><div class="stat-lbl">Pending</div></div>
+        </div>
+        <div class="section-lbl">Quick Action</div>
+        <div class="action-card primary-purp">
+          <div class="ac-icon">➕</div>
+          <div><div class="ac-title white">Add New Case</div><div class="ac-desc white">Enter new SAST pre-auth data</div></div>
+          <div class="ac-arr" style="color:#fff">→</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="action-card grad-dash" style="margin:0">
+            <div class="ac-icon">📊</div>
+            <div><div class="ac-title white">Dashboard</div><div class="ac-desc white">Charts & trends</div></div>
+          </div>
+          <div class="action-card grad-rep" style="margin:0">
+            <div class="ac-icon">📋</div>
+            <div><div class="ac-title white">Reports</div><div class="ac-desc white">District · Hospital · FY</div></div>
+          </div>
+        </div>
+        <div class="action-card grad-wa" style="margin-top:8px">
+          <div class="ac-icon">📤</div>
+          <div><div class="ac-title white">Share Daily Update on WhatsApp</div><div class="ac-desc white">Pre-filled message with live link</div></div>
+          <div style="color:#fff;margin-left:auto;font-size:18px">→</div>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 9. STATE HOSPITAL SUMMARY ───────────────────────────────────────────────
+  {
+    label: 'State — Hospital update monitoring with drill-down',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header green" style="padding-bottom:8px">
+        <div class="sh-title">Hospital — Surgery Update Status</div>
+        <div class="sh-sub">Tap any hospital to see pending / updated cases</div>
+      </div>
+      <div style="padding:12px 14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border-radius:10px;overflow:hidden;border:0.5px solid var(--border);margin-bottom:12px">
+          <div style="padding:10px;text-align:center;background:var(--red-light)">
+            <div style="font-size:22px;font-weight:700;color:var(--red)">604</div>
+            <div style="font-size:9px;color:var(--red);font-weight:700;text-transform:uppercase">Pending Update</div>
+          </div>
+          <div style="padding:10px;text-align:center;background:var(--green-light)">
+            <div style="font-size:22px;font-weight:700;color:var(--green)">47</div>
+            <div style="font-size:9px;color:var(--green);font-weight:700;text-transform:uppercase">Updated ✓</div>
+          </div>
+        </div>
+        ${hospSummaryRow('JSS Hospital Mysuru',108,5,103,65)}
+        ${hospSummaryRow('Apollo Hospitals',90,12,78,55)}
+        ${hospSummaryRow('K C General Hospital',79,8,71,43)}
+        ${hospSummaryRow('IGICH',34,4,30,25)}
+      </div>
+    </div>`
+  },
+
+  // ── 10. REPORTS ─────────────────────────────────────────────────────────────
+  {
+    label: 'Reports — 8 tabs with sorting, filtering, CSV download',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div style="background:var(--green-dark);padding:12px 16px">
+        <div style="color:#fff;font-size:14px;font-weight:600">📋 Shravan Sanjeevini — Reports</div>
+        <div style="color:rgba(255,255,255,.5);font-size:11px;margin-top:2px">Karnataka Cochlear Implant Programme</div>
+      </div>
+      <div style="background:var(--surface);padding:8px 12px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:5px"><span style="font-size:10px;color:var(--text-light)">FY</span><select style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:5px"><option>All Years</option></select></div>
+        <div style="display:flex;align-items:center;gap:5px"><span style="font-size:10px;color:var(--text-light)">District</span><select style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:5px"><option>All Districts</option></select></div>
+      </div>
+      <div class="tab-strip">
+        <div class="tab active">📍 District</div>
+        <div class="tab">🏥 Hospital</div>
+        <div class="tab">💰 Financial</div>
+        <div class="tab">🎧 Rehab</div>
+        <div class="tab">🦻 Device</div>
+        <div class="tab">⚠️ At-Risk</div>
+        <div class="tab">📅 FY</div>
+        <div class="tab">🗂️ Dist×Year</div>
+        <div class="tab">📅 Monthly</div>
+      </div>
+      <div style="padding:10px 12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px">
+          ${miniStat('651','Total','var(--text)')}
+          ${miniStat('30','Districts','var(--blue-mid)')}
+          ${miniStat('47','Completed','var(--green-mid)')}
+          ${miniStat('12','At Risk','var(--red)')}
+        </div>
+        <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:8px;overflow:hidden">
+          <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:0.5px solid var(--border)">
+            <span style="font-size:11px;font-weight:600">District Summary</span>
+            <span style="font-size:10px;background:var(--green-dark);color:#fff;padding:3px 8px;border-radius:5px;cursor:pointer">⬇ CSV</span>
+          </div>
+          <table style="width:100%;font-size:10px;border-collapse:collapse">
+            <tr style="background:var(--green-dark)"><th style="padding:5px 8px;color:#fff;text-align:left">District ▲</th><th style="padding:5px 8px;color:#fff">Total</th><th style="padding:5px 8px;color:#fff">Done</th><th style="padding:5px 8px;color:#fff">%</th></tr>
+            ${miniTableRow('BELAGAVI','Belgaum',52,8,15)}
+            ${miniTableRow('RAICHUR','Kalyana',43,5,12)}
+            ${miniTableRow('MYSURU','Mysore',39,11,28)}
+          </table>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 11. WHATSAPP SHARE ──────────────────────────────────────────────────────
+  {
+    label: 'WhatsApp — Pre-filled daily update message',
+    html: `<div style="min-height:572px;background:var(--gray)">
+      <div class="screen-header wa">
+        <div class="sh-title">📤 WhatsApp — Daily Update</div>
+        <div class="sh-sub">Pre-filled message ready to send</div>
+      </div>
+      <div style="padding:12px 14px">
+        <div style="font-size:11px;color:var(--text-light);margin-bottom:8px">Message pre-filled — just tap Send in WhatsApp:</div>
+        <div class="wa-preview">
+          <div class="wa-bubble">
+            <div>🦻 <strong>Shravan Sanjeevini — Hospital Update</strong></div>
+            <div>📅 19 March 2026 | 06:00 PM</div>
+            <div style="margin-top:6px">✅ Updated: 3 hospitals (47 cases)</div>
+            <div>🔴 Pending: 74 hospitals (604 cases)</div>
+            <div style="margin-top:6px">👉 View live status:</div>
+            <div style="color:var(--blue-mid);text-decoration:underline">cochlearkar.github.io/ci-scheme-karnataka/status.html</div>
+            <div class="wa-time">6:00 PM ✓</div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-light);margin:10px 0 6px">Live status page — anyone can view:</div>
+        <div style="background:#fff;border:1px solid var(--green-border);border-radius:10px;padding:12px">
+          <div style="font-size:12px;font-weight:600;color:var(--green-dark);margin-bottom:8px">🦻 Hospital Update Status</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+            ${miniStat('3','Completed','var(--green-mid)')}
+            ${miniStat('2','Partial','var(--amber-mid)')}
+            ${miniStat('72','Not Started','var(--red)')}
+          </div>
+          <div style="height:6px;background:var(--red-light);border-radius:3px;overflow:hidden">
+            <div style="width:4%;height:100%;background:var(--green-mid);border-radius:3px"></div>
+          </div>
+          <div style="font-size:9px;color:var(--text-light);margin-top:3px">4% complete · No login needed · Live data</div>
+        </div>
+      </div>
+    </div>`
+  },
+
+  // ── 12. FINAL ───────────────────────────────────────────────────────────────
+  {
+    label: 'Ready to explore — use demo credentials below',
+    html: `<div style="min-height:572px;background:var(--green-dark);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center">
+      <div style="font-size:48px;margin-bottom:16px">🎉</div>
+      <div style="color:#fff;font-size:20px;font-weight:700;margin-bottom:8px">Demo Complete!</div>
+      <div style="color:rgba(255,255,255,.65);font-size:13px;line-height:1.6;margin-bottom:28px">
+        Shravan Sanjeevini manages the complete lifecycle of cochlear implant programme —
+        from pre-auth to surgery, rehab sessions, field follow-up, outcome assessment and state-level reporting.
+      </div>
+      <div style="background:rgba(255,255,255,.1);border-radius:12px;padding:14px 16px;width:100%;text-align:left">
+        <div style="color:rgba(255,255,255,.7);font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:8px">Demo Credentials</div>
+        ${credRow('🏥 Hospital', 'demo_hospital')}
+        ${credRow('🎧 Rehab', 'demo_rehab')}
+        ${credRow('📍 District', 'demo_district')}
+        ${credRow('🌐 State', 'demo_state')}
+        <div style="color:rgba(255,255,255,.5);font-size:11px;margin-top:8px">All passwords: Demo@2025</div>
+      </div>
+    </div>`
+  }
+
+];
+
+// ── HELPERS ────────────────────────────────────────────────────────────────────
+function roleBtn(icon, label, desc, bg, color) {
+  return `<div style="background:${bg};border-radius:12px;padding:12px;cursor:pointer">
+    <div style="font-size:24px;margin-bottom:4px">${icon}</div>
+    <div style="font-size:12px;font-weight:600;color:${color}">${label}</div>
+    <div style="font-size:10px;color:${color};opacity:.7">${desc}</div>
+  </div>`;
+}
+function infoRow(l,v) {
+  return `<div><div class="info-label" style="color:var(--green)">${l}</div><div class="info-val" style="color:var(--green-dark)">${v}</div></div>`;
+}
+function infoRowColor(l,v,c) {
+  return `<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:${c};opacity:.7">${l}</div><div style="font-size:12px;font-weight:500;color:${c};margin-top:1px">${v}</div></div>`;
+}
+function fieldDisplay(l,v) {
+  return `<div><div class="field-lbl">${l}</div><div class="field-val">${v}</div></div>`;
+}
+function jStep(icon, label, done, active) {
+  const cls = done?'done':active?'active':'';
+  return `<div class="j-step"><div class="j-circle ${cls}">${done?'✓':icon}</div><div class="j-label">${label}</div></div>`;
+}
+function jLine(done) {
+  return `<div class="j-line${done?' done':''}"></div>`;
+}
+function scoreCell(n,en,kn,selected) {
+  return `<div style="text-align:center;padding:5px 2px;border:1px solid ${selected?'#4a2a7a':' var(--border)'};border-radius:6px;font-size:10px;background:${selected?'#4a2a7a':'var(--surface)'}">
+    <div style="font-weight:700;color:${selected?'#fff':'var(--text)'}">${n}</div>
+    <div style="font-size:8px;color:${selected?'rgba(255,255,255,.8)':'var(--text-light)'}">${en}</div>
+    <div style="font-size:8px;color:${selected?'rgba(255,255,255,.7)':'#7a4f1a'}">${kn}</div>
+  </div>`;
+}
+function hospSummaryRow(name, total, updated, pending, pct) {
+  return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:6px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+      <div style="font-size:12px;font-weight:500;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <span class="badge-sm" style="background:var(--red-light);color:var(--red)">${pending} pend</span>
+        <span class="badge-sm" style="background:var(--green-light);color:var(--green)">${updated} done</span>
+      </div>
+    </div>
+    <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+      <div style="width:${pct}%;height:100%;background:var(--green-mid);border-radius:2px"></div>
+    </div>
+  </div>`;
+}
+function miniStat(n,l,c) {
+  return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:8px;padding:8px;text-align:center">
+    <div style="font-size:16px;font-weight:700;color:${c}">${n}</div>
+    <div style="font-size:9px;color:var(--text-light);text-transform:uppercase;font-weight:600;margin-top:1px">${l}</div>
+  </div>`;
+}
+function miniTableRow(district, zone, total, done, pct) {
+  return `<tr><td style="padding:5px 8px">${district}<div style="font-size:9px;color:var(--text-light)">${zone}</div></td><td style="padding:5px 8px;text-align:center">${total}</td><td style="padding:5px 8px;text-align:center;color:var(--green);font-weight:600">${done}</td><td style="padding:5px 8px;text-align:center">${pct}%</td></tr>`;
+}
+function credRow(role, user) {
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid rgba(255,255,255,.1)">
+    <span style="color:rgba(255,255,255,.8);font-size:12px">${role}</span>
+    <span style="font-size:11px;color:#fff;font-family:monospace;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:4px">${user}</span>
+  </div>`;
+}
+
+// ── SLIDE ENGINE ──────────────────────────────────────────────────────────────
+let current = 0;
+
+function render() {
+  const s = SLIDES[current];
+  document.getElementById('slide-content').innerHTML = s.html;
+  document.getElementById('slide-label').textContent = s.label;
+  document.getElementById('slide-counter').textContent = `Slide ${current+1} of ${SLIDES.length}`;
+  document.getElementById('btn-prev').disabled = current === 0;
+  document.getElementById('btn-next').textContent = current === SLIDES.length-1 ? '✓ Done' : 'Next →';
+
+  // Dots
+  const dots = document.getElementById('dots');
+  dots.innerHTML = SLIDES.map((_, i) => {
+    const cls = i === current ? 'dot active' : i < current ? 'dot done' : 'dot';
+    return `<div class="${cls}" onclick="goTo(${i})"></div>`;
+  }).join('');
+}
+
+function nextSlide() {
+  if (current < SLIDES.length - 1) { current++; render(); scrollToTop(); }
+}
+function prevSlide() {
+  if (current > 0) { current--; render(); scrollToTop(); }
+}
+function goTo(i) { current = i; render(); scrollToTop(); }
+function scrollToTop() {
+  document.querySelector('.outer').scrollTop = 0;
+  window.scrollTo(0, 0);
+}
+
+// Swipe support
+let touchStartX = 0;
+document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+  const diff = touchStartX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 50) { diff > 0 ? nextSlide() : prevSlide(); }
+});
+
+render();
+</script>
+</body>
+</html>

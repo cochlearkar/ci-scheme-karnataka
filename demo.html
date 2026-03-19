@@ -23,12 +23,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
   position:fixed;inset:0;
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
+  background:var(--g);
 }
 
-/* ── ROLE HUB — fills phone exactly like login screen ── */
+/* ── ROLE HUB — fills entire screen exactly like login screen ── */
 #hub{
   position:absolute;
-  width:100%;height:100%;
+  inset:0;
   overflow:hidden;
   transition:transform 1s cubic-bezier(.4,0,.2,1), opacity 0.6s;
 }
@@ -55,7 +56,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 .role-tile.active-tile#tile-s .pulse-ring{border-color:#7F77DD;opacity:1;}
 @keyframes pulse{0%,100%{transform:scale(1);opacity:0;}50%{transform:scale(1.04);opacity:1;}}
 
-/* ── PHONE — the zoomed-in screen ── */
+/* ── PHONE — full screen on mobile, framed on desktop ── */
 #phone-wrap{
   position:absolute;
   width:100%;height:100%;
@@ -66,29 +67,38 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 }
 #phone-wrap.visible{opacity:1;pointer-events:all;}
 .phone-frame{
-  width:min(360px,94vw);
-  height:min(640px,88vh);
+  width:100%;height:100%;
   background:var(--s);
-  border-radius:28px;
+  border-radius:0;
   overflow:hidden;
-  box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);
   position:relative;
   display:flex;flex-direction:column;
 }
-.phone-bar{
-  height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+.phone-bar{display:none;}
+.phone-pill{display:none;}
+#phone-screen{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;}
+
+/* Desktop — restore phone frame */
+@media(min-width:480px){
+  .phone-frame{
+    width:min(360px,94vw);
+    height:min(660px,90vh);
+    border-radius:28px;
+    box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08);
+  }
+  .phone-bar{height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .phone-pill{width:64px;height:6px;border-radius:3px;background:rgba(255,255,255,.3);display:block;}
 }
-.phone-pill{width:64px;height:6px;border-radius:3px;background:rgba(255,255,255,.3);}
-#phone-screen{flex:1;overflow:hidden;position:relative;}
 
 /* ── CAPTION ── */
 #caption-bar{
   position:fixed;bottom:0;left:0;right:0;
-  padding:10px 16px 16px;
-  background:linear-gradient(transparent,rgba(10,61,46,.95));
+  padding:10px 16px max(16px,env(safe-area-inset-bottom));
+  background:linear-gradient(transparent,rgba(10,61,46,.9) 40%);
   display:flex;flex-direction:column;align-items:center;gap:8px;
   z-index:100;
   opacity:0;transition:opacity 0.4s;
+  pointer-events:none;
 }
 #caption-bar.show{opacity:1;}
 #caption-text{
@@ -155,7 +165,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
 .mht{font-size:15px;font-weight:600;}
 .mhs{font-size:10px;opacity:.6;margin-top:1px;}
 .chip{display:inline-block;background:rgba(255,255,255,.18);color:#fff;padding:2px 10px;border-radius:9px;font-size:10px;font-weight:600;margin-top:5px;}
-.bp{padding:12px 14px;overflow-y:auto;flex:1;}
+.bp{padding:12px 14px;overflow-y:auto;flex:1;padding-bottom:80px;}
 .sg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px;}
 .sb{background:var(--s);border:.5px solid var(--br);border-radius:9px;padding:9px;text-align:center;}
 .sn{font-size:18px;font-weight:700;}
@@ -248,14 +258,14 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'DM Sans',sans-seri
   <!-- ROLE HUB — matches exact login screen of the app -->
   <div id="hub">
     <!-- Green background fills phone -->
-    <div style="background:var(--g);width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;">
-      <div style="text-align:center;margin-bottom:28px;">
-        <div style="font-size:48px;margin-bottom:12px;">🦻</div>
-        <h1 style="color:#fff;font-size:20px;font-weight:700;letter-spacing:-.3px;">Shravan Sanjeevini</h1>
-        <p style="color:rgba(255,255,255,.55);font-size:12px;margin-top:5px;">Cochlear Implant Programme · NPPCD</p>
+    <div style="background:var(--g);width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:clamp(20px,5vw,40px) clamp(16px,5vw,28px);">
+      <div style="text-align:center;margin-bottom:clamp(18px,4vw,32px);">
+        <div style="font-size:clamp(40px,10vw,56px);margin-bottom:10px;">🦻</div>
+        <h1 style="color:#fff;font-size:clamp(18px,5vw,24px);font-weight:700;letter-spacing:-.3px;">Shravan Sanjeevini</h1>
+        <p style="color:rgba(255,255,255,.55);font-size:clamp(11px,3vw,13px);margin-top:5px;">Cochlear Implant Programme · NPPCD</p>
       </div>
       <!-- White card — exactly like the app -->
-      <div style="background:#fffcf8;border-radius:18px;padding:20px 18px;width:100%;max-width:320px;">
+      <div style="background:#fffcf8;border-radius:18px;padding:clamp(16px,4vw,24px);width:100%;max-width:min(100%,340px);">
         <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Select your role</div>
         <div style="font-size:11px;color:#8a8278;margin-bottom:16px;">Choose how you are connected to the programme</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">

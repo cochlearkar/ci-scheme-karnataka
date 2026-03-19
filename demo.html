@@ -495,14 +495,16 @@ function render() {
   }, 150);
 
   document.getElementById('slide-label').textContent = s.label;
-  document.getElementById('slide-counter-text').textContent = (current+1) + ' / ' + SLIDES.length;
-  // Slide number top-right overlay
+  var ctr = document.getElementById('slide-counter-text');
+  if (ctr) ctr.textContent = (current+1) + ' / ' + SLIDES.length;
   var numEl = document.getElementById('slide-num-overlay');
   if (numEl) numEl.textContent = (current+1) + ' / ' + SLIDES.length;
-  document.getElementById('progress-fill').style.width = Math.round(((current+1)/SLIDES.length)*100) + '%';
+  var pf = document.getElementById('progress-fill');
+  if (pf) pf.style.width = Math.round(((current+1)/SLIDES.length)*100) + '%';
 
 
   var dots = document.getElementById('dots');
+  if (!dots) return;
   dots.innerHTML = SLIDES.map(function(_, i) {
     var cls = i===current?'dot active':i<current?'dot done':'dot';
     return '<div class="'+cls+'" onclick="goTo('+i+')"></div>';

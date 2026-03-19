@@ -701,7 +701,7 @@ body {
       </div>
 
       <div style="text-align:right;margin-bottom:28px;">
-        <span style="font-size:11px;color:var(--text-light);">Forgot password? Contact cochlearkar@gmail.com</span>
+        <span style="font-size:11px;color:var(--text-light);">Forgot password? Contact <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6f0c000c07030a0e1d040e1d2f08020e0603410c0002">[email&#160;protected]</a></span>
       </div>
 
       <button id="login-submit-btn" onclick="authenticateAndLogin()"
@@ -898,62 +898,6 @@ body {
     <div class="role-chip" style="background:rgba(255,255,255,0.15);color:#fff;border:none">&#128205; District</div>
   </div>
   <div class="form-scroll" id="dist-body"></div>
-</div>
-
-<!-- ======== SCREEN: QUARTERLY EVALUATION ======== -->
-<div class="screen hidden" id="screen-qeval">
-  <div class="app-header" style="background:#4a2a7a">
-    <div class="header-left">
-      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.3);color:#fff">&#8592;</div>
-      <div>
-        <div class="header-title" style="color:#fff" id="qe-title">Quarterly Evaluation</div>
-        <div class="header-sub" style="color:rgba(255,255,255,0.7)" id="qe-sub">Clinical outcome assessment</div>
-      </div>
-    </div>
-    <div class="role-chip" style="background:rgba(255,255,255,0.2);color:#fff;border:none">&#128203; Q Eval</div>
-  </div>
-  <div class="form-scroll" id="qe-body"></div>
-</div>
-
-<!-- ======== SCREEN: REHAB CLAIM CASES ======== -->
-<div class="screen hidden" id="screen-claimcases">
-  <div class="app-header" style="background:var(--blue)">
-    <div class="header-left">
-      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.3);color:#fff">&#8592;</div>
-      <div>
-        <div class="header-title" style="color:#fff">Claim Cases</div>
-        <div class="header-sub" style="color:rgba(255,255,255,0.7)" id="claim-sub">Search &amp; assign your cases</div>
-      </div>
-    </div>
-    <div class="role-chip" style="background:rgba(255,255,255,0.2);color:#fff;border:none">&#127911; Rehab</div>
-  </div>
-  <div style="padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border)">
-    <div style="font-size:12px;color:var(--text-light);margin-bottom:8px">Search by child name, card number or district. Then assign your centre and enter the switch-on date.</div>
-    <div style="display:flex;gap:8px">
-      <input class="field-input" id="claim-search" placeholder="Name / Card no / District..." oninput="claimSearch()" style="flex:1;margin:0">
-      <div style="background:var(--blue);color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0" onclick="claimSearch()">Search</div>
-    </div>
-  </div>
-  <div class="form-scroll" id="claim-results" style="padding:10px 14px">
-    <div style="text-align:center;padding:32px;color:var(--text-light);font-size:13px">
-      Search for a child to claim them for your rehab centre
-    </div>
-  </div>
-</div>
-
-<!-- ======== SCREEN: REHAB QUARTERLY EVALUATION ======== -->
-<div class="screen hidden" id="screen-qeval">
-  <div class="app-header" style="background:var(--blue)">
-    <div class="header-left">
-      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.2);border-color:rgba(255,255,255,0.3);color:#fff">&#8592;</div>
-      <div>
-        <div class="header-title" style="color:#fff" id="qe-title">Quarterly Evaluation</div>
-        <div class="header-sub" style="color:rgba(255,255,255,0.7)" id="qe-sub">Clinical outcome assessment</div>
-      </div>
-    </div>
-    <div class="role-chip" style="background:rgba(255,255,255,0.2);color:#fff;border:none">&#127911; Rehab</div>
-  </div>
-  <div class="form-scroll" id="qe-body"></div>
 </div>
 
 <!-- ======== SCREEN: DISTRICT FOLLOW-UP ======== -->
@@ -1193,7 +1137,7 @@ body {
   📶 No internet — entry saved locally, will sync automatically
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 // ══════════════════════════════════════════
 // CONFIG — replace with your Apps Script URL
 // ══════════════════════════════════════════
@@ -1688,18 +1632,11 @@ async function authenticateAndLogin() {
     const { signInWithEmailAndPassword } = window._fbFns;
     const cred = await signInWithEmailAndPassword(window._fbAuth, email, password);
 
-    // Fetch profile from Firestore — read own document by UID
-    const { doc, getDoc } = window._fbFns;
-    const userDocRef = doc(window._fbDb, 'users', cred.user.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    let profile = userDocSnap.exists() ? userDocSnap.data() : null;
-
-    // Fallback: search by username if UID-based lookup fails
-    if (!profile) {
-      const { collection, getDocs } = window._fbFns;
-      const snap = await getDocs(collection(window._fbDb, 'users'));
-      snap.forEach(d => { if (d.data().username === username) profile = d.data(); });
-    }
+    // Fetch profile from Firestore users collection
+    const { collection, getDocs } = window._fbFns;
+    const snap = await getDocs(collection(window._fbDb, 'users'));
+    let profile = null;
+    snap.forEach(d => { if (d.data().username === username) profile = d.data(); });
 
     if (!profile) {
       errEl.textContent = 'User profile not found. Contact cochlearkar@gmail.com.';
@@ -1818,15 +1755,6 @@ function goBackToRoles() { showScreen('login'); }
 
 // Helper: has hospital submitted surgery details through the app?
 // Only counts explicit app submission — seed data surgery dates do NOT count
-function isQuarterlyDue(c) {
-  // Due if: switch-on exists, sessions >= 26 (Q1 end), and no quarterly eval in last 80 days
-  if (!c.switchOnDate && !c.surgAdmit) return false;
-  if ((c.sessions || 0) < 26) return false; // not enough sessions yet
-  if (!c._lastQEvalDate) return true; // never done
-  var daysSince = Math.floor((Date.now() - new Date(c._lastQEvalDate)) / 86400000);
-  return daysSince > 80; // due every ~3 months
-}
-
 function isHospitalUpdated(c) {
   return c.hospSubmitted === true;
 }
@@ -1899,34 +1827,9 @@ function filterCasesByUser(cases) {
   }
   if (currentUser.role === 'rehab') {
     const unit = (currentUser.unit || '').toLowerCase().trim();
-    // Zone mapping — which zones each rehab centre primarily serves
-    const ZONE_MAP = {
-      'aiish bengaluru':       ['bangalore'],
-      'aiish mysuru':          ['mysore'],
-      'nimhans bengaluru':     ['bangalore'],
-      'ksad dharwad':          ['belgaum'],
-      'sdm dharwad':           ['belgaum'],
-      'samspanda mandya':      ['mysore'],
-      'mims mandya rehab':     ['mysore'],
-      'jss hospital mysuru':   ['mysore'],
-      'kmc manipal rehab':     ['mysore'],
-      'kasturba hospital udupi':['mysore'],
-      'bims audiology center belagavi': ['belgaum'],
-      'dr.s.r.chandrasekhar institute': ['bangalore'],
-      'sri sathya sai sarala memorial': ['mysore'],
-      'manasa cochlear implant':        ['bangalore'],
-    };
     return cases.filter(c => {
-      // First try: exact match on rehabCentre field
       const rec = (c.rehabCentre || '').toLowerCase().trim();
-      if (rec && rec.includes(unit.split(' ')[0])) return true;
-      // Second try: if no rehabCentre assigned, match by zone
-      if (!c.rehabCentre) {
-        const zones = ZONE_MAP[unit] || [];
-        const cZone = (c.zone || '').toLowerCase();
-        return zones.some(z => cZone.includes(z));
-      }
-      return false;
+      return rec && rec === unit;
     });
   }
   if (currentUser.role === 'district') {
@@ -1996,52 +1899,9 @@ function buildHome() {
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
-    // Monthly AVT attendance summary for hospital
-    var now2 = new Date();
-    var thisMonthLabel = now2.toLocaleString('default',{month:'long'}) + ' ' + now2.getFullYear();
-    var prevMonth = new Date(now2.getFullYear(), now2.getMonth()-1, 1);
-    var prevMonthLabel = prevMonth.toLocaleString('default',{month:'long'}) + ' ' + prevMonth.getFullYear();
-    var thisMonthStr = now2.getFullYear() + '-' + String(now2.getMonth()+1).padStart(2,'0');
-    var prevMonthStr = prevMonth.getFullYear() + '-' + String(prevMonth.getMonth()+1).padStart(2,'0');
-
-    var postSurgery = allMyCases.filter(c => c.switchOnDate || c.surgAdmit);
-    if (postSurgery.length > 0) {
-      var thisMonthOk  = postSurgery.filter(c => c._lastSessionMonth === thisMonthStr && c._attendanceFlag !== 'red').length;
-      var thisMonthRed = postSurgery.filter(c => c._attendanceFlag === 'red').length;
-      var neverLogged  = postSurgery.filter(c => !c._lastRehabDate && c.rehabCentre).length;
-
-      html += `<div class="section-label">AVT Attendance — ${thisMonthLabel}</div>`;
-      html += `<div style="background:var(--surface);border:.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px">`;
-
-      postSurgery.slice(0,5).forEach(c => {
-        var thisM = (c._lastSessionMonth === thisMonthStr);
-        var flag  = c._attendanceFlag || '';
-        var dot   = flag === 'red' ? '#A32D2D' : flag === 'yellow' ? '#EF9F27' : '#1D9E75';
-        var label = !c.rehabCentre ? 'No rehab assigned'
-          : !c._lastRehabDate     ? 'Not yet started'
-          : flag === 'red'        ? '⚠ Missing sessions'
-          : flag === 'yellow'     ? '! 2 sessions missed'
-          : thisM                 ? '✓ Attending this month'
-          : 'Last: ' + (c._lastRehabDate||'—');
-        html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 13px;border-bottom:.5px solid var(--border)">
-          <div style="width:8px;height:8px;border-radius:50%;background:${dot};flex-shrink:0"></div>
-          <div style="flex:1;font-size:12px;font-weight:500">${isDemo() ? maskName(c.name) : c.name}</div>
-          <div style="font-size:11px;color:${dot};font-weight:500">${label}</div>
-        </div>`;
-      });
-      if (postSurgery.length > 5) {
-        html += `<div style="padding:8px 13px;font-size:11px;color:var(--text-light);text-align:center;cursor:pointer" onclick="buildCaseList('avt-concern');showScreen('cases')">
-          View all ${postSurgery.length} cases →</div>`;
-      }
-      html += `</div>`;
-    }
-
   } else if (currentRole === 'rehab') {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Update Rehab Sessions</div><div class="action-desc">Select a case to log today's session</div></div><div class="action-arrow">→</div></div>`;
-    const qDue = allMyCases.filter(c => isQuarterlyDue(c)).length;
-    if (qDue > 0) html += `<div class="action-card primary" onclick="buildCaseList('qdueonly');showScreen('cases')" style="background:#4a2a7a;border-color:#4a2a7a"><div class="action-icon">📋</div><div><div class="action-title">${qDue} quarterly evaluation${qDue!==1?'s':''} due</div><div class="action-desc">Submit Q report — MAIS, speech, language</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All assigned cases</div></div>`;
-    html += `<div class="action-card" onclick="openClaimCases()" style="border-color:var(--blue-mid);background:var(--blue-light)"><div class="action-icon">🔍</div><div><div class="action-title" style="color:var(--blue)">Claim New Cases</div><div class="action-desc">Search &amp; assign cases to your centre</div></div><div class="action-arrow">→</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'district') {
@@ -2403,8 +2263,6 @@ function buildCaseList(filter = 'all') {
   else if (filter === 'avt-red')      activeStatusFilter = 'AVT Red';
   else if (filter === 'avt-yellow')   activeStatusFilter = 'AVT Alert';
   else if (filter === 'avt-concern')  activeStatusFilter = 'AVT Alert';
-  else if (filter === 'qeval')         activeStatusFilter = 'All'; // show all for quarterly eval selection
-  else if (filter === 'qdueonly')     activeStatusFilter = 'Q Eval Due';
   else                                activeStatusFilter = 'All';
 
   // Lock hospital totals NOW — once per cases screen entry
@@ -2423,8 +2281,6 @@ function buildCaseList(filter = 'all') {
   } else {
     const chipOptions = currentRole === 'hospital'
     ? ['All','Needs update','Updated','AVT Alert']
-    : currentRole === 'rehab'
-    ? ['All','Q Eval Due','AVT Alert','Rehab 1','Rehab 2','Completed']
     : ['All','On track','At risk','AVT Alert','Rehab 1','Rehab 2','Completed'];
   filterRow.innerHTML = chipOptions.map(f =>
       `<div class="filter-chip ${f===activeStatusFilter?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
@@ -2505,8 +2361,6 @@ function applyAllFilters() {
     cases = cases.filter(c => c._attendanceFlag === 'red' || c._attendanceFlag === 'yellow');
   } else if (activeStatusFilter === 'AVT Red') {
     cases = cases.filter(c => c._attendanceFlag === 'red');
-  } else if (activeStatusFilter === 'Q Eval Due') {
-    cases = cases.filter(c => isQuarterlyDue(c));
   }
   filteredCases = cases;
   const searchEl = document.getElementById('case-search');
@@ -2561,9 +2415,6 @@ function caseCardHTML(c) {
       ? '<span class="status-pill" style="background:#fff0f0;color:var(--red);margin-left:4px">🔧 Device</span>'
       : '')+
     attendanceBadge(c)+
-    (isQuarterlyDue(c) && currentRole==='rehab'
-      ? '<span style="background:#EEEDFE;color:#4a2a7a;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">Q Due</span>'
-      : '')+
     '</div>'+
     '<div class="case-meta">'+
     '<span>'+(c.gender||'')+(c.age?', '+c.age:'')+' · '+(c.district||'')+'</span>'+
@@ -3957,23 +3808,9 @@ function openCaseSummary(cas) {
     btn.textContent = '✏️ Update Claim Details →';
     btn.className = 'btn-submit state';
   }
-  // Show extra button: outcome assessment for district, quarterly eval for rehab
+  // Show outcome assessment button for district role
   const extraBtn = document.getElementById('summary-extra-btn');
-  if (extraBtn) {
-    if (currentRole === 'district') {
-      extraBtn.style.display = 'block';
-      extraBtn.textContent = '🎯 Full Outcome Assessment';
-      extraBtn.style.background = '#4a2a7a';
-      extraBtn.onclick = function(){ openOutcomeAssessment(selectedCase); };
-    } else if (currentRole === 'rehab' && isQuarterlyDue(cas)) {
-      extraBtn.style.display = 'block';
-      extraBtn.textContent = '📋 Submit Quarterly Evaluation';
-      extraBtn.style.background = '#4a2a7a';
-      extraBtn.onclick = function(){ openQuarterlyEval(selectedCase); };
-    } else {
-      extraBtn.style.display = 'none';
-    }
-  }
+  if (extraBtn) extraBtn.style.display = (currentRole === 'district') ? 'block' : 'none';
   document.getElementById('summary-action-bar').style.display = 'block';
   showScreen('casesummary');
 }
@@ -4088,170 +3925,6 @@ function buildSummaryHTML(c) {
 
 // ======== REHAB SESSION FORM ========
 
-
-// ══════════════════════════════════════════════════════════════
-// REHAB CLAIM CASES
-// Rehab centre searches all cases and tags unassigned ones
-// ══════════════════════════════════════════════════════════════
-
-function openClaimCases() {
-  var unit = currentUser ? currentUser.unit : '';
-  document.getElementById('claim-sub').textContent = unit + ' — search & assign cases';
-  document.getElementById('claim-search').value = '';
-  document.getElementById('claim-results').innerHTML =
-    '<div style="text-align:center;padding:32px;color:var(--text-light);font-size:13px">'
-    +'Search for a child by name, card number or district to assign them to your centre.</div>';
-  showScreen('claimcases');
-}
-
-function claimSearch() {
-  var q = (document.getElementById('claim-search').value || '').trim().toLowerCase();
-  var resultsEl = document.getElementById('claim-results');
-
-  if (q.length < 2) {
-    resultsEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-light);font-size:12px">Type at least 2 characters to search</div>';
-    return;
-  }
-
-  // Search ALL cases — not just assigned ones
-  var matches = SAMPLE_CASES.filter(function(c) {
-    return (c.name||'').toLowerCase().includes(q)
-      || String(c.id).includes(q)
-      || (c.district||'').toLowerCase().includes(q)
-      || (c.hospital||'').toLowerCase().includes(q);
-  }).slice(0, 20);
-
-  if (!matches.length) {
-    resultsEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-light);font-size:12px">No cases found for "' + q + '"</div>';
-    return;
-  }
-
-  var unit = currentUser ? currentUser.unit : '';
-
-  resultsEl.innerHTML = matches.map(function(c) {
-    var alreadyMine = (c.rehabCentre||'').toLowerCase() === unit.toLowerCase();
-    var otherCentre = c.rehabCentre && !alreadyMine;
-
-    return '<div style="background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px">'
-      // Patient info
-      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
-      +'<div>'
-      +'<div style="font-size:13px;font-weight:600">'+(c.name||'—')+'</div>'
-      +'<div style="font-size:11px;color:var(--text-light);margin-top:2px">Card: '+c.id+' · '+c.hospital+'</div>'
-      +'<div style="font-size:11px;color:var(--text-light)">District: '+(c.district||'—')+' · FY: '+(c.fy||'—')+'</div>'
-      +'</div>'
-      +'<span style="background:'+(alreadyMine?'var(--green-light)':otherCentre?'var(--amber-light)':'var(--blue-light)')
-      +';color:'+(alreadyMine?'var(--green)':otherCentre?'var(--amber)':'var(--blue)')
-      +';font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;flex-shrink:0">'
-      +(alreadyMine?'✓ Yours':otherCentre?'At '+c.rehabCentre:'Unassigned')+'</span>'
-      +'</div>'
-
-      // Claim form — show if unassigned OR already mine (to update switch-on date)
-      +(alreadyMine
-        // Already claimed — just show switch-on date update
-        ? '<div style="background:var(--green-light);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--green)">'
-          +'✓ Assigned to your centre'
-          +(c.switchOnDate ? ' · Switch-on: '+c.switchOnDate : ' · No switch-on date set')
-          +'</div>'
-          +'<div style="display:flex;gap:6px;margin-top:6px">'
-          +'<div style="flex:1"><div style="font-size:10px;color:var(--text-light);margin-bottom:3px">Update switch-on date</div>'
-          +'<input type="date" id="switchon-'+c.id+'" class="field-input" style="margin:0;font-size:12px" value="'+(c.switchOnDate||'')+'" placeholder="Switch-on date"></div>'
-          +'<div style="background:var(--blue);color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;align-self:flex-end;white-space:nowrap" '
-          +'onclick="claimCase(&quot;'+c.id+'&quot;, true)">Update</div>'
-          +'</div>'
-
-        // Not yet claimed — show full claim form
-        : '<div style="display:flex;gap:6px;align-items:flex-end">'
-          +'<div style="flex:1"><div style="font-size:10px;color:var(--text-light);margin-bottom:3px">Switch-on date <span style="color:var(--red)">*</span></div>'
-          +'<input type="date" id="switchon-'+c.id+'" class="field-input" style="margin:0;font-size:12px" placeholder="Date of switch-on"></div>'
-          +'<div style="background:'+(otherCentre?'var(--amber-mid)':'var(--blue)')+';color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap" '
-          +'onclick="claimCase(&quot;'+c.id+'&quot;, false)">'
-          +(otherCentre?'Override &amp; Claim':'Claim Case')+'</div>'
-          +'</div>'
-      )
-      +'</div>';
-  }).join('');
-}
-
-async function claimCase(caseId, updateOnly) {
-  var switchOnEl = document.getElementById('switchon-' + caseId);
-  var switchOn = switchOnEl ? switchOnEl.value : '';
-  var unit = currentUser ? currentUser.unit : '';
-
-  if (!switchOn) {
-    alert('Please enter the switch-on date before claiming.');
-    return;
-  }
-
-  var cas = SAMPLE_CASES.find(function(c){ return String(c.id) === String(caseId); });
-  if (!cas) { alert('Case not found.'); return; }
-
-  try {
-    var _doc = window._fbFns.doc;
-    var _upd = window._fbFns.updateDoc;
-
-    var updates = {
-      rehabCentre:  unit,
-      switchOnDate: switchOn,
-      _lastModified: new Date().toISOString()
-    };
-
-    // If claiming fresh — set current session count from paper if >0
-    // For hybrid approach: don't reset sessions, just assign centre
-    if (!updateOnly && !cas.rehabCentre) {
-      updates.status = cas.status || 'rehab1';
-    }
-
-    await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
-
-    // Update local cache
-    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(caseId); });
-    if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
-
-    // Refresh search results
-    claimSearch();
-
-    // Show brief confirmation
-    var btn = null; // button reference not needed after &quot; fix
-    if (btn) { btn.textContent = '✓ Done'; btn.style.background = 'var(--green-mid)'; }
-
-  } catch(e) {
-    alert('Error: ' + e.message);
-  }
-}
-
-function activityCheck(id, label) {
-  return '<div style="display:flex;align-items:center;gap:8px;background:var(--gray);border-radius:8px;padding:9px 12px;cursor:pointer" onclick="toggleActivity(this,&quot;'+id+'&quot;,event)">'
-    +'<div id="'+id+'" style="width:18px;height:18px;border:2px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;background:#fff"></div>'
-    +'<div style="font-size:12px;font-weight:500">'+label+'</div>'
-    +'</div>';
-}
-
-function toggleActivity(container, id, e) {
-  var box = document.getElementById(id);
-  if (!box) return;
-  var checked = box.getAttribute('data-checked') === '1';
-  if (checked) {
-    box.setAttribute('data-checked','0');
-    box.textContent = '';
-    box.style.background = '#fff';
-    box.style.borderColor = 'var(--border)';
-    container.style.background = 'var(--gray)';
-  } else {
-    box.setAttribute('data-checked','1');
-    box.textContent = '✓';
-    box.style.background = 'var(--blue)';
-    box.style.borderColor = 'var(--blue)';
-    box.style.color = '#fff';
-    container.style.background = 'var(--blue-light)';
-  }
-}
-
-function getActivityChecked(id) {
-  var el = document.getElementById(id);
-  return el && el.getAttribute('data-checked') === '1';
-}
-
 function openRehabSession(cas) {
   selectedCase = cas;
   document.getElementById('rs-title').textContent = cas.name || 'Log Session';
@@ -4271,25 +3944,8 @@ function openRehabSession(cas) {
   var r1checked = (cas.r1Admit && !cas.r2Admit) ? 'checked' : '';
   var r2checked = cas.r2Admit ? 'checked' : '';
 
-  // Guidance banner
-  var guidanceBanner = '';
-  if (!cas.switchOnDate) {
-    guidanceBanner = '<div style="margin:12px 14px 0;background:#fff8e1;border:1px solid #f59e0b;border-radius:10px;padding:10px 14px;font-size:12px;color:#92400e">'
-      +'⚠️ <strong>Switch-on date not set.</strong> Use <em>Claim New Cases</em> on home screen to set the switch-on date first.</div>';
-  }
-  var yearNote = '';
-  if (cas.switchOnDate) {
-    var monthsSinceOn = Math.floor((Date.now()-new Date(cas.switchOnDate))/86400000/30.5);
-    var inYear2 = monthsSinceOn > 12;
-    var expPerWeek = inYear2 ? 1 : 2;
-    var expPerMonth = inYear2 ? 4 : 8;
-    yearNote = '<div style="background:var(--blue-light);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--blue);margin:8px 14px 0">'
-      +'📅 '+(inYear2?'Year 2':'Year 1')+' · '+monthsSinceOn+' months post switch-on'
-      +' · Expected: <strong>'+expPerWeek+' session'+(expPerWeek>1?'s':'')+'/week</strong> ('+expPerMonth+'/month)</div>';
-  }
-
-  document.getElementById('rs-body').innerHTML = guidanceBanner + yearNote +
-    '<div style="margin:12px 14px 0;background:var(--blue-light);border:1px solid #B5D4F4;border-radius:12px;padding:14px 16px">'
+  document.getElementById('rs-body').innerHTML =
+    '<div style="margin:14px 16px 0;background:var(--blue-light);border:1px solid #B5D4F4;border-radius:12px;padding:14px 16px">'
     +'<div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Patient Information</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
     +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">SAST Ref</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.surgRefNo||cas.tpa||'-')+'</div></div>'
@@ -4304,128 +3960,59 @@ function openRehabSession(cas) {
     +'<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
     +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Programme Journey</div>'
     +buildJourneyInfographic(cas)+'</div>'
-    +yearNote
     +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">Session Progress</div>'
     +'<div class="session-dots">'+dotsHTML+'</div>'
     +'<div style="font-size:11px;color:var(--text-light);margin-top:4px">'+sessionsDone+' completed &middot; '+(totalSess-sessionsDone)+' remaining</div></div>'
-
-    // ── Section 1: Session Details ───────────────────────────────
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">📅 Session Details</div>'
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Session Details</div>'
     +'<div class="field-row">'
     +'<div class="field"><div class="field-label">Session date <span class="req">*</span></div><input type="date" class="field-input has-value" id="rs-sessdate" value="'+today+'"></div>'
-    +'<div class="field"><div class="field-label">Session number</div><input type="number" class="field-input" id="rs-sessnum" min="1" max="200" placeholder="e.g. 91" value="'+(sessionsDone+1)+'"></div>'
-    +'</div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Month <span class="req">*</span></div>'
-    +'<select class="field-input" id="rs-month"><option value="">Select month</option>'
-    +'<option>January</option><option>February</option><option>March</option><option>April</option>'
-    +'<option>May</option><option>June</option><option>July</option><option>August</option>'
-    +'<option>September</option><option>October</option><option>November</option><option>December</option>'
-    +'</select></div>'
-    +'<div class="field"><div class="field-label">Quarter</div>'
-    +'<select class="field-input" id="rs-quarter"><option value="">Select</option>'
-    +'<option>Quarter I (Month 1-3)</option><option>Quarter II (Month 4-6)</option>'
-    +'<option>Quarter III (Month 7-9)</option><option>Quarter IV (Month 10-12)</option>'
-    +'</select></div>'
+    +'<div class="field"><div class="field-label">Session number</div><input type="number" class="field-input" id="rs-sessnum" min="1" max="54" placeholder="e.g. 3" value="'+(sessionsDone+1)+'"></div>'
     +'</div>'
     +'<div class="field"><div class="field-label">Rehab stage <span class="req">*</span></div>'
     +'<div class="radio-group" id="rs-stage">'
     +'<div class="radio-item '+r1checked+'" onclick="selectRadio(this,&quot;rs-stage&quot;)"><div class="radio-dot"></div>Rehab Part 1 (2002GP)</div>'
     +'<div class="radio-item '+r2checked+'" onclick="selectRadio(this,&quot;rs-stage&quot;)"><div class="radio-dot"></div>Rehab Part 2 (2003GP)</div>'
     +'</div></div>'
-    +'<div class="field"><div class="field-label">Therapist / Audiologist name <span class="req">*</span></div>'
-    +'<input class="field-input" id="rs-therapist" placeholder="Name"></div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Duration <span class="req">*</span></div>'
+    +'<select class="field-input" id="rs-duration"><option value="">Select</option><option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option></select></div>'
+    +'<div class="field"><div class="field-label">Session type</div>'
+    +'<select class="field-input" id="rs-sesstype"><option>AVT (Auditory Verbal Therapy)</option><option>Mapping / Programming</option><option>Counselling</option><option>Parent training</option><option>Assessment</option></select></div>'
     +'</div>'
-
-    // ── Section 2: Attendance ────────────────────────────────────
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">✅ Attendance</div>'
+    +'<div class="field"><div class="field-label">Therapist name <span class="req">*</span></div><input class="field-input" id="rs-therapist" placeholder="Name of AVT therapist / audiologist"></div>'
+    +'</div>'
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Attendance &amp; Response</div>'
     +'<div class="field"><div class="field-label">Attendance <span class="req">*</span></div>'
     +'<div class="radio-group" id="rs-attendance">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>P — Present (child + guardian attended)</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>A — Absent (family informed)</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>A — Absent (not reachable)</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Holiday / Centre closed</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Present - child + guardian attended</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Absent - family informed</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Absent - not reachable</div>'
     +'</div></div>'
-    +'</div>'
-
-    // ── Section 3: Session Activities (matches AIISH paper exactly) ──
-    +'<div class="form-section" style="margin:0 16px" id="rs-activities-section">'
-    +'<div class="form-section-title">📋 Session Activities</div>'
-    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:10px">Tick if completed — leave blank if not required (NA)</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-    +activityCheck('rs-act-audition',  '🦻 Audition')
-    +activityCheck('rs-act-speech',    '🗣️ Speech')
-    +activityCheck('rs-act-language',  '📖 Language')
-    +activityCheck('rs-act-cognition', '🧠 Cognition')
-    +activityCheck('rs-act-parent',    '👨‍👩‍👧 Parent guidance')
-    +'</div></div>'
-
-    // ── Section 4: Mapping (shown only if session type = mapping) ──
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">🔧 Mapping / Programming</div>'
-    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:8px">Complete only if a mapping session was done today</div>'
-    +'<div class="field"><div class="field-label">Mapping done today?</div>'
-    +'<div class="radio-group" id="rs-mapping-done">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-mapping-done&quot;)"><div class="radio-dot"></div>No mapping today</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-mapping-done&quot;)"><div class="radio-dot"></div>Yes — mapping done</div>'
-    +'</div></div>'
-    +'<div id="rs-mapping-details" style="display:none">'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">ECAP done?</div>'
-    +'<div class="radio-group" id="rs-ecap">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-ecap&quot;)"><div class="radio-dot"></div>Yes</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-ecap&quot;)"><div class="radio-dot"></div>No</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">Sound field test done?</div>'
-    +'<div class="radio-group" id="rs-soundfield">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-soundfield&quot;)"><div class="radio-dot"></div>Yes</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-soundfield&quot;)"><div class="radio-dot"></div>No</div>'
-    +'</div></div></div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Comfort with coil magnet?</div>'
-    +'<div class="radio-group" id="rs-coilcomfort">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-coilcomfort&quot;)"><div class="radio-dot"></div>Yes</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-coilcomfort&quot;)"><div class="radio-dot"></div>No</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">Referred to ENT surgeon?</div>'
-    +'<div class="radio-group" id="rs-ent-ref">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-ent-ref&quot;)"><div class="radio-dot"></div>No</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-ent-ref&quot;)"><div class="radio-dot"></div>Yes</div>'
-    +'</div></div></div>'
-    +'<div class="field"><div class="field-label">Status of sutures / skin under coil</div>'
-    +'<input class="field-input" id="rs-sutures" placeholder="Good / Healed / Issue (describe)"></div>'
-    +'<div class="field"><div class="field-label">Mapping issues</div>'
-    +'<input class="field-input" id="rs-mapping-issues" placeholder="None / describe any issues"></div>'
-    +'</div></div>'
-
-    // ── Section 5: Progress ──────────────────────────────────────
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">📈 Progress &amp; Milestone</div>'
-    +'<div class="field"><div class="field-label">Child progress this session</div>'
+    +'<div class="field"><div class="field-label">Child&#39;s progress this session</div>'
     +'<div class="radio-group" id="rs-progress">'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>🌟 Excellent</div>'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>✅ Good — on track</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>⚠️ Fair — needs attention</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>❌ Poor — significant difficulty</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Excellent - exceeding expectations</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Good - on track</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Fair - needs more attention</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Poor - significant difficulty</div>'
     +'</div></div>'
     +'<div class="field"><div class="field-label">Speech &amp; Language milestone</div>'
-    +'<select class="field-input" id="rs-milestone"><option value="">Select...</option>'
-    +'<option>Detection</option><option>Discrimination</option>'
-    +'<option>Identification</option><option>Comprehension</option>'
-    +'<option>Verbal expression</option><option>Age-appropriate communication</option>'
-    +'</select></div>'
-    +'<div class="field"><div class="field-label">Session notes</div>'
-    +'<textarea class="field-input" id="rs-notes" rows="2" placeholder="Progress notes, observations..."></textarea></div>'
-    +'</div>'
-
-    // ── Section 6: Claim ─────────────────────────────────────────
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">💰 Claim Details</div>'
+    +'<select class="field-input" id="rs-milestone"><option value="">Select milestone...</option>'
+    +'<option>Detection - responds to sounds</option><option>Discrimination - distinguishes sounds</option>'
+    +'<option>Identification - recognises familiar words</option><option>Comprehension - understands spoken language</option>'
+    +'<option>Verbal expression - producing speech</option><option>Age-appropriate communication</option>'
+    +'</select></div></div>'
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Claim &amp; Follow-up</div>'
     +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Claim reference no.</div>'
-    +'<input class="field-input" id="rs-claimref" placeholder="COC_H_..."></div>'
+    +'<div class="field"><div class="field-label">Claim reference no.</div><input class="field-input" id="rs-claimref" placeholder="e.g. COC_H_..."></div>'
     +'<div class="field"><div class="field-label">Claim status</div>'
     +'<select class="field-input" id="rs-claimstatus"><option value="">Select</option>'
-    +'<option>CLAIMS PAID</option><option>SUBMITTED</option><option>PENDING</option>'
-    +'<option>NEED MORE INFO</option><option>REJECTED</option>'
+    +'<option>CLAIMS PAID</option><option>SUBMITTED</option><option>PENDING</option><option>NEED MORE INFO</option><option>REJECTED</option>'
     +'</select></div></div>'
+    +'<div class="field"><div class="field-label">Next session date</div><input type="date" class="field-input" id="rs-nextsess"></div>'
+    +'</div>'
+    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Notes</div>'
+    +'<div class="field"><div class="field-label">Session notes / observations</div><textarea class="field-input" id="rs-notes" rows="3" placeholder="Progress notes, parent feedback, observations..."></textarea></div>'
+    +'<div class="field"><div class="field-label">Issues flagged</div><textarea class="field-input" id="rs-issues" rows="2" placeholder="Device issues, attendance concerns, any flags..."></textarea></div>'
     +'</div>'
     +'<div style="padding:0 16px 40px">'
     +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
@@ -4433,31 +4020,6 @@ function openRehabSession(cas) {
     +'</div>';
 
   showScreen('rehabsession');
-
-  // Toggle mapping details when mapping is selected
-  setTimeout(function() {
-    var mappingGroup = document.getElementById('rs-mapping-done');
-    if (mappingGroup) {
-      mappingGroup.addEventListener('click', function() {
-        var checked = document.querySelector('#rs-mapping-done .radio-item.checked');
-        var details = document.getElementById('rs-mapping-details');
-        if (details) details.style.display = (checked && checked.textContent.includes('Yes')) ? 'block' : 'none';
-      });
-    }
-    // Auto-select current month
-    var monthEl = document.getElementById('rs-month');
-    if (monthEl) {
-      var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-      monthEl.value = months[new Date().getMonth()];
-    }
-    // Auto-select quarter
-    var qEl = document.getElementById('rs-quarter');
-    if (qEl) {
-      var m = new Date().getMonth();
-      var q = m < 3 ? 'Quarter I (Month 1-3)' : m < 6 ? 'Quarter II (Month 4-6)' : m < 9 ? 'Quarter III (Month 7-9)' : 'Quarter IV (Month 10-12)';
-      qEl.value = q;
-    }
-  }, 100);
 }
 
 async function submitRehabSession() {
@@ -4485,45 +4047,27 @@ async function submitRehabSession() {
   var progress = document.querySelector('#rs-progress .radio-item.checked');
   var now      = new Date().toISOString();
 
-  var mappingDone = document.querySelector('#rs-mapping-done .radio-item.checked');
-  var mappingYes  = mappingDone && mappingDone.textContent.includes('Yes');
-
   var sessionEntry = {
-    caseId:       String(selectedCase.id),
-    caseName:     selectedCase.name || '',
+    caseId: String(selectedCase.id),
+    caseName: selectedCase.name || '',
     caseDistrict: selectedCase.district || '',
-    rehabCentre:  currentUser ? currentUser.unit : '',
-    submittedBy:  currentUser ? currentUser.username : '',
-    sessdate:     sessdate,
-    sessNum:      sessNum,
-    month:        (document.getElementById('rs-month') ? document.getElementById('rs-month').value : ''),
-    quarter:      (document.getElementById('rs-quarter') ? document.getElementById('rs-quarter').value : ''),
-    stage:        stage.textContent.trim(),
-    therapist:    therapist,
-    attendance:   attendance.textContent.trim(),
-    // Activities checklist
-    actAudition:  getActivityChecked('rs-act-audition'),
-    actSpeech:    getActivityChecked('rs-act-speech'),
-    actLanguage:  getActivityChecked('rs-act-language'),
-    actCognition: getActivityChecked('rs-act-cognition'),
-    actParent:    getActivityChecked('rs-act-parent'),
-    // Progress
-    progress:     progress ? progress.textContent.trim() : '',
-    milestone:    document.getElementById('rs-milestone').value,
-    notes:        document.getElementById('rs-notes').value.trim(),
-    // Mapping
-    mappingDone:  mappingYes,
-    ecapDone:     mappingYes ? (document.querySelector('#rs-ecap .radio-item.checked') ? document.querySelector('#rs-ecap .radio-item.checked').textContent.trim() : '') : '',
-    soundField:   mappingYes ? (document.querySelector('#rs-soundfield .radio-item.checked') ? document.querySelector('#rs-soundfield .radio-item.checked').textContent.trim() : '') : '',
-    coilComfort:  mappingYes ? (document.querySelector('#rs-coilcomfort .radio-item.checked') ? document.querySelector('#rs-coilcomfort .radio-item.checked').textContent.trim() : '') : '',
-    entRef:       mappingYes ? (document.querySelector('#rs-ent-ref .radio-item.checked') ? document.querySelector('#rs-ent-ref .radio-item.checked').textContent.trim() : '') : '',
-    sutures:      mappingYes ? document.getElementById('rs-sutures').value.trim() : '',
-    mappingIssues:mappingYes ? document.getElementById('rs-mapping-issues').value.trim() : '',
-    // Claim
-    claimRef:     document.getElementById('rs-claimref').value.trim(),
-    claimStatus:  document.getElementById('rs-claimstatus').value,
-    timestamp:    now,
-    entryId:      'RS-' + Date.now()
+    rehabCentre: currentUser ? currentUser.unit : '',
+    submittedBy: currentUser ? currentUser.username : '',
+    sessdate: sessdate, sessNum: sessNum,
+    stage: stage.textContent.trim(),
+    duration: duration,
+    sesstype: document.getElementById('rs-sesstype').value,
+    therapist: therapist,
+    attendance: attendance.textContent.trim(),
+    progress: progress ? progress.textContent.trim() : '',
+    milestone: document.getElementById('rs-milestone').value,
+    claimRef:    document.getElementById('rs-claimref').value.trim(),
+    claimStatus: document.getElementById('rs-claimstatus').value,
+    nextSess:    document.getElementById('rs-nextsess').value,
+    notes:       document.getElementById('rs-notes').value.trim(),
+    issues:      document.getElementById('rs-issues').value.trim(),
+    timestamp: now,
+    entryId: 'RS-' + Date.now()
   };
 
   try {
@@ -5673,239 +5217,6 @@ function drShowTabStyle(tab) {
   });
 }
 
-
-// ══════════════════════════════════════════════════════════════
-// QUARTERLY EVALUATION FORM — filled by rehab centre
-// ══════════════════════════════════════════════════════════════
-
-function openQuarterlyEval(cas) {
-  selectedCase = cas;
-  var today = new Date().toISOString().split('T')[0];
-
-  // Determine quarter number from sessions done
-  var sessNum = cas.sessions || 0;
-  var qNum = sessNum >= 78 ? 4 : sessNum >= 52 ? 3 : sessNum >= 26 ? 2 : 1;
-  var qLabel = 'Quarter ' + qNum + ' (Month ' + ((qNum-1)*3+1) + '–' + (qNum*3) + ')';
-
-  document.getElementById('qe-title').textContent = cas.name || 'Quarterly Evaluation';
-  document.getElementById('qe-sub').textContent = qLabel + '  ·  Card: ' + cas.id;
-
-  document.getElementById('qe-body').innerHTML =
-
-    // Patient info card
-    '<div style="margin:14px 16px 0;background:#EEEDFE;border:1px solid #c4b8f8;border-radius:12px;padding:14px 16px">'
-    +'<div style="font-size:10px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📋 '+qLabel+'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
-    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">Name</div><div style="color:#7F77DD;font-weight:500">'+(cas.name||'—')+'</div></div>'
-    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">Patient ID</div><div style="color:#7F77DD;font-weight:500">'+(cas.id||'—')+'</div></div>'
-    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">Sessions done</div><div style="color:#7F77DD;font-weight:500">'+(sessNum||'0')+'</div></div>'
-    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">Switch-on date</div><div style="color:#7F77DD;font-weight:500">'+(cas.switchOnDate||cas.surgAdmit||'—')+'</div></div>'
-    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">Rehab Centre</div><div style="color:#7F77DD;font-weight:500">'+(cas.rehabCentre||'—')+'</div></div>'
-    +'<div><div style="color:#4a2a7a;font-size:10px;font-weight:600;text-transform:uppercase">Hospital</div><div style="color:#7F77DD;font-weight:500">'+(cas.hospital||'—')+'</div></div>'
-    +'</div></div>'
-
-    // Assessment details
-    +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">📅 Evaluation Details</div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Evaluation date <span class="req">*</span></div>'
-    +'<input type="date" class="field-input has-value" id="qe-date" value="'+today+'"></div>'
-    +'<div class="field"><div class="field-label">Quarter <span class="req">*</span></div>'
-    +'<select class="field-input" id="qe-quarter"><option value="">Select</option>'
-    +'<option '+(qNum===1?'selected':'')+'>Quarter I (Month 1–3)</option>'
-    +'<option '+(qNum===2?'selected':'')+'>Quarter II (Month 4–6)</option>'
-    +'<option '+(qNum===3?'selected':'')+'>Quarter III (Month 7–9)</option>'
-    +'<option '+(qNum===4?'selected':'')+'>Quarter IV (Month 10–12)</option>'
-    +'</select></div></div>'
-    +'<div class="field"><div class="field-label">Evaluated by <span class="req">*</span></div>'
-    +'<input class="field-input" id="qe-evaluator" placeholder="Audiologist / SLP name"></div>'
-    +'</div>'
-
-    // AV Therapy completion
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">🎧 AV Therapy Completion</div>'
-    +'<div class="field"><div class="field-label">AV Therapy sessions completed this quarter? <span class="req">*</span></div>'
-    +'<div class="radio-group" id="qe-avt-complete">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;qe-avt-complete&quot;)"><div class="radio-dot"></div>Yes — all sessions completed</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-avt-complete&quot;)"><div class="radio-dot"></div>Partial — some sessions missed</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-avt-complete&quot;)"><div class="radio-dot"></div>No — significantly incomplete</div>'
-    +'</div></div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Sessions scheduled</div>'
-    +'<input type="number" class="field-input" id="qe-sess-scheduled" placeholder="e.g. 26" min="1" max="30"></div>'
-    +'<div class="field"><div class="field-label">Sessions attended</div>'
-    +'<input type="number" class="field-input" id="qe-sess-attended" placeholder="e.g. 22" min="0" max="30"></div>'
-    +'</div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Mapping sessions done</div>'
-    +'<input type="number" class="field-input" id="qe-mapping" placeholder="e.g. 2" min="0" max="10"></div>'
-    +'<div class="field"><div class="field-label">Mapping issues</div>'
-    +'<select class="field-input" id="qe-mapping-issues"><option value="">None</option>'
-    +'<option>Comfort issues</option><option>ECAP issues</option>'
-    +'<option>Referred to ENT</option><option>Other</option>'
-    +'</select></div></div>'
-    +'</div>'
-
-    // Audiological evaluation
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">👂 Audiological Evaluation</div>'
-    +'<div class="field"><div class="field-label">Aided audiogram result <span class="req">*</span></div>'
-    +'<div class="radio-group" id="qe-audiogram">'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-audiogram&quot;)"><div class="radio-dot"></div>Within speech spectrum (250–4000 Hz, 20–40 dB)</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-audiogram&quot;)"><div class="radio-dot"></div>Upper border of speech spectrum</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-audiogram&quot;)"><div class="radio-dot"></div>Below speech spectrum — needs remapping</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-audiogram&quot;)"><div class="radio-dot"></div>Not done this quarter</div>'
-    +'</div></div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">MAIS Score (/40) <span class="req">*</span></div>'
-    +'<input type="number" class="field-input" id="qe-mais" placeholder="0–40" min="0" max="40"></div>'
-    +'<div class="field"><div class="field-label">Speech Perception % (open set)</div>'
-    +'<input type="number" class="field-input" id="qe-speech-pct" placeholder="0–100" min="0" max="100"></div>'
-    +'</div>'
-    +'<div style="background:var(--gray);border-radius:8px;padding:8px 12px;font-size:11px;margin-top:4px">'
-    +'MAIS interpretation: <span id="qe-mais-interp" style="color:var(--text-light)">Enter score above</span></div>'
-    +'</div>'
-
-    // Language evaluation
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">🗣️ Speech & Language Evaluation</div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Receptive Language Age (RLA)</div>'
-    +'<input class="field-input" id="qe-rla" placeholder="e.g. 3.7–4.0 years"></div>'
-    +'<div class="field"><div class="field-label">Expressive Language Age (ELA)</div>'
-    +'<input class="field-input" id="qe-ela" placeholder="e.g. 2.7–2.9 years"></div>'
-    +'</div>'
-    +'<div class="field"><div class="field-label">Language assessment tool used</div>'
-    +'<select class="field-input" id="qe-lang-tool"><option value="">Select</option>'
-    +'<option>ACSLS (Assessment of Communication Skills for Language and Speech)</option>'
-    +'<option>REELS (Receptive-Expressive Emergent Language Scale)</option>'
-    +'<option>PLS-5 (Preschool Language Scale)</option>'
-    +'<option>TACL (Test for Auditory Comprehension of Language)</option>'
-    +'<option>Clinical observation only</option>'
-    +'</select></div>'
-    +'</div>'
-
-    // Overall progress
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">📊 Overall Progress Assessment</div>'
-    +'<div class="field"><div class="field-label">Overall outcome this quarter <span class="req">*</span></div>'
-    +'<div class="radio-group" id="qe-progress">'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-progress&quot;)"><div class="radio-dot"></div>🌟 Ahead — exceeding expectations for hearing age</div>'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;qe-progress&quot;)"><div class="radio-dot"></div>✅ On track — progressing as expected</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-progress&quot;)"><div class="radio-dot"></div>⚠️ Behind — slower than expected, needs review</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;qe-progress&quot;)"><div class="radio-dot"></div>🔴 Concern — significant issues, refer for review</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">Recommendations</div>'
-    +'<textarea class="field-input" id="qe-reco" rows="2" placeholder="Continue current plan / Change approach / Refer to specialist..."></textarea></div>'
-    +'<div class="field"><div class="field-label">Clinical notes</div>'
-    +'<textarea class="field-input" id="qe-notes" rows="2" placeholder="Key observations, parent feedback, device usage..."></textarea></div>'
-    +'</div>'
-
-    // Submit
-    +'<div style="padding:0 16px 40px">'
-    +'<div id="qe-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
-    +'<button onclick="submitQuarterlyEval()" style="width:100%;padding:14px;background:#4a2a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="qe-submit-btn">Submit Quarterly Evaluation &#8594;</button>'
-    +'</div>';
-
-  // Live MAIS interpretation
-  document.getElementById('qe-body').addEventListener('input', function(e) {
-    if (e.target.id === 'qe-mais') {
-      var s = parseInt(e.target.value) || 0;
-      var el = document.getElementById('qe-mais-interp');
-      if (el) {
-        el.textContent = s >= 32 ? 'Excellent (≥80%)' : s >= 20 ? 'Good (50–80%)' : s >= 10 ? 'Fair (25–50%)' : 'Needs attention (<25%)';
-        el.style.color = s >= 32 ? 'var(--green)' : s >= 20 ? 'var(--amber)' : 'var(--red)';
-      }
-    }
-  });
-
-  showScreen('qeval');
-}
-
-async function submitQuarterlyEval() {
-  if (isDemo()) { alert('🔒 Demo account — submissions are disabled.'); return; }
-  var errEl = document.getElementById('qe-error');
-  var btn   = document.getElementById('qe-submit-btn');
-  errEl.style.display = 'none';
-
-  var date      = document.getElementById('qe-date').value;
-  var quarter   = document.getElementById('qe-quarter').value;
-  var evaluator = document.getElementById('qe-evaluator').value.trim();
-  var mais      = document.getElementById('qe-mais').value;
-  var audiogram = document.querySelector('#qe-audiogram .radio-item.checked');
-  var progress  = document.querySelector('#qe-progress .radio-item.checked');
-  var avtDone   = document.querySelector('#qe-avt-complete .radio-item.checked');
-
-  if (!date)      { errEl.textContent='Evaluation date is required.';   errEl.style.display='block'; return; }
-  if (!quarter)   { errEl.textContent='Quarter is required.';           errEl.style.display='block'; return; }
-  if (!evaluator) { errEl.textContent='Evaluator name is required.';    errEl.style.display='block'; return; }
-  if (!mais)      { errEl.textContent='MAIS score is required.';        errEl.style.display='block'; return; }
-  if (!audiogram) { errEl.textContent='Audiogram result is required.';  errEl.style.display='block'; return; }
-  if (!progress)  { errEl.textContent='Overall progress is required.';  errEl.style.display='block'; return; }
-
-  btn.textContent = 'Submitting...';
-  btn.disabled = true;
-
-  var entry = {
-    caseId:           String(selectedCase.id),
-    caseName:         selectedCase.name || '',
-    caseDistrict:     selectedCase.district || '',
-    rehabCentre:      currentUser ? currentUser.unit : '',
-    submittedBy:      currentUser ? currentUser.username : '',
-    date:             date,
-    quarter:          quarter,
-    evaluator:        evaluator,
-    avtComplete:      avtDone ? avtDone.textContent.trim() : '',
-    sessScheduled:    document.getElementById('qe-sess-scheduled').value,
-    sessAttended:     document.getElementById('qe-sess-attended').value,
-    mappingDone:      document.getElementById('qe-mapping').value,
-    mappingIssues:    document.getElementById('qe-mapping-issues').value,
-    audiogramResult:  audiogram.textContent.trim(),
-    maisScore:        parseInt(mais) || 0,
-    maisPercent:      Math.round((parseInt(mais)||0) / 40 * 100),
-    speechPercent:    document.getElementById('qe-speech-pct').value,
-    rla:              document.getElementById('qe-rla').value.trim(),
-    ela:              document.getElementById('qe-ela').value.trim(),
-    langTool:         document.getElementById('qe-lang-tool').value,
-    overallProgress:  progress.textContent.trim(),
-    recommendations:  document.getElementById('qe-reco').value.trim(),
-    notes:            document.getElementById('qe-notes').value.trim(),
-    timestamp:        new Date().toISOString(),
-    entryId:          'QE-' + Date.now()
-  };
-
-  try {
-    var _col = window._fbFns.collection;
-    var _add = window._fbFns.addDoc;
-    var _doc = window._fbFns.doc;
-    var _upd = window._fbFns.updateDoc;
-
-    await _add(_col(window._fbDb, 'submissions_qeval'), entry);
-
-    // Update case with latest quarterly eval data
-    var progressFlag = progress.textContent.includes('Concern') || progress.textContent.includes('Behind');
-    var caseUpdates = {
-      _lastQEvalDate:     date,
-      _lastQEvalQuarter:  quarter,
-      _lastMaisScore:     entry.maisScore,
-      _lastSpeechPct:     entry.speechPercent,
-      _lastQProgress:     entry.overallProgress,
-      _lastModified:      new Date().toISOString()
-    };
-    if (progressFlag) caseUpdates.risk = true;
-
-    await _upd(_doc(window._fbDb, 'cases', String(selectedCase.id)), caseUpdates);
-    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(selectedCase.id); });
-    if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
-
-    document.getElementById('success-msg').textContent = quarter + ' evaluation submitted for ' + selectedCase.name + '.';
-    document.getElementById('success-id').textContent  = entry.entryId;
-    document.getElementById('offline-note').style.display = 'none';
-    screenHistory = ['home'];
-    showScreen('success');
-  } catch(e) {
-    errEl.textContent = 'Error saving: ' + e.message;
-    errEl.style.display = 'block';
-    btn.textContent = 'Submit Quarterly Evaluation →';
-    btn.disabled = false;
-  }
-}
-
 // ══════════════════════════════════════════════════════════════
 // DISTRICT UNIFIED SCREEN — Case view + Follow-up + Assessment
 // ══════════════════════════════════════════════════════════════
@@ -7022,6 +6333,6 @@ window.addEventListener('load', async () => {
   }
 });
 </script>
-</script>
+<script src="cases.js" defer></script>
 </body>
 </html>

@@ -1692,24 +1692,24 @@ async function authenticateAndLogin() {
     currentRole = profile.role;
     sessionStorage.setItem('ci_user', JSON.stringify(currentUser));
 
-    // Show loading screen immediately after auth
+    // Show loading screen — auth succeeded, now load data
     showScreen('loading');
-
-    // Load cases from Firestore
-    await loadCasesFromFirestore();
-
     btn.innerHTML = 'Sign in →'; btn.disabled = false;
 
-    if (currentUser.mustChangePassword) {
-      showScreen('setpwd');
-    } else {
-      buildHome();
-      showScreen('home');
-    }
+    await loadCasesFromFirestore();
+
+    // Navigate to home — this must always run, never get swallowed by catch
+    try { buildHome(); } catch(e2) { console.error('buildHome:', e2); }
+    showScreen('home');
 
   } catch(e) {
-    const msg = (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential')
-      ? 'Incorrect username or password.' : e.message;
+    // Only auth/profile errors land here — navigate away from loading screen
+    const isAuthErr = e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential';
+    const msg = isAuthErr ? 'Incorrect username or password.' : e.message;
+    // If we already passed auth (loading screen showing), go to login
+    if (currentScreen === 'loading') {
+      showScreen('auth', false);
+    }
     errEl.textContent = msg;
     errEl.style.display = 'block';
     btn.innerHTML = 'Sign in →'; btn.disabled = false;
@@ -6768,17 +6768,24 @@ window.addEventListener('load', async () => {
 
   const saved = sessionStorage.getItem('ci_user');
   if (saved) {
+    // Show loading screen immediately before any async work
+    showScreen('loading', false);
+    const statusEl = document.getElementById('loading-status');
+    if (statusEl) statusEl.textContent = 'Restoring your session…';
     try {
       currentUser = JSON.parse(saved);
       currentRole = currentUser.role;
-      // Show loading screen immediately — never leave a blank white page
-      showScreen('loading', false);
-      const statusEl = document.getElementById('loading-status');
-      if (statusEl) statusEl.textContent = 'Restoring your session…';
       await loadCasesFromFirestore();
-      buildHome();
-      showScreen('home', false);
-    } catch(e) { sessionStorage.removeItem('ci_user'); }
+    } catch(e) {
+      console.error('Session restore error:', e);
+      sessionStorage.removeItem('ci_user');
+      // Fall through to show login screen — do NOT leave loading stuck
+      showScreen('login', false);
+      return;
+    }
+    // Data loaded — go home regardless of buildHome errors
+    try { buildHome(); } catch(e) { console.error('buildHome:', e); }
+    showScreen('home', false);
   }
 });
 </script>

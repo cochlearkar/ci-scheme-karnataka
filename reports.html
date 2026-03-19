@@ -157,6 +157,7 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
     <div class="tab" onclick="showTab('fy')">📅 FY Progress</div>
     <div class="tab" onclick="showTab('distyr')">🗂️ District × Year</div>
     <div class="tab" onclick="showTab('device')">🦻 Device Status</div>
+    <div class="tab" onclick="showTab('avt')">🎧 AVT Attendance</div>
     <div class="tab" onclick="showTab('quarterly')">&#128197; Monthly / Quarterly</div>
     <div class="tab" onclick="showTab('device')">&#129955; Device Status</div>
   </div>
@@ -394,6 +395,41 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
       </div>
     </div>
 
+    <!-- ── AVT ATTENDANCE ── -->
+    <div class="report-section" id="sec-avt">
+      <div class="stat-grid" id="avt-stats"></div>
+      <div class="table-wrap" style="margin-bottom:16px">
+        <div class="table-header">
+          <span class="table-title">🔴 Red Alert — Missing AVT (Immediate action)</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-avt-red','avt_red_alert')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-avt-red">
+          <thead><tr><th>Name</th><th>District</th><th>Rehab Centre</th><th>Hospital</th><th>Last Session</th><th>Consecutive Missed</th><th>Mobile</th></tr></thead>
+          <tbody id="tbody-avt-red"></tbody>
+        </table></div>
+      </div>
+      <div class="table-wrap" style="margin-bottom:16px">
+        <div class="table-header">
+          <span class="table-title">⚠️ Yellow Alert — 2 consecutive sessions missed</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-avt-yellow','avt_yellow_alert')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-avt-yellow">
+          <thead><tr><th>Name</th><th>District</th><th>Rehab Centre</th><th>Last Session</th><th>Mobile</th></tr></thead>
+          <tbody id="tbody-avt-yellow"></tbody>
+        </table></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Rehab Centre — Attendance Summary</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-avt-centre','avt_centre_summary')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-avt-centre">
+          <thead><tr><th>Rehab Centre</th><th>Total Children</th><th>🔴 Red</th><th>⚠️ Yellow</th><th>✅ On Track</th></tr></thead>
+          <tbody id="tbody-avt-centre"></tbody>
+        </table></div>
+      </div>
+    </div>
+
 
 
 <script type="module">
@@ -522,6 +558,7 @@ function showTab(name) {
   // Re-render distyr when that tab becomes visible
   if (name === 'distyr') { renderDistYr(); }
   if (name === 'device') { renderDevice(); }
+  if (name === 'avt') { renderAvt(); }
   if (name === 'quarterly') { renderQuarterly(); }
   if (name === 'device') { renderDevice(); }
   // Re-init sorting for newly visible table
@@ -602,6 +639,7 @@ function renderDevice() {
 function renderAll() {
   renderDistrict();
   renderDevice();
+  renderAvt();
   renderHospital();
   renderFinancial();
   renderRehab();
@@ -1056,6 +1094,73 @@ function closeDrilldown() {
 
 
 // -- DISTRICT × YEAR GRID ------------------------------------------------------
+
+
+// ── AVT ATTENDANCE ─────────────────────────────────────────────────────────────
+function renderAvt() {
+  var cases = FILTERED_CASES;
+  var surgCases = cases.filter(function(c){ return c.surgAdmit || c.hospSubmitted; });
+  var red    = surgCases.filter(function(c){ return c._attendanceFlag === 'red'; });
+  var yellow = surgCases.filter(function(c){ return c._attendanceFlag === 'yellow'; });
+  var ok     = surgCases.filter(function(c){ return !c._attendanceFlag; });
+
+  document.getElementById('avt-stats').innerHTML =
+    statCard(ok.length,     'On Track',     'var(--green-mid)') +
+    statCard(yellow.length, 'Yellow Alert', 'var(--amber-mid)') +
+    statCard(red.length,    'Red Alert',    'var(--red)') +
+    statCard(surgCases.length - ok.length - yellow.length - red.length, 'No Data', 'var(--text-light)');
+
+  // Red alert table
+  document.getElementById('tbody-avt-red').innerHTML = red.length ? red.map(function(c){
+    var mob = (c.mobile||'').replace(/[^0-9+]/g,'');
+    return '<tr>'
+      +'<td><strong>'+c.name+'</strong></td>'
+      +'<td>'+c.district+'</td>'
+      +'<td style="font-size:11px">'+c.rehabCentre+'</td>'
+      +'<td style="font-size:11px">'+c.hospital+'</td>'
+      +'<td>'+(c._lastRehabDate||'Never')+'</td>'
+      +'<td><span class="pill pill-red">'+(c._consecAbsent||'?')+' missed</span></td>'
+      +'<td>'+(mob?'<a href="tel:'+mob+'" style="color:var(--blue-mid)">'+mob+'</a>':'—')+'</td>'
+      +'</tr>';
+  }).join('') : '<tr><td colspan="7" class="empty">No red alerts ✅</td></tr>';
+
+  // Yellow alert table
+  document.getElementById('tbody-avt-yellow').innerHTML = yellow.length ? yellow.map(function(c){
+    var mob = (c.mobile||'').replace(/[^0-9+]/g,'');
+    return '<tr>'
+      +'<td><strong>'+c.name+'</strong></td>'
+      +'<td>'+c.district+'</td>'
+      +'<td style="font-size:11px">'+c.rehabCentre+'</td>'
+      +'<td>'+(c._lastRehabDate||'—')+'</td>'
+      +'<td>'+(mob?'<a href="tel:'+mob+'" style="color:var(--blue-mid)">'+mob+'</a>':'—')+'</td>'
+      +'</tr>';
+  }).join('') : '<tr><td colspan="5" class="empty">No yellow alerts ✅</td></tr>';
+
+  // Centre summary
+  var centreMap = {};
+  surgCases.forEach(function(c){
+    var r = c.rehabCentre||'Unknown';
+    if(!centreMap[r]) centreMap[r]={total:0,red:0,yellow:0,ok:0};
+    centreMap[r].total++;
+    if(c._attendanceFlag==='red') centreMap[r].red++;
+    else if(c._attendanceFlag==='yellow') centreMap[r].yellow++;
+    else centreMap[r].ok++;
+  });
+  document.getElementById('tbody-avt-centre').innerHTML = Object.entries(centreMap)
+    .sort(function(a,b){ return (b[1].red+b[1].yellow)-(a[1].red+a[1].yellow); })
+    .map(function(e){
+      return '<tr>'
+        +'<td>'+e[0]+'</td><td>'+e[1].total+'</td>'
+        +'<td>'+(e[1].red>0?'<span class="pill pill-red">'+e[1].red+'</span>':'0')+'</td>'
+        +'<td>'+(e[1].yellow>0?'<span class="pill pill-amber">'+e[1].yellow+'</span>':'0')+'</td>'
+        +'<td><span style="color:var(--green-mid);font-weight:600">'+e[1].ok+'</span></td>'
+        +'</tr>';
+    }).join('') || '<tr><td colspan="5" class="empty">No data</td></tr>';
+
+  makeSortable('tbl-avt-red');
+  makeSortable('tbl-avt-yellow');
+  makeSortable('tbl-avt-centre');
+}
 
 // ── DEVICE STATUS ─────────────────────────────────────────────────────────────
 function renderDevice() {

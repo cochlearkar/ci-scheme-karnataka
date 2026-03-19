@@ -1886,6 +1886,15 @@ function buildHome() {
     if (updated > 0) {
       html += `<div class="action-card" onclick="buildCaseList('hosp-updated');showScreen('cases')"><div class="action-icon">&#9989;</div><div class="action-title">${updated} updated</div><div class="action-desc">Surgery details submitted</div></div>`;
     }
+    // AVT attendance alerts for hospital
+    var avtRed    = allMyCases.filter(c=>c._attendanceFlag==='red').length;
+    var avtYellow = allMyCases.filter(c=>c._attendanceFlag==='yellow').length;
+    if (avtRed > 0) {
+      html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">⚠️</div><div><div class="action-title">${avtRed} child${avtRed!==1?'ren':''} missing AVT</div><div class="action-desc">Red alert — not attending regularly</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+    }
+    if (avtYellow > 0) {
+      html += `<div class="action-card" style="border-color:var(--amber-mid);background:var(--amber-light)" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:var(--amber)">${avtYellow} with attendance concern</div><div class="action-desc">2 consecutive sessions missed</div></div>`;
+    }
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All cases</div></div>`;
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
@@ -1897,7 +1906,9 @@ function buildHome() {
 
   } else if (currentRole === 'district') {
     html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify &amp; complete pending information</div></div><div class="action-arrow">→</div></div>`;
+    var avtAlerts = allMyCases.filter(c=>c._attendanceFlag==='red');
     if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
+    if (avtAlerts.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtAlerts.length} missing AVT sessions</div><div class="action-desc">Call family — get child back to rehab</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">By district</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#7a4f1a,#b87333);border:none" onclick="openDistrictReport()"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">District Report</div><div class="action-desc" style="color:rgba(255,255,255,.75)">Status · Follow-up · Outcomes · At-risk</div></div>`;
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📈</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
@@ -2249,6 +2260,9 @@ function buildCaseList(filter = 'all') {
   else if (filter === 'hosp-updated') activeStatusFilter = 'Updated';
   else if (filter === 'risk')         activeStatusFilter = 'At risk';
   else if (filter === 'confirm')      activeStatusFilter = 'Confirm';
+  else if (filter === 'avt-red')      activeStatusFilter = 'AVT Red';
+  else if (filter === 'avt-yellow')   activeStatusFilter = 'AVT Alert';
+  else if (filter === 'avt-concern')  activeStatusFilter = 'AVT Alert';
   else                                activeStatusFilter = 'All';
 
   // Lock hospital totals NOW — once per cases screen entry
@@ -2266,8 +2280,8 @@ function buildCaseList(filter = 'all') {
     ).join('');
   } else {
     const chipOptions = currentRole === 'hospital'
-    ? ['All','Pending Update','Updated']
-    : ['All','On track','At risk','Rehab 1','Rehab 2','Completed'];
+    ? ['All','Needs update','Updated','AVT Alert']
+    : ['All','On track','At risk','AVT Alert','Rehab 1','Rehab 2','Completed'];
   filterRow.innerHTML = chipOptions.map(f =>
       `<div class="filter-chip ${f===activeStatusFilter?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
     ).join('');
@@ -2343,6 +2357,10 @@ function applyAllFilters() {
     cases = cases.filter(c => c.status === 'rehab1');
   } else if (activeStatusFilter === 'Rehab 2') {
     cases = cases.filter(c => c.status === 'rehab2');
+  } else if (activeStatusFilter === 'AVT Alert') {
+    cases = cases.filter(c => c._attendanceFlag === 'red' || c._attendanceFlag === 'yellow');
+  } else if (activeStatusFilter === 'AVT Red') {
+    cases = cases.filter(c => c._attendanceFlag === 'red');
   }
   filteredCases = cases;
   const searchEl = document.getElementById('case-search');
@@ -2383,6 +2401,8 @@ function caseCardHTML(c) {
   } else {
     pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':c.status==='rehab1'||c.status==='rehab2'?'pill-rehab':'pill-pending';
     pillLabel = c.status==='paid'?'&#10003; Complete':c.status==='risk'?'&#9888; At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pending':'Active';
+    if (c._attendanceFlag === 'red')    cardBorder = 'border-left:4px solid var(--red);';
+    if (c._attendanceFlag === 'yellow') cardBorder = 'border-left:4px solid var(--amber-mid);';
   }
   const dateLabel = c.surgAdmit ? 'Surgery: '+c.surgAdmit : c.r1Admit ? 'Rehab1: '+c.r1Admit : c.r2Admit ? 'Rehab2: '+c.r2Admit : 'Pre-auth stage';
   var deviceBadge = c._deviceFlag ? '<span style="background:var(--red-light);color:var(--red);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">🦻 Device</span>' : '';
@@ -2394,6 +2414,7 @@ function caseCardHTML(c) {
     (c._deviceStatus && !c._deviceStatus.includes('Functional') && !c._deviceStatus.includes('Waiting')
       ? '<span class="status-pill" style="background:#fff0f0;color:var(--red);margin-left:4px">🔧 Device</span>'
       : '')+
+    attendanceBadge(c)+
     '</div>'+
     '<div class="case-meta">'+
     '<span>'+(c.gender||'')+(c.age?', '+c.age:'')+' · '+(c.district||'')+'</span>'+
@@ -4057,11 +4078,39 @@ async function submitRehabSession() {
 
     await _add(_col(window._fbDb, 'submissions_rehab'), sessionEntry);
 
+    // Compute attendance flag from this session
+    var isAbsent = attendance.textContent.trim().indexOf('Absent') > -1;
+    var prevConsecAbsent = selectedCase._consecAbsent || 0;
+    var newConsecAbsent  = isAbsent ? prevConsecAbsent + 1 : 0;
+    var missedThisMonth  = (selectedCase._missedThisMonth || 0) + (isAbsent ? 1 : 0);
+
+    // Reset missed count if new month
+    var lastMonth = selectedCase._lastSessionMonth || '';
+    var thisMonthStr = sessdate.substring(0, 7);
+    if (lastMonth !== thisMonthStr) missedThisMonth = isAbsent ? 1 : 0;
+
+    var newFlag = '';
+    if (newConsecAbsent >= 2) newFlag = 'yellow';
+    if (newConsecAbsent >= 2 && isAbsent) newFlag = 'red';
+    if (missedThisMonth >= 4) newFlag = 'red';
+
+    // Days since last session (only if present)
+    var prevDate = selectedCase._lastRehabDate || '';
+    if (!isAbsent) {
+      var gap = prevDate ? Math.floor((new Date(sessdate)-new Date(prevDate))/86400000) : 0;
+      if (gap > 14) sessionEntry.gapDays = gap; // flag long gap
+    }
+
     var caseUpdates = {
-      sessions: sessNum,
+      sessions: isAbsent ? (selectedCase.sessions||0) : sessNum,
       lastContact: sessdate,
       _lastRole: 'rehab',
-      _lastModified: now
+      _lastModified: now,
+      _lastRehabDate: isAbsent ? (selectedCase._lastRehabDate||'') : sessdate,
+      _consecAbsent: newConsecAbsent,
+      _missedThisMonth: missedThisMonth,
+      _lastSessionMonth: thisMonthStr,
+      _attendanceFlag: newFlag
     };
     var stageText = stage.textContent.trim();
     if (stageText.indexOf('Part 1') > -1) {
@@ -4480,6 +4529,7 @@ function openDistrictReport() {
     {id:'age',      icon:'👶', label:'Age'},
     {id:'fy',       icon:'📅', label:'FY Progress'},
     {id:'device',   icon:'🦻', label:'Device'},
+    {id:'avt',      icon:'🎧', label:'AVT Attendance'},
   ];
 
   document.getElementById('dr-tabs').innerHTML = tabs.map(t =>
@@ -4770,6 +4820,80 @@ function drRender(cases) {
           }).join('')}
         </table></div>`;
     }
+  }
+
+  // ── AVT ATTENDANCE TAB ──────────────────────────────────────────────────
+  else if (_drTab === 'avt') {
+    var surgCases = cases.filter(function(c){ return c.surgAdmit || c.hospSubmitted; });
+    var noAlert   = surgCases.filter(function(c){ return !c._attendanceFlag; }).length;
+    var yellow    = surgCases.filter(function(c){ return c._attendanceFlag==='yellow'; });
+    var red       = surgCases.filter(function(c){ return c._attendanceFlag==='red'; });
+
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">'
+      +statBox(noAlert,'On Track','var(--green)','var(--green-light)')
+      +statBox(yellow.length,'Yellow Alert','var(--amber)','var(--amber-light)')
+      +statBox(red.length,'Red Alert','var(--red)','var(--red-light)')
+      +'</div>';
+
+    if (red.length) {
+      html += sectionHead('🔴 Red Alert — Immediate action needed', red.length);
+      html += '<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">'
+        +'<table style="width:100%;border-collapse:collapse">'
+        +tableRow(['Name','Village','Rehab Centre','Last Session','Mobile'],true)
+        +red.map(function(c){
+          var mob = cleanMob(c.mobile||'');
+          return tableRow([
+            c.name||'—', c.village||'—', (c.rehabCentre||'—').split(' ').slice(0,2).join(' '),
+            c._lastRehabDate||'Never',
+            mob?'<a href="tel:'+mob+'" style="color:var(--blue-mid)">'+mob+'</a>':'—'
+          ]);
+        }).join('')
+        +'</table></div>'
+        +'<div style="font-size:11px;color:var(--red);background:var(--red-light);border-radius:8px;padding:9px 12px;margin-top:8px">📞 Call these families immediately. As district officer, your follow-up can get the child back to rehab.</div>';
+    }
+
+    if (yellow.length) {
+      html += sectionHead('⚠️ Yellow Alert — 2 consecutive sessions missed', yellow.length);
+      html += '<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">'
+        +'<table style="width:100%;border-collapse:collapse">'
+        +tableRow(['Name','Village','Rehab Centre','Last Session','Mobile'],true)
+        +yellow.map(function(c){
+          var mob = cleanMob(c.mobile||'');
+          return tableRow([
+            c.name||'—', c.village||'—', (c.rehabCentre||'—').split(' ').slice(0,2).join(' '),
+            c._lastRehabDate||'—',
+            mob?'<a href="tel:'+mob+'" style="color:var(--blue-mid)">'+mob+'</a>':'—'
+          ]);
+        }).join('')
+        +'</table></div>';
+    }
+
+    if (!red.length && !yellow.length) {
+      html += '<div style="text-align:center;padding:32px 16px;color:var(--green);font-size:14px">✅ All children attending AVT regularly in this district</div>';
+    }
+
+    // Summary by rehab centre
+    var centreMap = {};
+    surgCases.forEach(function(c){
+      var r = c.rehabCentre||'Unknown';
+      if(!centreMap[r]) centreMap[r]={total:0,red:0,yellow:0,ok:0};
+      centreMap[r].total++;
+      if(c._attendanceFlag==='red') centreMap[r].red++;
+      else if(c._attendanceFlag==='yellow') centreMap[r].yellow++;
+      else centreMap[r].ok++;
+    });
+    html += sectionHead('Rehab Centre — Attendance Summary');
+    html += '<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">'
+      +'<table style="width:100%;border-collapse:collapse">'
+      +tableRow(['Rehab Centre','Total','🔴 Red','⚠️ Yellow','✅ OK'],true)
+      +Object.entries(centreMap).map(function(e){
+        return tableRow([e[0],e[1].total,
+          e[1].red>0?'<span style="color:var(--red);font-weight:600">'+e[1].red+'</span>':'0',
+          e[1].yellow>0?'<span style="color:var(--amber);font-weight:600">'+e[1].yellow+'</span>':'0',
+          '<span style="color:var(--green);font-weight:600">'+e[1].ok+'</span>'
+        ]);
+      }).join('')
+      +'</table></div>';
   }
 
   // ── AT-RISK TAB ───────────────────────────────────────────────────
@@ -5650,6 +5774,92 @@ async function submitDistrictFollowup() {
     btn.textContent = 'Save Follow-up →';
     btn.disabled = false;
   }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ATTENDANCE ALERT ENGINE
+// Rules: 2 consecutive missed = yellow, 4 missed in month = red,
+//        <75% this month = red, no log in 14 days = red
+// ══════════════════════════════════════════════════════════════
+
+function computeAttendanceFlag(cas) {
+  // Returns: 'red', 'yellow', or ''
+  if (!cas._rehabSessions || !cas._rehabSessions.length) {
+    // No sessions logged yet — only flag if switch-on was >14 days ago
+    if (cas.switchOnDate) {
+      var switchOn = new Date(cas.switchOnDate);
+      var daysSince = Math.floor((Date.now() - switchOn) / 86400000);
+      if (daysSince > 14) return 'red'; // should have started by now
+    }
+    return '';
+  }
+
+  var sessions = cas._rehabSessions.slice().sort(function(a,b){
+    return new Date(b.sessdate) - new Date(a.sessdate);
+  });
+
+  var now = new Date();
+  var thisMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+
+  // Rule 1: No session logged in last 14 days
+  var lastDate = new Date(sessions[0].sessdate);
+  var daysSinceLast = Math.floor((Date.now() - lastDate) / 86400000);
+  if (daysSinceLast > 14) return 'red';
+
+  // Rule 2: 2 consecutive missed
+  var consecutive = 0;
+  for (var i=0; i<Math.min(sessions.length,5); i++) {
+    if (sessions[i].attendance && sessions[i].attendance.indexOf('Absent') > -1) {
+      consecutive++;
+      if (consecutive >= 2) return 'yellow';
+    } else {
+      break;
+    }
+  }
+
+  // Rule 3: This month — count present vs absent
+  var thisMonthSess = sessions.filter(function(s){ return s.sessdate && s.sessdate.startsWith(thisMonth); });
+  var missed = thisMonthSess.filter(function(s){ return s.attendance && s.attendance.indexOf('Absent') > -1; }).length;
+  var present = thisMonthSess.filter(function(s){ return s.attendance && s.attendance.indexOf('Present') > -1; }).length;
+  var total = present + missed;
+
+  // Rule 4: 4 or more missed this month
+  if (missed >= 4) return 'red';
+
+  // Rule 5: Below 75% this month (need at least 4 sessions to judge)
+  if (total >= 4 && present / total < 0.75) return 'red';
+
+  return '';
+}
+
+// Load rehab sessions for a case from Firestore into cas._rehabSessions
+async function loadRehabSessionsForCase(caseId) {
+  try {
+    var _col = window._fbFns.collection;
+    var _q   = window._fbFns.query || null;
+    var _where = window._fbFns.where || null;
+    var _get = window._fbFns.getDocs;
+    var col  = _col(window._fbDb, 'submissions_rehab');
+    var snap = await _get(col);
+    var sessions = [];
+    snap.forEach(function(d) {
+      var data = d.data();
+      if (String(data.caseId) === String(caseId)) sessions.push(data);
+    });
+    return sessions;
+  } catch(e) {
+    console.warn('Could not load rehab sessions:', e.message);
+    return [];
+  }
+}
+
+// Compute attendance badge HTML for case cards
+function attendanceBadge(cas) {
+  var flag = cas._attendanceFlag || '';
+  if (flag === 'red')    return '<span style="background:#FCEBEB;color:var(--red);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">⚠ AVT</span>';
+  if (flag === 'yellow') return '<span style="background:#FAEEDA;color:var(--amber);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">! AVT</span>';
+  return '';
 }
 
 // HOSPITAL UPDATE FUNCTIONS

@@ -1662,11 +1662,18 @@ async function authenticateAndLogin() {
     const { signInWithEmailAndPassword } = window._fbFns;
     const cred = await signInWithEmailAndPassword(window._fbAuth, email, password);
 
-    // Fetch profile from Firestore users collection
-    const { collection, getDocs } = window._fbFns;
-    const snap = await getDocs(collection(window._fbDb, 'users'));
-    let profile = null;
-    snap.forEach(d => { if (d.data().username === username) profile = d.data(); });
+    // Fetch profile from Firestore — read own document by UID
+    const { doc, getDoc } = window._fbFns;
+    const userDocRef = doc(window._fbDb, 'users', cred.user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    let profile = userDocSnap.exists() ? userDocSnap.data() : null;
+
+    // Fallback: search by username if UID-based lookup fails
+    if (!profile) {
+      const { collection, getDocs } = window._fbFns;
+      const snap = await getDocs(collection(window._fbDb, 'users'));
+      snap.forEach(d => { if (d.data().username === username) profile = d.data(); });
+    }
 
     if (!profile) {
       errEl.textContent = 'User profile not found. Contact cochlearkar@gmail.com.';

@@ -608,6 +608,25 @@ body {
 @media (max-width: 768px) {
   #dsk-brand, #dsk-bar { display: none !important; }
   body::before, body::after { display: none !important; }
+  body { display: block !important; }
+
+  /* Reset ALL desktop screen overrides — full viewport on mobile */
+  .screen {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    right: 0 !important;
+    transform: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+  }
 }
 
 </style>
@@ -1840,75 +1859,87 @@ function filterCasesByUser(cases) {
 }
 
 function buildHome() {
-  _stateHospFilter = null; // clear any hospital drill-down filter
-  // Cases already loaded into SAMPLE_CASES by loadCasesFromFirestore() at login
-  // Fallback to cases.js if Firestore hasn't loaded yet
+  _stateHospFilter = null;
   if (SAMPLE_CASES.length === 0 && typeof PRELOADED_CASES_DATA !== 'undefined') {
     SAMPLE_CASES = PRELOADED_CASES_DATA;
   }
-  const meta = ROLE_META[currentRole];
+  const meta     = ROLE_META[currentRole];
   const unitName = (currentUser && currentUser.unit) ? currentUser.unit : meta.orgOptions[0];
   document.getElementById('home-title').textContent = meta.icon + '  ' + unitName;
-  document.getElementById('home-sub').textContent = meta.label + ' · Shravan Sanjeevini';
+  document.getElementById('home-sub').textContent   = meta.label + ' · Shravan Sanjeevini';
   const chip = document.getElementById('home-chip');
   chip.textContent = meta.label;
-  chip.className = 'role-chip ' + meta.chip;
-  // User info bar
+  chip.className   = 'role-chip ' + meta.chip;
   if (currentUser) {
     document.getElementById('user-display-name').textContent = currentUser.username + (isDemo() ? ' 🔒 Demo' : '');
     document.getElementById('user-display-role').textContent = meta.label + (currentUser.unit ? ' · ' + currentUser.unit.substring(0,30) : '');
   }
 
   const allMyCases = filterCasesByUser(SAMPLE_CASES);
-  const myCases = allMyCases;
-  const risks = myCases.filter(c => c.risk);
-  const ontrack = myCases.filter(c => !c.risk);
-  document.getElementById('stat1').textContent = myCases.length;
-  document.getElementById('stat2').textContent = myCases.filter(c=>c.status==='paid'||c.status==='rehab1'||c.status==='rehab2').length;
-  document.getElementById('stat3').textContent = risks.length;
-  document.getElementById('stat2').textContent = ontrack.length;
-  document.getElementById('stat3').textContent = risks.length;
+  const risks      = allMyCases.filter(c => c.risk);
+  const ontrack    = allMyCases.filter(c => !c.risk);
+  document.getElementById('stat1').textContent       = allMyCases.length;
+  document.getElementById('stat2').textContent       = ontrack.length;
+  document.getElementById('stat3').textContent       = risks.length;
   document.getElementById('stat1-label').textContent = currentRole === 'district' ? 'In district' : 'Total cases';
 
-  const body = document.getElementById('home-body');
-  let html = '';
+  // ── AVT attendance data (used by all roles) ────────────────────────────────
+  const avtRed      = allMyCases.filter(c => c._attendanceFlag === 'red');
+  const avtYellow   = allMyCases.filter(c => c._attendanceFlag === 'yellow');
+  const avtOK       = allMyCases.filter(c => c._attendanceFlag === '' || !c._attendanceFlag);
+  const avtTotal    = allMyCases.filter(c => c._lastRehabDate); // ever had a session
+  const noSession14 = allMyCases.filter(c => {
+    if (!c._lastRehabDate && !c.switchOnDate) return false;
+    var ref = c._lastRehabDate || c.switchOnDate;
+    return Math.floor((Date.now() - new Date(ref)) / 86400000) > 14;
+  });
 
-  // Primary action
-  html += `<div class="section-label">Quick action</div>`;
-  html += `<div class="action-grid">`;
+  const body = document.getElementById('home-body');
+  let html   = '';
+
+  // ── QUICK ACTIONS ──────────────────────────────────────────────────────────
+  html += `<div class="section-label">Quick action</div><div class="action-grid">`;
 
   if (currentRole === 'hospital') {
     const pending = allMyCases.filter(c => !isHospitalUpdated(c)).length;
     const updated = allMyCases.filter(c =>  isHospitalUpdated(c)).length;
     if (pending > 0) {
-      html += `<div class="action-card primary" onclick="buildCaseList('hosp-pending');showScreen('cases')" style="background:var(--red);border-color:var(--red)"><div class="action-icon">&#128308;</div><div><div class="action-title">${pending} case${pending!==1?'s':''} need your update</div><div class="action-desc">Surgery &amp; device details not yet submitted</div></div><div class="action-arrow">&#8594;</div></div>`;
+      html += `<div class="action-card primary" onclick="buildCaseList('hosp-pending');showScreen('cases')" style="background:var(--red);border-color:var(--red)"><div class="action-icon">🔴</div><div><div class="action-title">${pending} case${pending!==1?'s':''} need your update</div><div class="action-desc">Surgery &amp; device details not yet submitted</div></div><div class="action-arrow">→</div></div>`;
     }
     if (updated > 0) {
-      html += `<div class="action-card" onclick="buildCaseList('hosp-updated');showScreen('cases')"><div class="action-icon">&#9989;</div><div class="action-title">${updated} updated</div><div class="action-desc">Surgery details submitted</div></div>`;
+      html += `<div class="action-card" onclick="buildCaseList('hosp-updated');showScreen('cases')"><div class="action-icon">✅</div><div class="action-title">${updated} updated</div><div class="action-desc">Surgery details submitted</div></div>`;
     }
-    // AVT attendance alerts for hospital
-    var avtRed    = allMyCases.filter(c=>c._attendanceFlag==='red').length;
-    var avtYellow = allMyCases.filter(c=>c._attendanceFlag==='yellow').length;
-    if (avtRed > 0) {
-      html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">⚠️</div><div><div class="action-title">${avtRed} child${avtRed!==1?'ren':''} missing AVT</div><div class="action-desc">Red alert — not attending regularly</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+    if (avtRed.length > 0) {
+      html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtRed.length} child${avtRed.length!==1?'ren':''} missing AVT 🔴</div><div class="action-desc">Not attending regularly — follow up</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     }
-    if (avtYellow > 0) {
-      html += `<div class="action-card" style="border-color:var(--amber-mid);background:var(--amber-light)" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:var(--amber)">${avtYellow} with attendance concern</div><div class="action-desc">2 consecutive sessions missed</div></div>`;
+    if (avtYellow.length > 0) {
+      html += `<div class="action-card" style="border-color:#d97706;background:#fffbeb" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:#92400e">${avtYellow.length} attendance concern ⚠️</div><div class="action-desc">2 consecutive sessions missed</div></div>`;
     }
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All cases</div></div>`;
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'rehab') {
-    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Update Rehab Sessions</div><div class="action-desc">Select a case to log today's session</div></div><div class="action-arrow">→</div></div>`;
-    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All assigned cases</div></div>`;
+    const rehabRed    = allMyCases.filter(c => c._attendanceFlag === 'red').length;
+    const rehabYellow = allMyCases.filter(c => c._attendanceFlag === 'yellow').length;
+    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">📋</div><div><div class="action-title">Log Weekly Sessions</div><div class="action-desc">Mark attendance for each child this week</div></div><div class="action-arrow">→</div></div>`;
+    if (rehabRed > 0) {
+      html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🔴</div><div><div class="action-title">${rehabRed} child${rehabRed!==1?'ren':''} — RED alert</div><div class="action-desc">4+ absences — district must be informed</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+    }
+    if (rehabYellow > 0) {
+      html += `<div class="action-card" style="border-color:#d97706;background:#fffbeb" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:#92400e">${rehabYellow} — follow up ⚠️</div><div class="action-desc">2 consecutive absences — call family</div></div>`;
+    }
+    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse all cases</div><div class="action-desc">All assigned cases</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'district') {
-    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">🔴</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify &amp; complete pending information</div></div><div class="action-arrow">→</div></div>`;
-    var avtAlerts = allMyCases.filter(c=>c._attendanceFlag==='red');
-    if (risks.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
-    if (avtAlerts.length > 0) html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtAlerts.length} missing AVT sessions</div><div class="action-desc">Call family — get child back to rehab</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+    if (avtRed.length > 0) {
+      html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtRed.length} missing AVT 🔴</div><div class="action-desc">Call family — get child back to rehab</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+    }
+    if (risks.length > 0) {
+      html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
+    }
+    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">✅</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify pending information</div></div><div class="action-arrow">→</div></div>`;
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">By district</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#7a4f1a,#b87333);border:none" onclick="openDistrictReport()"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">District Report</div><div class="action-desc" style="color:rgba(255,255,255,.75)">Status · Follow-up · Outcomes · At-risk</div></div>`;
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📈</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
@@ -1922,22 +1953,175 @@ function buildHome() {
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#128C7E,#25D366);border:none;cursor:pointer" onclick="shareWhatsApp()"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">📤</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Share Daily Update on WhatsApp</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Tap to open WhatsApp with today's hospital summary pre-filled</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">All guidelines · Rates · Checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
   }
-
   html += `</div>`;
 
-  // Alerts
+  // ── AVT ATTENDANCE PANEL (all roles except state see their filtered view) ──
+  if (currentRole !== 'state' && avtTotal.length > 0) {
+    const totalWithSessions = avtTotal.length;
+    const redCount    = avtRed.length;
+    const yellowCount = avtYellow.length;
+    const okCount     = avtOK.filter(c => c._lastRehabDate).length;
+    const overallPct  = totalWithSessions > 0 ? Math.round(okCount / totalWithSessions * 100) : 0;
+
+    html += `<div class="section-label" style="margin-top:20px">AVT Attendance Monitor</div>`;
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px">`;
+
+    // Traffic light summary bar
+    html += `<div style="display:flex;gap:8px;margin-bottom:12px">`;
+    html += `<div onclick="buildCaseList('avt-red');showScreen('cases')" style="flex:1;background:${redCount>0?'#fee2e2':'#f9fafb'};border:1px solid ${redCount>0?'#fca5a5':'#e5e7eb'};border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer">
+      <div style="font-size:20px;font-weight:800;color:${redCount>0?'#dc2626':'#9ca3af'}">${redCount}</div>
+      <div style="font-size:9px;font-weight:700;color:${redCount>0?'#991b1b':'#9ca3af'};text-transform:uppercase">🔴 Red</div>
+    </div>`;
+    html += `<div onclick="buildCaseList('avt-yellow');showScreen('cases')" style="flex:1;background:${yellowCount>0?'#fffbeb':'#f9fafb'};border:1px solid ${yellowCount>0?'#fcd34d':'#e5e7eb'};border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer">
+      <div style="font-size:20px;font-weight:800;color:${yellowCount>0?'#d97706':'#9ca3af'}">${yellowCount}</div>
+      <div style="font-size:9px;font-weight:700;color:${yellowCount>0?'#92400e':'#9ca3af'};text-transform:uppercase">⚠️ Yellow</div>
+    </div>`;
+    html += `<div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 8px;text-align:center">
+      <div style="font-size:20px;font-weight:800;color:#16a34a">${okCount}</div>
+      <div style="font-size:9px;font-weight:700;color:#166534;text-transform:uppercase">✅ OK</div>
+    </div>`;
+    html += `</div>`;
+
+    // Progress bar
+    const barRed    = totalWithSessions > 0 ? Math.round(redCount/totalWithSessions*100)    : 0;
+    const barYellow = totalWithSessions > 0 ? Math.round(yellowCount/totalWithSessions*100) : 0;
+    const barOK     = 100 - barRed - barYellow;
+    html += `<div style="margin-bottom:10px">`;
+    html += `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-light);margin-bottom:4px"><span>${totalWithSessions} children with sessions logged</span><span>${barOK}% on track</span></div>`;
+    html += `<div style="height:8px;border-radius:4px;background:#e5e7eb;overflow:hidden;display:flex">`;
+    if (barOK > 0)     html += `<div style="width:${barOK}%;background:#16a34a"></div>`;
+    if (barYellow > 0) html += `<div style="width:${barYellow}%;background:#d97706"></div>`;
+    if (barRed > 0)    html += `<div style="width:${barRed}%;background:#dc2626"></div>`;
+    html += `</div>`;
+    html += `<div style="display:flex;gap:12px;margin-top:4px;font-size:9px;color:var(--text-light)">
+      <span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block"></span>On track</span>
+      <span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:50%;background:#d97706;display:inline-block"></span>Concern</span>
+      <span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:50%;background:#dc2626;display:inline-block"></span>Alert</span>
+    </div>`;
+    html += `</div>`;
+
+    // Red cases — show names (up to 5)
+    if (redCount > 0) {
+      html += `<div style="border-top:0.5px solid var(--border);padding-top:10px">`;
+      html += `<div style="font-size:10px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🔴 Needs immediate attention</div>`;
+      const showRed = avtRed.slice(0,5);
+      showRed.forEach(c => {
+        const daysSince = c._lastRehabDate ? Math.floor((Date.now()-new Date(c._lastRehabDate))/86400000) : null;
+        const missedMo  = c._missedThisMonth || 0;
+        const consec    = c._consecAbsent || 0;
+        const reason    = consec >= 4 ? consec+' consecutive absences'
+                        : missedMo >= 4 ? missedMo+' missed this month'
+                        : daysSince > 14 ? daysSince+' days since last session'
+                        : 'Low attendance';
+        html += `<div onclick="openCaseFromList('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:6px;cursor:pointer">
+          <div style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+            <div style="font-size:10px;color:#991b1b">${reason} · ${c.district}</div>
+          </div>
+          <div style="font-size:11px;color:#9ca3af">→</div>
+        </div>`;
+      });
+      if (redCount > 5) {
+        html += `<div onclick="buildCaseList('avt-red');showScreen('cases')" style="text-align:center;font-size:11px;color:var(--blue);font-weight:600;padding:6px;cursor:pointer">+ ${redCount-5} more → View all</div>`;
+      }
+      html += `</div>`;
+    }
+
+    // Yellow cases — compact list (up to 3)
+    if (yellowCount > 0) {
+      html += `<div style="border-top:0.5px solid var(--border);padding-top:10px;margin-top:4px">`;
+      html += `<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">⚠️ Follow up recommended</div>`;
+      avtYellow.slice(0,3).forEach(c => {
+        html += `<div onclick="openCaseFromList('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;margin-bottom:5px;cursor:pointer">
+          <div style="width:8px;height:8px;border-radius:50%;background:#d97706;flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+            <div style="font-size:10px;color:#92400e">${c._consecAbsent||0} consec. absences · ${c.district}</div>
+          </div>
+          <div style="font-size:11px;color:#9ca3af">→</div>
+        </div>`;
+      });
+      if (yellowCount > 3) {
+        html += `<div onclick="buildCaseList('avt-yellow');showScreen('cases')" style="text-align:center;font-size:11px;color:var(--blue);font-weight:600;padding:6px;cursor:pointer">+ ${yellowCount-3} more → View all</div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `</div>`; // end AVT panel
+  }
+
+  // ── STATE: AVT panel shows centre-wise summary ─────────────────────────────
+  if (currentRole === 'state') {
+    const allRed    = SAMPLE_CASES.filter(c => c._attendanceFlag === 'red').length;
+    const allYellow = SAMPLE_CASES.filter(c => c._attendanceFlag === 'yellow').length;
+    const allSess   = SAMPLE_CASES.filter(c => c._lastRehabDate).length;
+
+    if (allSess > 0) {
+      html += `<div class="section-label" style="margin-top:20px">AVT Attendance — All Centres</div>`;
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px">`;
+      html += `<div style="display:flex;gap:8px;margin-bottom:12px">`;
+      html += `<div onclick="buildCaseList('avt-red');showScreen('cases')" style="flex:1;background:${allRed>0?'#fee2e2':'#f9fafb'};border:1px solid ${allRed>0?'#fca5a5':'#e5e7eb'};border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer">
+        <div style="font-size:20px;font-weight:800;color:${allRed>0?'#dc2626':'#9ca3af'}">${allRed}</div>
+        <div style="font-size:9px;font-weight:700;color:${allRed>0?'#991b1b':'#9ca3af'};text-transform:uppercase">🔴 Red alert</div></div>`;
+      html += `<div onclick="buildCaseList('avt-yellow');showScreen('cases')" style="flex:1;background:${allYellow>0?'#fffbeb':'#f9fafb'};border:1px solid ${allYellow>0?'#fcd34d':'#e5e7eb'};border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer">
+        <div style="font-size:20px;font-weight:800;color:${allYellow>0?'#d97706':'#9ca3af'}">${allYellow}</div>
+        <div style="font-size:9px;font-weight:700;color:${allYellow>0?'#92400e':'#9ca3af'};text-transform:uppercase">⚠️ Concern</div></div>`;
+      const allOK = allSess - allRed - allYellow;
+      html += `<div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 8px;text-align:center">
+        <div style="font-size:20px;font-weight:800;color:#16a34a">${allOK}</div>
+        <div style="font-size:9px;font-weight:700;color:#166534;text-transform:uppercase">✅ On track</div></div>`;
+      html += `</div>`;
+
+      // Centre-wise breakdown
+      const centreMap = {};
+      SAMPLE_CASES.filter(c => c._lastRehabDate || c.rehabCentre).forEach(c => {
+        const ctr = c.rehabCentre || 'Unknown centre';
+        if (!centreMap[ctr]) centreMap[ctr] = {red:0, yellow:0, ok:0, total:0};
+        centreMap[ctr].total++;
+        if (c._attendanceFlag==='red') centreMap[ctr].red++;
+        else if (c._attendanceFlag==='yellow') centreMap[ctr].yellow++;
+        else centreMap[ctr].ok++;
+      });
+      const centres = Object.entries(centreMap).sort((a,b) => b[1].red - a[1].red);
+      if (centres.length > 0) {
+        html += `<div style="border-top:0.5px solid var(--border);padding-top:10px">`;
+        html += `<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Centre-wise</div>`;
+        centres.slice(0,8).forEach(([name, stats]) => {
+          const pct = Math.round(stats.ok/stats.total*100);
+          const barW = pct;
+          html += `<div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="font-size:11px;font-weight:600;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%">${name}</span>
+              <span style="font-size:10px;color:var(--text-light)">${stats.total} · ${stats.red>0?'<span style="color:#dc2626">'+stats.red+'🔴</span>':''} ${stats.yellow>0?'<span style="color:#d97706">'+stats.yellow+'⚠️</span>':''}</span>
+            </div>
+            <div style="height:5px;border-radius:3px;background:#e5e7eb;overflow:hidden;display:flex">
+              <div style="width:${Math.round(stats.ok/stats.total*100)}%;background:#16a34a"></div>
+              <div style="width:${Math.round(stats.yellow/stats.total*100)}%;background:#d97706"></div>
+              <div style="width:${Math.round(stats.red/stats.total*100)}%;background:#dc2626"></div>
+            </div>
+          </div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+  }
+
+  // ── AT-RISK alert cards ────────────────────────────────────────────────────
   if (risks.length) {
-    html += `<div class="section-label" style="margin-top:20px">Needs attention</div>`;
+    html += `<div class="section-label" style="margin-top:20px">At-risk cases</div>`;
     risks.forEach(c => {
       html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
         <div class="alert-dot"></div>
-        <div style="flex:1"><div class="alert-name">${c.name}</div><div class="alert-detail">${c.village} · ${c.phase} · Last contact: ${c.lastContact}</div></div>
+        <div style="flex:1"><div class="alert-name">${c.name}</div>
+        <div class="alert-detail">${c.village||c.taluk} · ${c.phase} · Last contact: ${c.lastContact}</div></div>
         <span class="alert-tag">At risk</span>
       </div>`;
     });
   }
 
-  // State team — update status summary by hospital and rehab centre
+  // ── State summary by hospital / rehab ─────────────────────────────────────
   if (currentRole === 'state') {
     html += buildStateUpdateSummary(SAMPLE_CASES);
   }
@@ -1945,87 +2129,6 @@ function buildHome() {
   body.innerHTML = html;
 }
 
-// ── STATE UPDATE SUMMARY ─────────────────────────────────────────────────────
-
-
-
-// ── RESOURCES ────────────────────────────────────────────────────────────────
-// To update links: replace the url values with your Google Drive share links
-// Google Drive share URL format: https://drive.google.com/file/d/FILE_ID/view
-const RESOURCES = [
-  {
-    id: 'guidelines',
-    title: 'Programme Guidelines',
-    desc: 'NPPCD Karnataka Cochlear Implant Programme — operational guidelines',
-    icon: '📋',
-    url: '',  // ← Paste Google Drive link here
-    roles: ['hospital','rehab','district','state'],
-    tag: 'PDF'
-  },
-  {
-    id: 'rates',
-    title: 'Package Rates & Tariff',
-    desc: 'SAST package rates for surgery, device and rehabilitation claims',
-    icon: '💰',
-    url: '',  // ← Paste Google Drive link here
-    roles: ['hospital','rehab','district','state'],
-    tag: 'PDF'
-  },
-  {
-    id: 'hosp-checklist',
-    title: 'Hospital Claim Checklist',
-    desc: 'Documents required for surgery pre-authorisation and claim submission',
-    icon: '🏥',
-    url: '',  // ← Paste Google Drive link here
-    roles: ['hospital','state'],
-    tag: 'PDF'
-  },
-  {
-    id: 'rehab-checklist',
-    title: 'Rehab Claim Checklist',
-    desc: 'Documents required for Part 1 and Part 2 rehabilitation claim submission',
-    icon: '🎧',
-    url: '',  // ← Paste Google Drive link here
-    roles: ['rehab','state'],
-    tag: 'PDF'
-  },
-  {
-    id: 'district-checklist',
-    title: 'District Officer Checklist',
-    desc: 'Field verification and follow-up checklist for district programme officers',
-    icon: '📍',
-    url: '',  // ← Paste Google Drive link here
-    roles: ['district','state'],
-    tag: 'PDF'
-  },
-  {
-    id: 'annexure-a',
-    title: 'Annexure A — Patient Consent Form',
-    desc: 'Blank template for patient/guardian consent for cochlear implantation',
-    icon: '📄',
-    url: '',  // ← Paste Google Drive link here
-    roles: ['hospital','state'],
-    tag: 'Form'
-  },
-  {
-    id: 'annexure-b',
-    title: 'Annexure B — Audiological Assessment',
-    desc: 'Pre-surgery audiological assessment report template',
-    icon: '📄',
-    url: '',  // ← Paste Google Drive link here
-    roles: ['hospital','state'],
-    tag: 'Form'
-  },
-  {
-    id: 'annexure-c',
-    title: 'Annexure C — Rehab Progress Report',
-    desc: 'Monthly rehabilitation progress report template for AVT sessions',
-    icon: '📄',
-    url: '',  // ← Paste Google Drive link here
-    roles: ['rehab','state'],
-    tag: 'Form'
-  }
-];
 
 function openResources() {
   var meta = ROLE_META[currentRole];
@@ -3927,99 +4030,236 @@ function buildSummaryHTML(c) {
 
 function openRehabSession(cas) {
   selectedCase = cas;
-  document.getElementById('rs-title').textContent = cas.name || 'Log Session';
-  document.getElementById('rs-sub').textContent = 'Card: ' + cas.id + '  ' + (cas.rehabCentre || '');
-  var sessionsDone = cas.sessions || 0;
-  var totalSess = cas.totalSessions || 54;
-  var today = new Date().toISOString().split('T')[0];
+  if (isDemo()) { demoBanner(); return; }
 
-  var dotsHTML = '';
-  for (var d=0; d<Math.min(18,totalSess); d++) {
-    var n = d+1;
-    if (n <= sessionsDone) dotsHTML += '<div class="sdot sdot-done">'+n+'</div>';
-    else if (n === sessionsDone+1) dotsHTML += '<div class="sdot sdot-today">'+n+'</div>';
-    else dotsHTML += '<div class="sdot sdot-pending">'+n+'</div>';
+  var sessionsDone = cas.sessions || 0;
+  var sessYear = sessionsDone < 104 ? 1 : 2;
+  var sessPerWeek = sessYear === 1 ? 2 : 1;
+  var today = new Date();
+  var todayStr = today.toISOString().split('T')[0];
+  var monthName = today.toLocaleString('en-IN', {month:'long', year:'numeric'});
+  var quarterNum = Math.ceil((today.getMonth()+1)/3);
+  var quarterLabel = ['I','II','III','IV'][quarterNum-1];
+
+  document.getElementById('rs-title').textContent = cas.name || 'Weekly Session Log';
+  document.getElementById('rs-sub').textContent = (currentUser.unit||'') + '  ·  ' + monthName + '  ·  Quarter ' + quarterLabel;
+
+  // ── Attendance flag banner ──────────────────────────────────
+  var flag = cas._attendanceFlag || '';
+  var consecAbs = cas._consecAbsent || 0;
+  var missedMo  = cas._missedThisMonth || 0;
+  var lastSess  = cas._lastRehabDate || cas.lastContact || '';
+  var daysSinceLast = lastSess ? Math.floor((Date.now()-new Date(lastSess))/86400000) : 999;
+
+  var alertHTML = '';
+  if (flag==='red' || daysSinceLast>14) {
+    alertHTML = '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:10px 14px;margin:12px 16px 0;font-size:12px;font-weight:700;color:#991b1b">🔴 ATTENDANCE ALERT — '
+      +(consecAbs>=4?'4 consecutive absences':missedMo>=4?'4+ sessions missed this month':daysSinceLast>14?'No session in '+daysSinceLast+' days':'Low attendance')
+      +' — District Officer should be notified</div>';
+  } else if (flag==='yellow') {
+    alertHTML = '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin:12px 16px 0;font-size:12px;font-weight:700;color:#92400e">⚠️ 2 consecutive absences — please follow up with family</div>';
   }
 
+  // ── Patient info strip ──────────────────────────────────────
+  var mob = cleanMob(cas.mobile);
+  var infoHTML =
+    '<div style="margin:14px 16px 0;background:#e8f5ee;border:1px solid #b7ddc8;border-radius:12px;padding:12px 14px">'
+    +'<div style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Patient · '+monthName+' · Quarter '+quarterLabel+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px">'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Name</span><div style="color:#0a3d2e;font-weight:600">'+(cas.name||'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Card</span><div style="color:#0a3d2e;font-weight:600">'+(cas.id||'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">District</span><div style="color:#0a3d2e;font-weight:600">'+(cas.district||'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Mobile</span><div style="color:#0a3d2e;font-weight:600">'+(mob?'<a href="tel:'+mob+'" style="color:#0a3d2e">'+mob+'</a>':'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Sessions done</span><div style="color:#0a3d2e;font-weight:700">'+sessionsDone+' / '+( sessYear===1?'104':'104+')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Year / Freq</span><div style="color:#0a3d2e;font-weight:600">Year '+sessYear+' · '+sessPerWeek+'x per week</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Last session</span><div style="color:'+(daysSinceLast>14?'#dc2626':'#0a3d2e')+';font-weight:600">'+(lastSess||'Not recorded')+(daysSinceLast>14?' ('+daysSinceLast+' days ago)':'')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">This month</span><div style="color:'+(missedMo>=4?'#dc2626':missedMo>=2?'#d97706':'#0a3d2e')+';font-weight:600">'+(missedMo||0)+' missed | '+(cas._monthAttendPct!=null?cas._monthAttendPct+'% attended':'—')+'</div></div>'
+    +'</div></div>';
+
+  // ── Journey infographic ─────────────────────────────────────
+  var journeyHTML =
+    '<div style="margin:10px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px">'
+    +buildJourneyInfographic(cas)+'</div>';
+
+  // ── Therapist + Stage (common fields) ───────────────────────
   var r1checked = (cas.r1Admit && !cas.r2Admit) ? 'checked' : '';
   var r2checked = cas.r2Admit ? 'checked' : '';
-
-  document.getElementById('rs-body').innerHTML =
-    '<div style="margin:14px 16px 0;background:var(--blue-light);border:1px solid #B5D4F4;border-radius:12px;padding:14px 16px">'
-    +'<div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Patient Information</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px">'
-    +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">SAST Ref</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.surgRefNo||cas.tpa||'-')+'</div></div>'
-    +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">FY</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.fy||'-')+'</div></div>'
-    +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">Name</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.name||'-')+'</div></div>'
-    +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">Gender</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.gender||'-')+'</div></div>'
-    +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">Village</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.village||'-')+'</div></div>'
-    +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">District</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.district||'-')+'</div></div>'
-    +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">Hospital</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cas.hospital||'-')+'</div></div>'
-    +'<div><div style="color:var(--blue);font-size:10px;font-weight:600;text-transform:uppercase">Mobile</div><div style="color:var(--blue-mid);font-weight:500;font-size:12px">'+(cleanMob(cas.mobile)||'-')+'</div></div>'
-    +'</div></div>'
-    +'<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
-    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Programme Journey</div>'
-    +buildJourneyInfographic(cas)+'</div>'
-    +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">Session Progress</div>'
-    +'<div class="session-dots">'+dotsHTML+'</div>'
-    +'<div style="font-size:11px;color:var(--text-light);margin-top:4px">'+sessionsDone+' completed &middot; '+(totalSess-sessionsDone)+' remaining</div></div>'
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Session Details</div>'
-    +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Session date <span class="req">*</span></div><input type="date" class="field-input has-value" id="rs-sessdate" value="'+today+'"></div>'
-    +'<div class="field"><div class="field-label">Session number</div><input type="number" class="field-input" id="rs-sessnum" min="1" max="54" placeholder="e.g. 3" value="'+(sessionsDone+1)+'"></div>'
-    +'</div>'
+  var commonHTML =
+    '<div class="form-section" style="margin:14px 16px 0">'
+    +'<div class="form-section-title">Therapist &amp; Stage</div>'
+    +'<div class="field"><div class="field-label">Audiologist / Therapist name <span class="req">*</span></div>'
+    +'<input class="field-input" id="rs-therapist" placeholder="Name of AVT therapist / audiologist"></div>'
     +'<div class="field"><div class="field-label">Rehab stage <span class="req">*</span></div>'
     +'<div class="radio-group" id="rs-stage">'
-    +'<div class="radio-item '+r1checked+'" onclick="selectRadio(this,&quot;rs-stage&quot;)"><div class="radio-dot"></div>Rehab Part 1 (2002GP)</div>'
-    +'<div class="radio-item '+r2checked+'" onclick="selectRadio(this,&quot;rs-stage&quot;)"><div class="radio-dot"></div>Rehab Part 2 (2003GP)</div>'
-    +'</div></div>'
+    +'<div class="radio-item '+r1checked+'" onclick="selectRadio(this,\'rs-stage\')"><div class="radio-dot"></div>Part 1 (2002GP) — Year 1 · Sessions 1–104</div>'
+    +'<div class="radio-item '+r2checked+'" onclick="selectRadio(this,\'rs-stage\')"><div class="radio-dot"></div>Part 2 (2003GP) — Year 2 · Sessions 105+</div>'
+    +'</div></div></div>';
+
+  // ── Weekly session slots (matches AIISH paper) ──────────────
+  // Show sessPerWeek+1 slots so centre can log more if needed
+  var slotCount = sessPerWeek + 1;
+  window._rs_slotCount = slotCount;
+  window._rs_sessYear = sessYear;
+  window._rs_sessPerWeek = sessPerWeek;
+  window._rs_sessionsDone = sessionsDone;
+
+  // Get Mon of current week
+  var dayOfWeek = today.getDay();
+  var monday = new Date(today);
+  monday.setDate(today.getDate() - ((dayOfWeek+6)%7));
+
+  var slotsHTML = '<div class="form-section" style="margin:0 16px"><div class="form-section-title">📋 Weekly Attendance Sheet</div>'
+    +'<div style="font-size:11px;color:var(--text-light);margin-bottom:10px">Log each session this week · '
+    +sessPerWeek+'x per week expected (Year '+sessYear+')</div>';
+
+  for (var s=0; s<slotCount; s++) {
+    var d = new Date(monday);
+    d.setDate(monday.getDate() + (s * Math.floor(5/sessPerWeek)));
+    var dStr = d.toISOString().split('T')[0];
+    var weekNum = Math.ceil((d.getDate())/7);
+    var weekLbl = 'Week-'+weekNum;
+    var sNum = sessionsDone + s + 1;
+    var sid = 'rs-slot-'+s;
+
+    slotsHTML +=
+      '<div id="'+sid+'-card" style="border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--surface);transition:border-color .2s">'
+      // Header row: SI no + week label + session number
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+      +'<div style="width:24px;height:24px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">'+(s+1)+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:var(--text-light);background:var(--gray-bg);padding:3px 8px;border-radius:6px">'+weekLbl+'</div>'
+      +'<div style="font-size:11px;color:var(--text-light)">Session '+sNum+'</div>'
+      +'<input type="date" class="field-input" id="'+sid+'-date" value="'+dStr+'" style="flex:1;font-size:12px;padding:5px 8px;min-width:0">'
+      +'</div>'
+      // Attendance: P / Absent-Informed / Absent-Not Reachable
+      +'<div style="margin-bottom:8px">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-bottom:5px">Present (P) / Absent (A)</div>'
+      +'<div style="display:flex;gap:6px">'
+      +'<button type="button" id="'+sid+'-P" onclick="rsSelectAtt(\''+sid+'\',\'P\')" '
+      +'style="flex:1;padding:8px 4px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#374151">P<br><span style="font-size:9px;font-weight:400">Present</span></button>'
+      +'<button type="button" id="'+sid+'-AI" onclick="rsSelectAtt(\''+sid+'\',\'AI\')" '
+      +'style="flex:1;padding:8px 4px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#374151">A<br><span style="font-size:9px;font-weight:400">Absent-Informed</span></button>'
+      +'<button type="button" id="'+sid+'-ANR" onclick="rsSelectAtt(\''+sid+'\',\'ANR\')" '
+      +'style="flex:1;padding:8px 4px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#374151">A<br><span style="font-size:9px;font-weight:400">Absent-NR</span></button>'
+      +'</div></div>'
+      // Activities (shown when Present)
+      +'<div id="'+sid+'-acts" style="display:none;margin-top:8px">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-bottom:5px">Session Activities ✓</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-aud" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Audition</label>'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-spe" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Speech</label>'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-lan" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Language</label>'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-cog" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Cognition</label>'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:12px"><input type="checkbox" id="'+sid+'-par" checked style="accent-color:#1a8a5a;width:14px;height:14px"> Parent guidance</label>'
+      +'</div></div>'
+      +'</div>';
+  }
+  slotsHTML += '</div>';
+
+  // ── Mapping section (monthly) ────────────────────────────────
+  var mappingHTML =
+    '<div class="form-section" style="margin:0 16px">'
+    +'<div class="form-section-title">🎧 Mapping (if done this week)</div>'
     +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Duration <span class="req">*</span></div>'
-    +'<select class="field-input" id="rs-duration"><option value="">Select</option><option>30 min</option><option selected>45 min</option><option>60 min</option><option>90 min</option></select></div>'
-    +'<div class="field"><div class="field-label">Session type</div>'
-    +'<select class="field-input" id="rs-sesstype"><option>AVT (Auditory Verbal Therapy)</option><option>Mapping / Programming</option><option>Counselling</option><option>Parent training</option><option>Assessment</option></select></div>'
+    +'<div class="field"><div class="field-label">Mapping date</div><input type="date" class="field-input" id="rs-mapdate"></div>'
+    +'<div class="field"><div class="field-label">No. of maps done</div><input type="number" class="field-input" id="rs-mapcount" min="0" max="10" placeholder="e.g. 1"></div>'
     +'</div>'
-    +'<div class="field"><div class="field-label">Therapist name <span class="req">*</span></div><input class="field-input" id="rs-therapist" placeholder="Name of AVT therapist / audiologist"></div>'
-    +'</div>'
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Attendance &amp; Response</div>'
-    +'<div class="field"><div class="field-label">Attendance <span class="req">*</span></div>'
-    +'<div class="radio-group" id="rs-attendance">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Present - child + guardian attended</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Absent - family informed</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-attendance&quot;)"><div class="radio-dot"></div>Absent - not reachable</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">Child&#39;s progress this session</div>'
-    +'<div class="radio-group" id="rs-progress">'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Excellent - exceeding expectations</div>'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Good - on track</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Fair - needs more attention</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;rs-progress&quot;)"><div class="radio-dot"></div>Poor - significant difficulty</div>'
-    +'</div></div>'
-    +'<div class="field"><div class="field-label">Speech &amp; Language milestone</div>'
-    +'<select class="field-input" id="rs-milestone"><option value="">Select milestone...</option>'
-    +'<option>Detection - responds to sounds</option><option>Discrimination - distinguishes sounds</option>'
-    +'<option>Identification - recognises familiar words</option><option>Comprehension - understands spoken language</option>'
-    +'<option>Verbal expression - producing speech</option><option>Age-appropriate communication</option>'
-    +'</select></div></div>'
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Claim &amp; Follow-up</div>'
     +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Claim reference no.</div><input class="field-input" id="rs-claimref" placeholder="e.g. COC_H_..."></div>'
-    +'<div class="field"><div class="field-label">Claim status</div>'
-    +'<select class="field-input" id="rs-claimstatus"><option value="">Select</option>'
-    +'<option>CLAIMS PAID</option><option>SUBMITTED</option><option>PENDING</option><option>NEED MORE INFO</option><option>REJECTED</option>'
-    +'</select></div></div>'
-    +'<div class="field"><div class="field-label">Next session date</div><input type="date" class="field-input" id="rs-nextsess"></div>'
+    +'<div class="field"><div class="field-label">Sound field test</div>'
+    +'<div class="radio-group" id="rs-soundfield" style="flex-direction:row;gap:6px">'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-soundfield\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-soundfield\')" style="flex:1"><div class="radio-dot"></div>No</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">ECAP done</div>'
+    +'<div class="radio-group" id="rs-ecap" style="flex-direction:row;gap:6px">'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-ecap\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-ecap\')" style="flex:1"><div class="radio-dot"></div>No</div>'
+    +'</div></div>'
     +'</div>'
-    +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">Notes</div>'
-    +'<div class="field"><div class="field-label">Session notes / observations</div><textarea class="field-input" id="rs-notes" rows="3" placeholder="Progress notes, parent feedback, observations..."></textarea></div>'
-    +'<div class="field"><div class="field-label">Issues flagged</div><textarea class="field-input" id="rs-issues" rows="2" placeholder="Device issues, attendance concerns, any flags..."></textarea></div>'
-    +'</div>'
-    +'<div style="padding:0 16px 40px">'
-    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
-    +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="rs-submit-btn">Save Session &#8594;</button>'
+    +'<div class="field"><div class="field-label">Issues in mapping / device status</div>'
+    +'<input class="field-input" id="rs-devicestatus" placeholder="None / describe issues with sutures, coil, processor..."></div>'
     +'</div>';
 
+  // ── Progress + notes ─────────────────────────────────────────
+  var progressHTML =
+    '<div class="form-section" style="margin:0 16px">'
+    +'<div class="form-section-title">📊 Progress This Week</div>'
+    +'<div class="field"><div class="field-label">Child\'s overall response</div>'
+    +'<div class="radio-group" id="rs-progress">'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-progress\')"><div class="radio-dot"></div>Excellent — exceeding expectations</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-progress\')"><div class="radio-dot"></div>Good — on track</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-progress\')"><div class="radio-dot"></div>Fair — needs more attention</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-progress\')"><div class="radio-dot"></div>Poor — significant difficulty</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Current milestone</div>'
+    +'<select class="field-input" id="rs-milestone">'
+    +'<option value="">Select milestone...</option>'
+    +'<option>Detection — responds to sounds</option>'
+    +'<option>Discrimination — distinguishes sounds</option>'
+    +'<option>Identification — recognises familiar words</option>'
+    +'<option>Comprehension — understands spoken language</option>'
+    +'<option>Verbal expression — producing speech</option>'
+    +'<option>Age-appropriate communication</option>'
+    +'</select></div>'
+    +'<div class="field"><div class="field-label">Parent guidance done</div>'
+    +'<div class="radio-group" id="rs-parentguidance" style="flex-direction:row;gap:6px">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-parentguidance\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-parentguidance\')" style="flex:1"><div class="radio-dot"></div>No</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Video recorded (3 min)</div>'
+    +'<div class="radio-group" id="rs-video" style="flex-direction:row;gap:6px">'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-video\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-video\')" style="flex:1"><div class="radio-dot"></div>No</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Notes / observations</div>'
+    +'<textarea class="field-input" id="rs-notes" rows="3" placeholder="Child\'s response, parent feedback, observations this week..."></textarea></div>'
+    +'<div class="field"><div class="field-label">Issues to flag</div>'
+    +'<textarea class="field-input" id="rs-issues" rows="2" placeholder="Device issues, attendance concerns, family situation..."></textarea></div>'
+    +'</div>';
+
+  // ── Submit ───────────────────────────────────────────────────
+  var submitHTML =
+    '<div style="padding:0 16px 40px">'
+    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
+    +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;" id="rs-submit-btn">Save Weekly Log →</button>'
+    +'</div>';
+
+  document.getElementById('rs-body').innerHTML =
+    alertHTML + infoHTML + journeyHTML + commonHTML + slotsHTML + mappingHTML + progressHTML + submitHTML;
+
   showScreen('rehabsession');
+}
+
+function rsSelectAtt(sid, val) {
+  // val: 'P', 'AI' (Absent-Informed), 'ANR' (Absent-Not Reachable)
+  var card = document.getElementById(sid+'-card');
+  var pBtn   = document.getElementById(sid+'-P');
+  var aiBtn  = document.getElementById(sid+'-AI');
+  var anrBtn = document.getElementById(sid+'-ANR');
+  var acts   = document.getElementById(sid+'-acts');
+
+  // Reset all buttons
+  [pBtn, aiBtn, anrBtn].forEach(function(b) {
+    if (!b) return;
+    b.style.borderColor = '#d1d5db';
+    b.style.background  = '#fff';
+    b.style.color       = '#374151';
+  });
+
+  // Highlight selected
+  var colors = {P:['#1a8a5a','#f0fdf4','#065f46'], AI:['#d97706','#fffbeb','#92400e'], ANR:['#dc2626','#fef2f2','#991b1b']};
+  var c = colors[val] || colors.P;
+  var selBtn = document.getElementById(sid+'-'+val);
+  if (selBtn) {
+    selBtn.style.borderColor = c[0];
+    selBtn.style.background  = c[1];
+    selBtn.style.color       = c[2];
+  }
+  // Update card border
+  if (card) card.style.borderColor = c[0];
+  // Store selection
+  if (card) card.setAttribute('data-att', val);
+  // Show/hide activities
+  if (acts) acts.style.display = (val==='P') ? 'block' : 'none';
 }
 
 async function submitRehabSession() {
@@ -4028,47 +4268,157 @@ async function submitRehabSession() {
   var btn   = document.getElementById('rs-submit-btn');
   errEl.style.display = 'none';
 
-  var sessdate  = document.getElementById('rs-sessdate').value;
+  // ── Validate common fields ──────────────────────────────────
   var therapist = document.getElementById('rs-therapist').value.trim();
-  var duration  = document.getElementById('rs-duration').value;
-  var attendance= document.querySelector('#rs-attendance .radio-item.checked');
   var stage     = document.querySelector('#rs-stage .radio-item.checked');
+  if (!therapist) { errEl.textContent='Therapist name is required.'; errEl.style.display='block'; return; }
+  if (!stage)     { errEl.textContent='Rehab stage is required.';    errEl.style.display='block'; return; }
 
-  if (!sessdate)   { errEl.textContent='Session date is required.';     errEl.style.display='block'; return; }
-  if (!therapist)  { errEl.textContent='Therapist name is required.';   errEl.style.display='block'; return; }
-  if (!duration)   { errEl.textContent='Session duration is required.'; errEl.style.display='block'; return; }
-  if (!attendance) { errEl.textContent='Attendance is required.';       errEl.style.display='block'; return; }
-  if (!stage)      { errEl.textContent='Rehab stage is required.';      errEl.style.display='block'; return; }
+  // ── Collect slot data ────────────────────────────────────────
+  var slotCount = window._rs_slotCount || 2;
+  var sessYear  = window._rs_sessYear  || 1;
+  var sessPerWeek = window._rs_sessPerWeek || 2;
+  var sessionsDone = window._rs_sessionsDone || selectedCase.sessions || 0;
+
+  var slots = [];
+  var presentCount = 0;
+  var absentCount  = 0;
+  var atLeastOne   = false;
+
+  for (var s=0; s<slotCount; s++) {
+    var sid  = 'rs-slot-'+s;
+    var card = document.getElementById(sid+'-card');
+    if (!card) continue;
+    var att = card.getAttribute('data-att');
+    if (!att) continue; // slot not filled — skip
+    atLeastOne = true;
+
+    var sDate = document.getElementById(sid+'-date');
+    var sNum  = sessionsDone + s + 1;
+    var slot  = {
+      slotIndex: s,
+      sessdate:  sDate ? sDate.value : new Date().toISOString().split('T')[0],
+      sessNum:   sNum,
+      attendance: att,
+      isPresent:  att === 'P',
+      isAbsent:   att !== 'P'
+    };
+    if (att === 'P') {
+      presentCount++;
+      slot.audition      = document.getElementById(sid+'-aud')  ? document.getElementById(sid+'-aud').checked  : false;
+      slot.speech        = document.getElementById(sid+'-spe')  ? document.getElementById(sid+'-spe').checked  : false;
+      slot.language      = document.getElementById(sid+'-lan')  ? document.getElementById(sid+'-lan').checked  : false;
+      slot.cognition     = document.getElementById(sid+'-cog')  ? document.getElementById(sid+'-cog').checked  : false;
+      slot.parentGuide   = document.getElementById(sid+'-par')  ? document.getElementById(sid+'-par').checked  : false;
+    } else {
+      absentCount++;
+    }
+    slots.push(slot);
+  }
+
+  if (!atLeastOne) {
+    errEl.textContent = 'Please mark attendance for at least one session slot.';
+    errEl.style.display = 'block';
+    return;
+  }
 
   btn.textContent = 'Saving...';
   btn.disabled = true;
 
-  var sessNum  = parseInt(document.getElementById('rs-sessnum').value) || (selectedCase.sessions||0) + 1;
-  var progress = document.querySelector('#rs-progress .radio-item.checked');
-  var now      = new Date().toISOString();
+  var now       = new Date().toISOString();
+  var lastDate  = slots.filter(function(s){return s.sessdate;}).map(function(s){return s.sessdate;}).sort().pop() || '';
+  var monthStr  = lastDate.substring(0,7);
+  var progress  = document.querySelector('#rs-progress .radio-item.checked');
+  var parentG   = document.querySelector('#rs-parentguidance .radio-item.checked');
+  var videoR    = document.querySelector('#rs-video .radio-item.checked');
+  var soundF    = document.querySelector('#rs-soundfield .radio-item.checked');
+  var ecap      = document.querySelector('#rs-ecap .radio-item.checked');
 
-  var sessionEntry = {
-    caseId: String(selectedCase.id),
-    caseName: selectedCase.name || '',
-    caseDistrict: selectedCase.district || '',
-    rehabCentre: currentUser ? currentUser.unit : '',
-    submittedBy: currentUser ? currentUser.username : '',
-    sessdate: sessdate, sessNum: sessNum,
-    stage: stage.textContent.trim(),
-    duration: duration,
-    sesstype: document.getElementById('rs-sesstype').value,
-    therapist: therapist,
-    attendance: attendance.textContent.trim(),
-    progress: progress ? progress.textContent.trim() : '',
-    milestone: document.getElementById('rs-milestone').value,
-    claimRef:    document.getElementById('rs-claimref').value.trim(),
-    claimStatus: document.getElementById('rs-claimstatus').value,
-    nextSess:    document.getElementById('rs-nextsess').value,
-    notes:       document.getElementById('rs-notes').value.trim(),
-    issues:      document.getElementById('rs-issues').value.trim(),
-    timestamp: now,
-    entryId: 'RS-' + Date.now()
+  // ── Build Firestore entry ────────────────────────────────────
+  var weekEntry = {
+    type:          'weekly_sheet',
+    caseId:        String(selectedCase.id),
+    caseName:      selectedCase.name || '',
+    caseDistrict:  selectedCase.district || '',
+    caseHospital:  selectedCase.hospital || '',
+    rehabCentre:   currentUser ? currentUser.unit : '',
+    submittedBy:   currentUser ? currentUser.username : '',
+    therapist:     therapist,
+    stage:         stage.textContent.trim(),
+    sessYear:      sessYear,
+    sessPerWeek:   sessPerWeek,
+    month:         monthStr,
+    slots:         slots,
+    totalSlots:    slots.length,
+    presentCount:  presentCount,
+    absentCount:   absentCount,
+    attendancePct: slots.length > 0 ? Math.round(presentCount/slots.length*100) : 0,
+    progress:      progress  ? progress.textContent.trim()  : '',
+    milestone:     document.getElementById('rs-milestone')    ? document.getElementById('rs-milestone').value    : '',
+    parentGuidance:parentG   ? parentG.textContent.trim()   : '',
+    videoRecorded: videoR    ? videoR.textContent.trim()    : '',
+    mapDate:       document.getElementById('rs-mapdate')      ? document.getElementById('rs-mapdate').value      : '',
+    mapCount:      document.getElementById('rs-mapcount')     ? document.getElementById('rs-mapcount').value     : '',
+    soundField:    soundF    ? soundF.textContent.trim()    : '',
+    ecap:          ecap      ? ecap.textContent.trim()      : '',
+    deviceStatus:  document.getElementById('rs-devicestatus') ? document.getElementById('rs-devicestatus').value.trim() : '',
+    notes:         document.getElementById('rs-notes')        ? document.getElementById('rs-notes').value.trim()        : '',
+    issues:        document.getElementById('rs-issues')       ? document.getElementById('rs-issues').value.trim()       : '',
+    timestamp:     now,
+    entryId:       'RSW-' + Date.now()
   };
+
+  // ── Compute attendance flags ─────────────────────────────────
+  var prevConsec = selectedCase._consecAbsent || 0;
+  var newConsec  = 0;
+  // Walk slots in order to compute consecutive absences
+  for (var i=0; i<slots.length; i++) {
+    if (slots[i].isAbsent) newConsec++;
+    else newConsec = 0;
+  }
+  // Carry over from previous if first slot is also absent
+  if (slots.length > 0 && slots[0].isAbsent) newConsec = prevConsec + newConsec;
+
+  var prevMissed = (selectedCase._lastSessionMonth === monthStr) ? (selectedCase._missedThisMonth || 0) : 0;
+  var newMissed  = prevMissed + absentCount;
+
+  var newFlag = '';
+  if (newConsec >= 2)  newFlag = 'yellow';
+  if (newConsec >= 4)  newFlag = 'red';
+  if (newMissed >= 4)  newFlag = 'red';
+
+  // Days since last present session
+  var lastPresentDate = slots.filter(function(s){return s.isPresent;}).map(function(s){return s.sessdate;}).sort().pop() || '';
+  var prevLastDate = selectedCase._lastRehabDate || '';
+  var finalLastDate = lastPresentDate || prevLastDate;
+  if (finalLastDate && !lastPresentDate) {
+    var dayGap = Math.floor((Date.now()-new Date(finalLastDate))/86400000);
+    if (dayGap > 14) newFlag = 'red';
+  }
+
+  // New total session count
+  var newTotalSessions = sessionsDone + presentCount;
+
+  var caseUpdates = {
+    sessions:          newTotalSessions,
+    lastContact:       lastDate || selectedCase.lastContact,
+    _lastRole:         'rehab',
+    _lastModified:     now,
+    _lastRehabDate:    finalLastDate,
+    _consecAbsent:     newConsec,
+    _missedThisMonth:  newMissed,
+    _lastSessionMonth: monthStr,
+    _attendanceFlag:   newFlag,
+    _monthAttendPct:   weekEntry.attendancePct
+  };
+
+  // Update claim/stage status from stage field
+  var stageText = stage.textContent.trim();
+  if (stageText.indexOf('Part 1') > -1) {
+    if (newTotalSessions >= 104) caseUpdates.status = 'rehab2';
+  } else if (stageText.indexOf('Part 2') > -1) {
+    // No auto-complete — hospital confirms payment
+  }
 
   try {
     var _col = window._fbFns.collection;
@@ -4076,77 +4426,34 @@ async function submitRehabSession() {
     var _doc = window._fbFns.doc;
     var _upd = window._fbFns.updateDoc;
 
-    await _add(_col(window._fbDb, 'submissions_rehab'), sessionEntry);
-
-    // Compute attendance flag from this session
-    var isAbsent = attendance.textContent.trim().indexOf('Absent') > -1;
-    var prevConsecAbsent = selectedCase._consecAbsent || 0;
-    var newConsecAbsent  = isAbsent ? prevConsecAbsent + 1 : 0;
-    var missedThisMonth  = (selectedCase._missedThisMonth || 0) + (isAbsent ? 1 : 0);
-
-    // Reset missed count if new month
-    var lastMonth = selectedCase._lastSessionMonth || '';
-    var thisMonthStr = sessdate.substring(0, 7);
-    if (lastMonth !== thisMonthStr) missedThisMonth = isAbsent ? 1 : 0;
-
-    var newFlag = '';
-    if (newConsecAbsent >= 2) newFlag = 'yellow';
-    if (newConsecAbsent >= 2 && isAbsent) newFlag = 'red';
-    if (missedThisMonth >= 4) newFlag = 'red';
-
-    // Days since last session (only if present)
-    var prevDate = selectedCase._lastRehabDate || '';
-    if (!isAbsent) {
-      var gap = prevDate ? Math.floor((new Date(sessdate)-new Date(prevDate))/86400000) : 0;
-      if (gap > 14) sessionEntry.gapDays = gap; // flag long gap
-    }
-
-    var caseUpdates = {
-      sessions: isAbsent ? (selectedCase.sessions||0) : sessNum,
-      lastContact: sessdate,
-      _lastRole: 'rehab',
-      _lastModified: now,
-      _lastRehabDate: isAbsent ? (selectedCase._lastRehabDate||'') : sessdate,
-      _consecAbsent: newConsecAbsent,
-      _missedThisMonth: missedThisMonth,
-      _lastSessionMonth: thisMonthStr,
-      _attendanceFlag: newFlag
-    };
-    var stageText = stage.textContent.trim();
-    if (stageText.indexOf('Part 1') > -1) {
-      if (sessionEntry.claimRef)    caseUpdates.r1RefNo  = sessionEntry.claimRef;
-      if (sessionEntry.claimStatus) caseUpdates.r1Status = sessionEntry.claimStatus;
-      if (sessionEntry.claimStatus === 'CLAIMS PAID') caseUpdates.status = 'rehab2';
-    } else if (stageText.indexOf('Part 2') > -1) {
-      if (sessionEntry.claimRef)    caseUpdates.r2RefNo  = sessionEntry.claimRef;
-      if (sessionEntry.claimStatus) caseUpdates.r2Status = sessionEntry.claimStatus;
-      if (sessionEntry.claimStatus === 'CLAIMS PAID') caseUpdates.status = 'paid';
-    }
+    await _add(_col(window._fbDb, 'submissions_rehab'), weekEntry);
     await _upd(_doc(window._fbDb, 'cases', String(selectedCase.id)), caseUpdates);
 
-    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(selectedCase.id); });
+    // Update local cache
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(selectedCase.id); });
     if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
 
-    btn.textContent = 'Save Session →';
+    btn.textContent = 'Save Weekly Log →';
     btn.disabled = false;
-    document.getElementById('success-msg').textContent = 'Session '+sessNum+' logged for '+selectedCase.name+'.';
-    document.getElementById('success-id').textContent  = sessionEntry.entryId;
+
+    var presentMsg = presentCount === 0 ? 'All sessions absent — flagged for follow-up' : presentCount+' session'+(presentCount>1?'s':'')+' logged for '+selectedCase.name;
+    if (newFlag === 'red') presentMsg += ' · 🔴 District Officer alert triggered';
+    else if (newFlag === 'yellow') presentMsg += ' · ⚠️ Follow-up recommended';
+
+    document.getElementById('success-msg').textContent = presentMsg;
+    document.getElementById('success-id').textContent  = weekEntry.entryId;
     document.getElementById('offline-note').style.display = 'none';
     screenHistory = ['home'];
     showScreen('success');
+
   } catch(e) {
     errEl.textContent = 'Error saving: ' + e.message;
     errEl.style.display = 'block';
-    btn.textContent = 'Save Session →';
+    btn.textContent = 'Save Weekly Log →';
     btn.disabled = false;
   }
 }
 
-
-
-// ══════════════════════════════════════════════════════════════
-// OUTCOME ASSESSMENT (IT-MAIS/MAIS + CAP + SIR + PEACH + Milestone)
-// ══════════════════════════════════════════════════════════════
 
 function openOutcomeAssessment(cas) {
   selectedCase = cas;

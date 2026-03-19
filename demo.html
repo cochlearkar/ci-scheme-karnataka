@@ -14,40 +14,66 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--green-dark);min-height:100vh;overflow-x:hidden;}
-.outer{display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:16px 16px 36px;}
-.demo-header{text-align:center;padding:14px 0 18px;color:#fff;}
-.demo-header h1{font-size:20px;font-weight:700;letter-spacing:-.3px;}
-.demo-header p{font-size:12px;color:rgba(255,255,255,.55);margin-top:4px;}
-.slide-counter{font-size:11px;color:rgba(255,255,255,.45);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
-.progress-bar{flex:1;height:3px;background:rgba(255,255,255,.15);border-radius:2px;max-width:200px;}
-.progress-fill{height:100%;background:var(--green-mid);border-radius:2px;transition:width .3s;}
-.phone{width:100%;max-width:360px;background:var(--surface);border-radius:28px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5);min-height:580px;position:relative;}
-.phone-notch{height:26px;background:#111;display:flex;align-items:center;justify-content:center;}
-.phone-notch-pill{width:70px;height:7px;background:#333;border-radius:4px;}
-.phone-content{min-height:554px;overflow:hidden;}
-/* slide transition */
-.phone-content{transition:opacity .3s;}
+
+/* ── MOBILE: full screen slide, no phone frame ── */
+.outer{display:flex;flex-direction:column;align-items:center;min-height:100vh;}
+.phone{width:100%;background:var(--surface);min-height:100vh;position:relative;}
+.phone-notch{display:none;}
+.phone-content{min-height:calc(100vh - 100px);overflow:hidden;transition:opacity .5s;}
 .phone-content.fade{opacity:0;}
-.nav-row{display:flex;gap:10px;margin-top:16px;max-width:360px;width:100%;}
-.nav-btn{flex:1;padding:12px;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .15s;}
-.nav-prev{background:rgba(255,255,255,.12);color:#fff;}
-.nav-next{background:#fff;color:var(--green-dark);}
-.nav-btn:disabled{opacity:.3;cursor:not-allowed;}
-.controls-row{display:flex;gap:8px;margin-top:10px;max-width:360px;width:100%;}
-.ctrl-btn{flex:1;padding:8px;border:1px solid rgba(255,255,255,.2);border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);}
-.ctrl-btn.active{background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.4);}
-.dots{display:flex;gap:5px;margin-top:12px;flex-wrap:wrap;justify-content:center;max-width:360px;}
-.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.2);transition:all .2s;cursor:pointer;}
+
+/* bottom controls bar — fixed at bottom on mobile */
+.bottom-ui{position:fixed;bottom:0;left:0;right:0;background:transparent;padding:10px 16px 14px;z-index:100;pointer-events:none;}
+.progress-bar{width:100%;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin-bottom:0;}
+.progress-fill{height:100%;background:var(--green-mid);border-radius:2px;transition:width .6s ease;}
+.progress-fill{height:100%;background:var(--green-mid);border-radius:2px;transition:width .4s;}
+.bottom-row{display:none;}
+.slide-counter{font-size:11px;color:rgba(255,255,255,.55);flex-shrink:0;}
+.dots{display:flex;gap:5px;flex:1;justify-content:center;flex-wrap:wrap;}
+.dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);cursor:pointer;transition:all .2s;flex-shrink:0;}
 .dot.active{background:#fff;transform:scale(1.4);}
 .dot.done{background:rgba(255,255,255,.5);}
-.slide-label{color:rgba(255,255,255,.6);font-size:11px;margin-top:10px;text-align:center;max-width:360px;line-height:1.4;}
-.creds-box{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px 16px;margin-top:16px;max-width:360px;width:100%;}
-.creds-title{color:rgba(255,255,255,.6);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+
+/* controls-row is just the play button on mobile */
+.controls-row{display:flex;justify-content:center;margin-top:0;}
+.ctrl-btn{border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;padding:8px 20px;background:var(--green-mid);color:#fff;}
+.ctrl-btn.active{background:#1a6b4a;}
+
+/* splash screen (shown before play) */
+.splash{position:fixed;inset:0;background:var(--green-dark);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;z-index:200;}
+.splash h1{color:#fff;font-size:24px;font-weight:700;margin:16px 0 6px;}
+.splash p{color:rgba(255,255,255,.6);font-size:13px;line-height:1.6;margin-bottom:32px;}
+.play-btn{background:var(--green-mid);color:#fff;border:none;border-radius:50px;padding:16px 40px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 8px 32px rgba(29,158,117,.4);}
+.play-btn:active{transform:scale(.97);}
+.splash-creds{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:14px 16px;width:100%;max-width:320px;text-align:left;margin-top:24px;}
+.creds-title{color:rgba(255,255,255,.5);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
 .creds-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid rgba(255,255,255,.1);}
 .creds-row:last-child{border:none;}
 .creds-role{font-size:12px;color:rgba(255,255,255,.75);}
-.creds-val{font-size:11px;color:#fff;font-family:monospace;background:rgba(255,255,255,.1);padding:2px 8px;border-radius:4px;}
-.app-link{display:block;text-align:center;margin-top:12px;color:#fff;font-size:13px;text-decoration:none;background:var(--green-mid);padding:12px;border-radius:10px;font-weight:600;max-width:360px;width:100%;}
+.creds-val{font-size:11px;color:#fff;font-family:monospace;background:rgba(255,255,255,.12);padding:2px 8px;border-radius:4px;}
+
+/* slide label — inside the slide at top as a small badge */
+.slide-badge{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(10,61,46,.7);color:rgba(255,255,255,.8);font-size:10px;padding:3px 12px;border-radius:20px;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}
+
+/* desktop: keep phone frame look */
+@media (min-width:480px){
+  body{display:flex;align-items:flex-start;justify-content:center;padding:24px 16px 60px;}
+  .outer{width:100%;max-width:400px;}
+  .phone{border-radius:32px;min-height:600px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5);border:6px solid #1a1a1a;}
+  .phone-notch{display:flex;height:24px;background:#111;align-items:center;justify-content:center;}
+  .phone-notch-pill{width:70px;height:7px;background:#333;border-radius:4px;}
+  .phone-content{min-height:554px;}
+  .bottom-ui{position:static;background:transparent;padding:12px 0 0;}
+  .splash{border-radius:28px;position:relative;inset:auto;padding:40px 28px;}
+}
+
+/* hide demo-header on mobile (shown in splash instead) */
+.demo-header{display:none;}
+@media (min-width:480px){.demo-header{display:block;text-align:center;padding:0 0 16px;color:#fff;}
+.demo-header h1{font-size:18px;font-weight:700;}.demo-header p{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;}}
+
+.slide-label{display:none;}
+.app-link{display:none;}
 /* ── SCREEN COMPONENTS ── */
 .sh{padding:13px 15px 11px;color:#fff;}
 .sh.green{background:var(--green-dark);}
@@ -125,52 +151,47 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </style>
 </head>
 <body>
-<div class="outer">
-
-<div class="demo-header">
-  <div style="font-size:38px;margin-bottom:8px">🦻</div>
+<!-- SPLASH SCREEN -->
+<div class="splash" id="splash">
+  <div style="font-size:56px;margin-bottom:8px">🦻</div>
   <h1>Shravan Sanjeevini</h1>
-  <p>Karnataka Cochlear Implant Programme · NPPCD<br>Interactive Application Demo</p>
-</div>
-
-<div class="slide-counter">
-  <span id="slide-counter-text">1 / 12</span>
-  <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:8%"></div></div>
-</div>
-
-<div class="phone" style="position:relative">
-  <div class="phone-notch"><div class="phone-notch-pill"></div></div>
-  <div class="phone-content" id="slide-content"></div>
-  <!-- Try it now floating button -->
+  <p>Karnataka Cochlear Implant Programme · NPPCD<br>Application Walkthrough<br><span style="font-size:11px;opacity:.6">12 screens · ~2 minutes</span></p>
+  <button class="play-btn" onclick="startDemo()">▶ Play Demo</button>
+  <div class="splash-creds">
+    <div class="creds-title">🔑 Demo Login · Password: Demo@2025</div>
+    <div class="creds-row"><span class="creds-role">🏥 Hospital</span><span class="creds-val">demo_hospital</span></div>
+    <div class="creds-row"><span class="creds-role">🎧 Rehab</span><span class="creds-val">demo_rehab</span></div>
+    <div class="creds-row"><span class="creds-role">📍 District</span><span class="creds-val">demo_district</span></div>
+    <div class="creds-row" style="opacity:.5"><span class="creds-role">🌐 State</span><span style="font-size:10px;color:rgba(255,255,255,.5);font-style:italic">Request: cochlearkar@gmail.com</span></div>
+  </div>
   <a href="https://cochlearkar.github.io/ci-scheme-karnataka/" target="_blank"
-    style="position:absolute;bottom:14px;right:14px;background:var(--green-mid);color:#fff;font-size:11px;font-weight:700;padding:7px 12px;border-radius:20px;text-decoration:none;box-shadow:0 3px 12px rgba(0,0,0,.3);z-index:10">
-    Try it now →
+    style="margin-top:16px;color:rgba(255,255,255,.5);font-size:12px;text-decoration:none">
+    🚀 Or open the app directly
   </a>
 </div>
 
+<!-- DEMO SCREEN (hidden until Play is tapped) -->
+<div id="demo-outer" style="display:none;flex-direction:column;min-height:100vh">
 
+  <!-- slide fills the screen -->
+  <div class="phone-content" id="slide-content" style="position:relative;flex:1"></div>
 
-<div class="controls-row" style="justify-content:center">
-  <button class="ctrl-btn" id="btn-auto" onclick="toggleAuto()" style="max-width:200px;font-size:14px;padding:12px 24px;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3)">▶ Play Demo</button>
-</div>
+  <!-- slide number overlay — top right -->
+  <div id="slide-num-overlay" style="position:fixed;top:12px;right:12px;background:rgba(0,0,0,.35);
+    color:rgba(255,255,255,.7);font-size:10px;font-weight:600;padding:3px 9px;border-radius:12px;
+    z-index:60;pointer-events:none">1 / 12</div>
 
-<div class="dots" id="dots"></div>
-<div class="slide-label" id="slide-label"></div>
-
-<div class="creds-box">
-  <div class="creds-title">🔑 Demo Login · All passwords: Demo@2025</div>
-  <div class="creds-row"><span class="creds-role">🏥 Hospital</span><span class="creds-val">demo_hospital</span></div>
-  <div class="creds-row"><span class="creds-role">🎧 Rehab</span><span class="creds-val">demo_rehab</span></div>
-  <div class="creds-row"><span class="creds-role">📍 District</span><span class="creds-val">demo_district</span></div>
-  <div class="creds-row" style="opacity:.5">
-    <span class="creds-role">🌐 State</span>
-    <span style="font-size:10px;color:rgba(255,255,255,.5);font-style:italic">Request via cochlearkar@gmail.com</span>
+  <!-- fixed bottom bar -->
+  <div class="bottom-ui" id="bottom-ui">
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:8%"></div></div>
+    <div class="bottom-row">
+      <span class="slide-counter" id="slide-counter-text">1 / 12</span>
+      <div class="dots" id="dots"></div>
+      <button class="ctrl-btn" id="btn-auto" onclick="toggleAuto()">⏸</button>
+    </div>
   </div>
 </div>
 
-<a class="app-link" href="https://cochlearkar.github.io/ci-scheme-karnataka/" target="_blank">🚀 Open Live Application</a>
-
-</div><!-- end outer -->
 
 <script>
 // ── MASKED DEMO DATA ──────────────────────────────────────────────────────────
@@ -415,22 +436,18 @@ html:'<div style="min-height:554px;background:var(--green-dark);display:flex;fle
 
 // ── AUTO-PLAY ENGINE ──────────────────────────────────────────────────────────
 var autoInterval = null;
-var AUTO_DURATION = 6000; // 6 seconds per slide
+var AUTO_DURATION = 9000; // 9 seconds per slide — optimised for video recording
 var autoPlaying = false;
 
 function toggleAuto() {
   var btn = document.getElementById('btn-auto');
   if (!autoPlaying) {
     autoPlaying = true;
-    btn.style.background = 'rgba(255,255,255,.25)';
-    btn.style.color = '#fff';
-    btn.textContent = '⏸ Pause';
+    btn.textContent = '⏸';
     startAuto();
   } else {
     autoPlaying = false;
-    btn.style.background = 'rgba(255,255,255,.08)';
-    btn.style.color = 'rgba(255,255,255,.8)';
-    btn.textContent = '▶ Play Demo';
+    btn.textContent = '▶';
     clearInterval(autoInterval);
   }
 }
@@ -452,17 +469,36 @@ function startAuto() {
 // ── SLIDE ENGINE ──────────────────────────────────────────────────────────────
 var current = 0;
 
+function startDemo() {
+  document.getElementById('splash').style.display = 'none';
+  var outer = document.getElementById('demo-outer');
+  outer.style.display = 'flex';
+  render();
+  autoPlaying = true;
+  document.getElementById('btn-auto').textContent = '⏸';
+  startAuto();
+}
+
 function render() {
   var s = SLIDES[current];
   var el = document.getElementById('slide-content');
   el.classList.add('fade');
   setTimeout(function() {
-    el.innerHTML = s.html;
+    el.style.position = 'relative';
+    // Caption bar at bottom showing slide label
+    var caption = '<div style="position:fixed;bottom:8px;left:0;right:0;z-index:40;padding:0 16px">'
+      + '<div style="background:rgba(10,61,46,.88);backdrop-filter:blur(6px);border-radius:12px;'
+      + 'padding:8px 16px;text-align:center;color:rgba(255,255,255,.9);font-size:12px;font-weight:500;'
+      + 'line-height:1.4">' + s.label + '</div></div>';
+    el.innerHTML = s.html + caption;
     el.classList.remove('fade');
   }, 150);
 
   document.getElementById('slide-label').textContent = s.label;
   document.getElementById('slide-counter-text').textContent = (current+1) + ' / ' + SLIDES.length;
+  // Slide number top-right overlay
+  var numEl = document.getElementById('slide-num-overlay');
+  if (numEl) numEl.textContent = (current+1) + ' / ' + SLIDES.length;
   document.getElementById('progress-fill').style.width = Math.round(((current+1)/SLIDES.length)*100) + '%';
 
 

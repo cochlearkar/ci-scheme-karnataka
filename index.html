@@ -836,6 +836,7 @@ body {
   <div class="form-scroll" id="summary-body"></div>
   <div class="bottom-bar" id="summary-action-bar" style="display:none">
     <button class="btn-submit" id="summary-action-btn" onclick="summaryAction()">Update →</button>
+    <button class="btn-submit" id="summary-eval-btn" onclick="openQuarterlyEval(selectedCase)" style="display:none;margin-top:8px;background:var(--purple)">🎯 Quarterly Evaluation →</button>
     <button class="btn-submit" id="summary-extra-btn" onclick="openOutcomeAssessment(selectedCase)"
       style="display:none;background:#4a2a7a;margin-top:8px;font-size:13px">
       &#127919; Full Outcome Assessment
@@ -1733,13 +1734,29 @@ async function loadCasesFromFirestore() {
     setStatus('Loading case data…');
     const snap = await getDocs(collection(window._fbDb, 'cases'));
     SAMPLE_CASES = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+    // Re-compute live attendance flags for cases that have no stored flag
+    // (e.g. child hasn't had a session but switch-on was >14 days ago)
+    SAMPLE_CASES.forEach(function(cas) {
+      if (!cas._attendanceFlag) {
+        var liveFlag = computeAttendanceFlagLive(cas);
+        if (liveFlag) cas._attendanceFlag = liveFlag;
+      }
+    });
     setStatus(`Loaded ${SAMPLE_CASES.length} cases.`);
     console.log('Loaded', SAMPLE_CASES.length, 'cases from Firestore');
   } catch(e) {
     console.error('loadCasesFromFirestore error:', e);
     setStatus('Could not load data — using local copy.');
     // Fallback to cases.js if available
-    if (typeof PRELOADED_CASES_DATA !== 'undefined') SAMPLE_CASES = PRELOADED_CASES_DATA;
+    if (typeof PRELOADED_CASES_DATA !== 'undefined') {
+      SAMPLE_CASES = PRELOADED_CASES_DATA;
+      SAMPLE_CASES.forEach(function(cas) {
+        if (!cas._attendanceFlag) {
+          var liveFlag = computeAttendanceFlagLive(cas);
+          if (liveFlag) cas._attendanceFlag = liveFlag;
+        }
+      });
+    }
   } finally {
     clearTimeout(retryTimer);
   }
@@ -1879,6 +1896,46 @@ function filterCasesByUser(cases) {
   return cases;
 }
 
+
+function openDistrictAVTCallList() {
+  var cases = filterCasesByUser(SAMPLE_CASES).filter(function(c){ return c._attendanceFlag === 'red'; });
+  if (!cases.length) { alert('No red-flagged cases at this time.'); return; }
+  var el = document.getElementById('avt-call-overlay');
+  if (el) el.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'avt-call-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;overflow-y:auto';
+  var rows = cases.map(function(c) {
+    var mob = cleanMob(c.mobile||'');
+    var reason = c._consecAbsent>=4 ? c._consecAbsent+' consecutive absences'
+      : c._missedThisMonth>=4 ? c._missedThisMonth+' missed this month'
+      : (c._monthAttendPct!=null && c._monthAttendPct<75) ? 'Attendance '+c._monthAttendPct+'%'
+      : 'No session in >14 days';
+    var nm = isDemo() ? maskName(c.name) : (c.name||'—');
+    var callBtn = mob
+      ? '<a href="tel:'+mob+'" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:#22c55e;color:#fff;border-radius:12px;padding:10px 14px;text-decoration:none;flex-shrink:0">'
+        + '<span style="font-size:20px">&#128222;</span>'
+        + '<span style="font-size:10px;font-weight:600">'+mob+'</span></a>'
+      : '<span style="font-size:11px;color:#aaa">No mobile</span>';
+    return '<div style="padding:14px 16px;border-bottom:1px solid #fee2e2">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+      + '<div>'
+      + '<div style="font-size:14px;font-weight:600;color:#111">'+nm+'</div>'
+      + '<div style="font-size:11px;color:#666;margin-top:1px">'+(c.rehabCentre||'&#8212;')+' &middot; '+(c.district||'')+'</div>'
+      + '<div style="font-size:11px;color:#dc2626;margin-top:3px;font-weight:600">&#128308; '+reason+'</div>'
+      + '<div style="font-size:10px;color:#888;margin-top:2px">Last session: '+(c._lastRehabDate||'Never')+'</div>'
+      + '</div>'+callBtn+'</div></div>';
+  }).join('');
+  var hdr = '<div style="background:#8a2a2a;padding:16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">'
+    + '<div onclick="document.getElementById(&quot;avt-call-overlay&quot;).remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#128222; AVT Call List &mdash; '+cases.length+' Red Alert</div>'
+    + '<div style="color:rgba(255,255,255,.7);font-size:11px">Call each family to get child back to rehab</div></div></div>';
+  var ftr = '<div style="padding:16px;background:#fef2f2;font-size:11px;color:#991b1b">'
+    + 'These children have not attended AVT as per programme rules. As District Officer you are responsible for follow-up.</div>';
+  overlay.innerHTML = hdr + '<div style="padding:8px 0">' + rows + '</div>' + ftr;
+  document.body.appendChild(overlay);
+}
 function buildHome() {
   _stateHospFilter = null;
   if (SAMPLE_CASES.length === 0 && typeof PRELOADED_CASES_DATA !== 'undefined') {
@@ -1943,7 +2000,18 @@ function buildHome() {
   } else if (currentRole === 'rehab') {
     const rehabRed    = allMyCases.filter(c => c._attendanceFlag === 'red').length;
     const rehabYellow = allMyCases.filter(c => c._attendanceFlag === 'yellow').length;
-    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">📋</div><div><div class="action-title">Log Weekly Sessions</div><div class="action-desc">Mark attendance for each child this week</div></div><div class="action-arrow">→</div></div>`;
+    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">📋</div><div><div class="action-title">Log Monthly Sessions</div><div class="action-desc">Mark attendance for each child this month</div></div><div class="action-arrow">→</div></div>`;
+    const dueEval = allMyCases.filter(c => {
+      var soStr = c.switchOn || c.switchOnDate || '';
+      if (!soStr || isNaN(new Date(soStr))) return false;
+      var mo = Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000));
+      if (mo < 3) return false;
+      if (c._lastEvalDate) return Math.floor((Date.now()-new Date(c._lastEvalDate))/86400000) > 80;
+      return true;
+    });
+    if (dueEval.length > 0) {
+      html += `<div class="action-card primary" onclick="buildCaseList('eval-due');showScreen('cases')" style="background:#5a3580;border-color:#5a3580"><div class="action-icon">🎯</div><div><div class="action-title">${dueEval.length} child${dueEval.length!==1?'ren':''} due Quarterly Eval</div><div class="action-desc">MAIS · Speech · Language milestone</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+    }
     if (rehabRed > 0) {
       html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🔴</div><div><div class="action-title">${rehabRed} child${rehabRed!==1?'ren':''} — RED alert</div><div class="action-desc">4+ absences — district must be informed</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     }
@@ -1955,7 +2023,10 @@ function buildHome() {
 
   } else if (currentRole === 'district') {
     if (avtRed.length > 0) {
-      html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtRed.length} missing AVT 🔴</div><div class="action-desc">Call family — get child back to rehab</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+      html += `<div class="action-card primary" onclick="openDistrictAVTCallList()" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">📞</div><div><div class="action-title">${avtRed.length} child${avtRed.length!==1?'ren':''} missing AVT 🔴</div><div class="action-desc">Tap to call families — get child back to rehab</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+    }
+    if (avtYellow.length > 0) {
+      html += `<div class="action-card" style="border-color:#d97706;background:#fffbeb" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:#92400e">${avtYellow.length} attendance concern — 2 consecutive absences</div><div class="action-desc" style="color:#92400e">Follow up with family this week</div></div>`;
     }
     if (risks.length > 0) {
       html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
@@ -2387,6 +2458,7 @@ function buildCaseList(filter = 'all') {
   else if (filter === 'avt-red')      activeStatusFilter = 'AVT Red';
   else if (filter === 'avt-yellow')   activeStatusFilter = 'AVT Alert';
   else if (filter === 'avt-concern')  activeStatusFilter = 'AVT Alert';
+  else if (filter === 'eval-due')     activeStatusFilter = 'Eval Due';
   else                                activeStatusFilter = 'All';
 
   // Lock hospital totals NOW — once per cases screen entry
@@ -2485,6 +2557,15 @@ function applyAllFilters() {
     cases = cases.filter(c => c._attendanceFlag === 'red' || c._attendanceFlag === 'yellow');
   } else if (activeStatusFilter === 'AVT Red') {
     cases = cases.filter(c => c._attendanceFlag === 'red');
+  } else if (activeStatusFilter === 'Eval Due') {
+    cases = cases.filter(function(c) {
+      var soStr = c.switchOn || c.switchOnDate || '';
+      if (!soStr || isNaN(new Date(soStr))) return false;
+      var mo = Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000));
+      if (mo < 3) return false;
+      if (c._lastEvalDate) return Math.floor((Date.now()-new Date(c._lastEvalDate))/86400000) > 80;
+      return true;
+    });
   }
   filteredCases = cases;
   const searchEl = document.getElementById('case-search');
@@ -4002,8 +4083,24 @@ function openCaseSummary(cas) {
   // Show outcome assessment button for district role
   const extraBtn = document.getElementById('summary-extra-btn');
   if (extraBtn) extraBtn.style.display = (currentRole === 'district') ? 'block' : 'none';
+  const evalBtn2 = document.getElementById('summary-eval-btn');
+  if (evalBtn2) evalBtn2.style.display = (currentRole === 'rehab') ? 'block' : 'none';
   document.getElementById('summary-action-bar').style.display = 'block';
   showScreen('casesummary');
+}
+
+
+function openQuarterlyEval(cas) {
+  if (!cas) return;
+  var soStr = cas.switchOn || cas.switchOnDate || '';
+  var evalPeriod = 'Quarterly Evaluation';
+  if (soStr && !isNaN(new Date(soStr))) {
+    var mo = Math.round((Date.now() - new Date(soStr)) / (30.44*24*3600*1000));
+    var nearest = [3,6,12,18,24].reduce(function(p,c){ return Math.abs(c-mo)<Math.abs(p-mo)?c:p; });
+    evalPeriod = nearest + '-month Evaluation (Switch-on: ' + soStr.substring(0,10) + ')';
+  }
+  cas._evalContext = evalPeriod;
+  openOutcomeAssessment(cas);
 }
 
 function summaryAction() {
@@ -4134,11 +4231,40 @@ function openRehabSession(cas) {
     {id:7, label:'Year 2 — Q3 (Month 19–21)', year:2, spw:1, rows:13, start:131},
     {id:8, label:'Year 2 — Q4 (Month 22–24)', year:2, spw:1, rows:13, start:144},
   ];
-  // Auto-detect quarter from sessions done
+  // Auto-detect quarter using switch-on date if available, else sessions count
   var curQtr = QTRS[0];
-  for (var qi = 0; qi < QTRS.length; qi++) {
-    if (sessionsDone >= QTRS[qi].start - 1) curQtr = QTRS[qi];
-  }
+  (function() {
+    var switchOnStr = cas.switchOn || cas.switchOnDate || '';
+    if (switchOnStr) {
+      // Parse switch-on date and compute months elapsed
+      var soDate = new Date(switchOnStr);
+      if (!isNaN(soDate)) {
+        var now = new Date();
+        var monthsElapsed = (now.getFullYear() - soDate.getFullYear()) * 12
+                          + (now.getMonth() - soDate.getMonth());
+        // Add partial-month credit: if we're past the 15th, count as next month
+        if (now.getDate() >= 15) monthsElapsed++;
+        monthsElapsed = Math.max(0, monthsElapsed);
+        // Map months to quarter
+        // Y1: M1-3=Q1, M4-6=Q2, M7-9=Q3, M10-12=Q4
+        // Y2: M13-15=Q5, M16-18=Q6, M19-21=Q7, M22-24=Q8
+        if      (monthsElapsed < 1)  curQtr = QTRS[0]; // before Q1 even starts
+        else if (monthsElapsed <= 3)  curQtr = QTRS[0]; // Month 1-3 → Y1Q1
+        else if (monthsElapsed <= 6)  curQtr = QTRS[1]; // Month 4-6 → Y1Q2
+        else if (monthsElapsed <= 9)  curQtr = QTRS[2]; // Month 7-9 → Y1Q3
+        else if (monthsElapsed <= 12) curQtr = QTRS[3]; // Month 10-12 → Y1Q4
+        else if (monthsElapsed <= 15) curQtr = QTRS[4]; // Month 13-15 → Y2Q1
+        else if (monthsElapsed <= 18) curQtr = QTRS[5]; // Month 16-18 → Y2Q2
+        else if (monthsElapsed <= 21) curQtr = QTRS[6]; // Month 19-21 → Y2Q3
+        else                          curQtr = QTRS[7]; // Month 22+ → Y2Q4
+        return; // date-based selection done
+      }
+    }
+    // Fallback: use sessions count
+    for (var qi = 0; qi < QTRS.length; qi++) {
+      if (sessionsDone >= QTRS[qi].start - 1) curQtr = QTRS[qi];
+    }
+  })();
   var sessYear     = curQtr.year;
   var sessPerWeek  = curQtr.spw;
   var today        = new Date();
@@ -4146,7 +4272,16 @@ function openRehabSession(cas) {
   var monthName    = today.toLocaleString('en-IN', {month:'long', year:'numeric'});
 
   document.getElementById('rs-title').textContent = cas.name || 'Weekly Session Log';
-  document.getElementById('rs-sub').textContent = (currentUser.unit||'') + '  ·  ' + monthName + '  ·  ' + curQtr.label;
+  var switchOnInfo = '';
+  if (cas.switchOn || cas.switchOnDate) {
+    var soStr = cas.switchOn || cas.switchOnDate;
+    var soD = new Date(soStr);
+    if (!isNaN(soD)) {
+      var moEl = Math.max(0, (new Date().getFullYear()-soD.getFullYear())*12+(new Date().getMonth()-soD.getMonth()));
+      switchOnInfo = ' · Switch-on: ' + soStr.substring(0,10) + ' (' + moEl + ' mo)';
+    }
+  }
+  document.getElementById('rs-sub').textContent = (currentUser.unit||'') + '  ·  ' + monthName + switchOnInfo;
 
   // ── Attendance flag banner ──────────────────────────────────
   var flag = cas._attendanceFlag || '';
@@ -4179,9 +4314,21 @@ function openRehabSession(cas) {
     +'</div></div>';
 
   // ── Quarter selector — 8 quarters across 2 years ─────────────
+  // Explain why this quarter was auto-selected
+  var qtrBasis = '';
+  (function(){
+    var soStr = cas.switchOn || cas.switchOnDate || '';
+    if (soStr && !isNaN(new Date(soStr))) {
+      var soDate = new Date(soStr);
+      var mo = Math.max(0, (new Date().getFullYear()-soDate.getFullYear())*12+(new Date().getMonth()-soDate.getMonth()));
+      qtrBasis = '📅 Auto-selected from Switch-on date ' + soStr.substring(0,10) + ' (' + mo + ' months ago)';
+    } else {
+      qtrBasis = '📊 Auto-selected from session count (' + sessionsDone + ' sessions done)';
+    }
+  })();
+
   var qtrHTML =
-    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
-    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">TICK ONE ONLY — Select quarter being submitted</div>'
+    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">TICK ONE ONLY — Select quarter being submitted</div>'    +'<div style="font-size:10px;color:var(--blue);margin-bottom:8px">'+qtrBasis+'</div>'
     // Year 1 label
     +'<div style="font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;margin:4px 0 4px">Year 1 &mdash; 2 sessions per week (104 total)</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;margin-bottom:8px">'
@@ -4674,12 +4821,17 @@ async function submitRehabSession() {
   var prevMissed = (selectedCase._lastSessionMonth === monthStr) ? (selectedCase._missedThisMonth || 0) : 0;
   var newMissed  = prevMissed + absentCount;
 
+  // Rule 1: 2 consecutive absences -> Yellow
+  // Rule 2: 4+ missed this month   -> Red
+  // Rule 3: <75% attendance (min 4 rows submitted) -> Red
+  // Rule 4: No session in >14 days -> Red
   var newFlag = '';
-  if (newConsec >= 2)  newFlag = 'yellow';
-  if (newConsec >= 4)  newFlag = 'red';
-  if (newMissed >= 4)  newFlag = 'red';
+  if (newConsec >= 2) newFlag = 'yellow';
+  if (newConsec >= 4) newFlag = 'red';
+  if (newMissed >= 4) newFlag = 'red';
+  var thisPct = slots.length > 0 ? Math.round(presentCount / slots.length * 100) : 100;
+  if (thisPct < 75 && slots.length >= 4) newFlag = 'red';
 
-  // Days since last present session
   var lastPresentDate = slots.filter(function(s){return s.isPresent;}).map(function(s){return s.sessdate;}).sort().pop() || '';
   var prevLastDate = selectedCase._lastRehabDate || '';
   var finalLastDate = lastPresentDate || prevLastDate;
@@ -6381,6 +6533,49 @@ async function submitDistrictFollowup() {
 // Rules: 2 consecutive missed = yellow, 4 missed in month = red,
 //        <75% this month = red, no log in 14 days = red
 // ══════════════════════════════════════════════════════════════
+
+// Lightweight flag for cases where _attendanceFlag is not yet stored:
+// flags if child's switch-on was >14 days ago with no rehab started,
+// OR if r1Admit (rehab start) was >21 days ago with no session ever logged.
+function computeAttendanceFlagLive(cas) {
+  // Already has a Firestore-backed flag — don't override
+  if (cas._attendanceFlag) return '';
+  // If there are already sessions logged, the submit handler controls the flag
+  if (cas._lastRehabDate) return '';
+  // Case 1: Switch-on date recorded and >14 days ago, rehab not started
+  var soStr = cas.switchOn || cas.switchOnDate || '';
+  if (soStr) {
+    var soDate = new Date(soStr);
+    if (!isNaN(soDate)) {
+      var daysSinceSO = Math.floor((Date.now() - soDate) / 86400000);
+      if (daysSinceSO > 14 && !cas._lastRehabDate) return 'red';
+    }
+  }
+  // Case 2: Rehab1 admission recorded but no session logged after 21 days
+  var r1Str = cas.r1Admit || '';
+  if (r1Str) {
+    var r1Date = new Date(r1Str);
+    if (!isNaN(r1Date)) {
+      var daysSinceR1 = Math.floor((Date.now() - r1Date) / 86400000);
+      if (daysSinceR1 > 21 && !cas._lastRehabDate) return 'yellow';
+    }
+  }
+  return '';
+}
+
+function computeAttendanceFlagLive(cas) {
+  if (cas._attendanceFlag) return '';
+  if (cas._lastRehabDate) return '';
+  var soStr = cas.switchOn || cas.switchOnDate || '';
+  if (soStr && !isNaN(new Date(soStr))) {
+    if (Math.floor((Date.now()-new Date(soStr))/86400000) > 14) return 'red';
+  }
+  var r1Str = cas.r1Admit || '';
+  if (r1Str && !isNaN(new Date(r1Str))) {
+    if (Math.floor((Date.now()-new Date(r1Str))/86400000) > 21) return 'yellow';
+  }
+  return '';
+}
 
 function computeAttendanceFlag(cas) {
   // Returns: 'red', 'yellow', or ''

@@ -156,7 +156,9 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
     <div class="tab" onclick="showTab('atrisk')">⚠️ At-Risk Cases</div>
     <div class="tab" onclick="showTab('fy')">📅 FY Progress</div>
     <div class="tab" onclick="showTab('distyr')">🗂️ District × Year</div>
+    <div class="tab" onclick="showTab('device')">🦻 Device Status</div>
     <div class="tab" onclick="showTab('quarterly')">&#128197; Monthly / Quarterly</div>
+    <div class="tab" onclick="showTab('device')">&#129955; Device Status</div>
   </div>
 
   <div class="content">
@@ -343,6 +345,57 @@ th.sort-desc::after { content: ' ▼'; font-size: 9px; opacity: .8; }
   </div>
 </div>
 
+    <!-- ── DEVICE STATUS ── -->
+    <div class="report-section" id="sec-device">
+      <div class="stat-grid" id="device-stats"></div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Device Status — State Overview</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-device','device_status')">⬇ CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-device">
+          <thead><tr><th>Status</th><th>Count</th><th>% of Total</th><th>Districts Affected</th></tr></thead>
+          <tbody id="tbody-device"></tbody>
+        </table></div>
+      </div>
+      <div class="table-wrap" style="margin-top:16px">
+        <div class="table-header">
+          <span class="table-title">Children Needing Device Action</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-device-action','device_action_list')">⬇ CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-device-action">
+          <thead><tr><th>Card No.</th><th>Name</th><th>District</th><th>Hospital</th><th>Device Status</th><th>Manufacturer</th><th>Mobile</th></tr></thead>
+          <tbody id="tbody-device-action"></tbody>
+        </table></div>
+      </div>
+    </div>
+    <!-- ── DEVICE STATUS ── -->
+    <div class="report-section" id="sec-device">
+      <div class="stat-grid" id="device-stats"></div>
+      <div class="table-wrap" style="margin-bottom:16px">
+        <div class="table-header">
+          <span class="table-title">Device Status Distribution</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-device-dist','device_status')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-device-dist">
+          <thead><tr><th>Status</th><th>Count</th><th>%</th></tr></thead>
+          <tbody id="tbody-device-dist"></tbody>
+        </table></div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Children Needing Device Attention</span>
+          <button class="dl-btn" onclick="downloadCSV('tbl-device-issues','device_issues')">&#11015; CSV</button>
+        </div>
+        <div style="overflow-x:auto"><table id="tbl-device-issues">
+          <thead><tr><th>Name</th><th>District</th><th>Hospital</th><th>Device Issue</th><th>Manufacturer</th><th>Last Contact</th><th>Mobile</th></tr></thead>
+          <tbody id="tbody-device-issues"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+
+
 <script type="module">
 import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
 import { getFirestore, collection, getDocs }      from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
@@ -468,7 +521,9 @@ function showTab(name) {
   document.getElementById('sec-'+name).classList.add('active');
   // Re-render distyr when that tab becomes visible
   if (name === 'distyr') { renderDistYr(); }
+  if (name === 'device') { renderDevice(); }
   if (name === 'quarterly') { renderQuarterly(); }
+  if (name === 'device') { renderDevice(); }
   // Re-init sorting for newly visible table
   initSortable();
 }
@@ -492,14 +547,68 @@ function statCard(num, label, color) {
 }
 
 // -- RENDER ALL ----------------------------------------------------------------
+function renderDevice() {
+  var cases = FILTERED_CASES;
+  var withStatus  = cases.filter(function(c){return c._deviceStatus;});
+  var functional  = cases.filter(function(c){return (c._deviceStatus||'').includes('Functional');}).length;
+  var needsAction = cases.filter(function(c){return c._deviceFlag;}).length;
+  var notUsing    = cases.filter(function(c){return (c._deviceStatus||'').includes('Not using');}).length;
+  var noStatus    = cases.length - withStatus.length;
+
+  document.getElementById('device-stats').innerHTML =
+    statCard(functional,'Functional','var(--green-mid)') +
+    statCard(needsAction,'Needs Action','var(--red)') +
+    statCard(notUsing,'Not Using','var(--amber-mid)') +
+    statCard(noStatus,'Not Reported','var(--text-light)');
+
+  var statuses = [
+    'Functional — working well',
+    'Needs mapping / programming',
+    'Coil issue — not staying / replaced',
+    'Battery issue — draining fast',
+    'Processor damaged — dropped / water damage',
+    'Needs replacement — beyond repair',
+    'Under repair — sent to service centre',
+    'Not using — child refuses / family stopped',
+    'Waiting for switch-on — not yet activated',
+  ];
+
+  var rows = statuses.map(function(s) {
+    var n = cases.filter(function(c){return (c._deviceStatus||'').includes(s.split('—')[0].trim());}).length;
+    if(n===0) return '';
+    var dists = [...new Set(cases.filter(function(c){return (c._deviceStatus||'').includes(s.split('—')[0].trim());}).map(function(c){return c.district||'—';}))].join(', ');
+    var pct = cases.length>0 ? Math.round(n/cases.length*100)+'%' : '0%';
+    return '<tr><td>'+s+'</td><td style="text-align:center;font-weight:600">'+n+'</td><td style="text-align:center">'+pct+'</td><td style="font-size:11px;color:var(--text-light)">'+dists+'</td></tr>';
+  }).filter(Boolean).join('');
+  document.getElementById('tbody-device').innerHTML = rows || '<tr><td colspan="4" class="empty">No device status data yet — district officers need to complete follow-up forms</td></tr>';
+
+  // Action list
+  var actionCases = cases.filter(function(c){return c._deviceFlag;});
+  var actionRows = actionCases.map(function(c){
+    var mob = (c.mobile||'').replace(/\.0$/,'').replace(/[^0-9+]/g,'');
+    return '<tr><td style="font-size:11px;color:var(--text-light)">'+c.id+'</td>'
+      +'<td><strong>'+c.name+'</strong></td>'
+      +'<td>'+c.district+'</td>'
+      +'<td style="font-size:11px">'+c.hospital+'</td>'
+      +'<td><span class="pill pill-red">'+((c._deviceStatus||'—').split('—')[0].trim())+'</span></td>'
+      +'<td>'+( c.manufacturer||'—')+'</td>'
+      +'<td>'+(mob?'<a href="tel:'+mob+'" style="color:var(--blue-mid)">'+mob+'</a>':'—')+'</td></tr>';
+  }).join('');
+  document.getElementById('tbody-device-action').innerHTML = actionRows || '<tr><td colspan="7" class="empty">No devices flagged for action</td></tr>';
+  makeSortable('tbl-device');
+  makeSortable('tbl-device-action');
+}
+
 function renderAll() {
   renderDistrict();
+  renderDevice();
   renderHospital();
   renderFinancial();
   renderRehab();
   renderAtRisk();
   renderFY();
   renderQuarterly();
+  renderDevice();
   // Re-attach sort listeners after all tables are re-rendered
   setTimeout(initSortable, 0);
 }
@@ -947,6 +1056,64 @@ function closeDrilldown() {
 
 
 // -- DISTRICT × YEAR GRID ------------------------------------------------------
+
+// ── DEVICE STATUS ─────────────────────────────────────────────────────────────
+function renderDevice() {
+  var cases = FILTERED_CASES;
+  var withStatus  = cases.filter(function(c){ return c._deviceStatus; });
+  var functional  = cases.filter(function(c){ return (c._deviceStatus||'').includes('Functional'); }).length;
+  var issues      = withStatus.length - functional;
+  var notRecorded = cases.length - withStatus.length;
+  var notUsing    = cases.filter(function(c){ return (c._deviceStatus||'').includes('Not using'); }).length;
+
+  document.getElementById('device-stats').innerHTML =
+    statCard(functional,  'Functional',   'var(--green-mid)') +
+    statCard(issues,      'Have Issues',  'var(--red)') +
+    statCard(notUsing,    'Not Using',    'var(--amber-mid)') +
+    statCard(notRecorded, 'Not Recorded', 'var(--text-light)');
+
+  var STATUSES = [
+    {label:'Functional', icon:'✅'},
+    {label:'mapping',    icon:'⚙️'},
+    {label:'Coil',       icon:'🔌'},
+    {label:'Battery',    icon:'🔋'},
+    {label:'damaged',    icon:'💥'},
+    {label:'replacement',icon:'🔴'},
+    {label:'repair',     icon:'🔧'},
+    {label:'Not using',  icon:'❌'},
+    {label:'switch-on',  icon:'⏳'},
+  ];
+
+  var distRows = STATUSES.map(function(s) {
+    var n = cases.filter(function(c){ return (c._deviceStatus||'').toLowerCase().includes(s.label.toLowerCase()); }).length;
+    var pct = cases.length>0 ? Math.round(n/cases.length*100) : 0;
+    return '<tr><td>'+s.icon+' '+s.label+'</td><td>'+n+'</td><td>'+pct+'%</td></tr>';
+  }).join('');
+  distRows += '<tr><td style="color:var(--text-light)">&#10067; Not yet recorded</td><td>'+notRecorded+'</td><td>'+Math.round(notRecorded/cases.length*100)+'%</td></tr>';
+  document.getElementById('tbody-device-dist').innerHTML = distRows;
+
+  var issueList = cases.filter(function(c){
+    return c._deviceStatus && !c._deviceStatus.includes('Functional') && !c._deviceStatus.includes('switch-on');
+  });
+  var issueRows = issueList.map(function(c){
+    var mob = (c.mobile||'').replace(/[^0-9+]/g,'');
+    return '<tr>'
+      +'<td><strong>'+c.name+'</strong></td>'
+      +'<td>'+c.district+'</td>'
+      +'<td style="font-size:11px">'+c.hospital+'</td>'
+      +'<td><span class="pill pill-red">'+(c._deviceStatus||'—')+'</span></td>'
+      +'<td style="font-size:11px">'+(c.manufacturer||'—')+'</td>'
+      +'<td style="font-size:11px">'+(c._lastDistFollowup||c.lastContact||'—')+'</td>'
+      +'<td>'+(mob?'<a href="tel:'+mob+'" style="color:var(--blue-mid)">'+mob+'</a>':'—')+'</td>'
+      +'</tr>';
+  }).join('');
+  document.getElementById('tbody-device-issues').innerHTML = issueRows ||
+    '<tr><td colspan="7" class="empty">No device issues recorded &#10003;</td></tr>';
+
+  makeSortable('tbl-device-dist');
+  makeSortable('tbl-device-issues');
+}
+
 function renderDistYr() {
   var cases = FILTERED_CASES;
   var el = document.getElementById('distyr-metric');

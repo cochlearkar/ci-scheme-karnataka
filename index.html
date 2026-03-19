@@ -2346,10 +2346,15 @@ function caseCardHTML(c) {
     pillLabel = c.status==='paid'?'&#10003; Complete':c.status==='risk'?'&#9888; At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pending':'Active';
   }
   const dateLabel = c.surgAdmit ? 'Surgery: '+c.surgAdmit : c.r1Admit ? 'Rehab1: '+c.r1Admit : c.r2Admit ? 'Rehab2: '+c.r2Admit : 'Pre-auth stage';
+  var deviceBadge = c._deviceFlag ? '<span style="background:var(--red-light);color:var(--red);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">🦻 Device</span>' : '';
+  const devFlag = c._deviceFlag ? '<span style="background:#FFF0F0;color:var(--red);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">🔧 DEVICE</span>' : '';
   return '<div class="case-card" style="'+cardBorder+'" onclick="openCaseFromList(\''+c.id+'\')">'+
     '<div class="case-header">'+
-    '<div class="case-name">'+c.name+'</div>'+
+    '<div class="case-name">'+c.name+deviceBadge+(c._deviceFlag?'<span style="background:#FFF0F0;color:var(--red);font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:4px">🔧</span>':'')+'</div>'+
     '<span class="status-pill '+pillClass+'">'+pillLabel+'</span>'+
+    (c._deviceStatus && !c._deviceStatus.includes('Functional') && !c._deviceStatus.includes('Waiting')
+      ? '<span class="status-pill" style="background:#fff0f0;color:var(--red);margin-left:4px">🔧 Device</span>'
+      : '')+
     '</div>'+
     '<div class="case-meta">'+
     '<span>'+(c.gender||'')+(c.age?', '+c.age:'')+' · '+(c.district||'')+'</span>'+
@@ -4433,6 +4438,7 @@ function openDistrictReport() {
     {id:'outcome',  icon:'🎯', label:'Outcomes'},
     {id:'age',      icon:'👶', label:'Age'},
     {id:'fy',       icon:'📅', label:'FY Progress'},
+    {id:'device',   icon:'🦻', label:'Device'},
   ];
 
   document.getElementById('dr-tabs').innerHTML = tabs.map(t =>
@@ -4642,7 +4648,90 @@ function drRender(cases) {
     }
   }
 
-  // ── AT-RISK TAB ───────────────────────────────────────────────
+  // ── DEVICE TAB ───────────────────────────────────────────────────
+  else if (_drTab === 'device') {
+    const STATUS_COLORS = {
+      'Functional':   {color:'var(--green)',   bg:'var(--green-light)'},
+      'mapping':      {color:'var(--blue-mid)', bg:'var(--blue-light)'},
+      'Coil':         {color:'var(--amber)',    bg:'var(--amber-light)'},
+      'Battery':      {color:'var(--amber)',    bg:'var(--amber-light)'},
+      'damaged':      {color:'var(--red)',      bg:'var(--red-light)'},
+      'replacement':  {color:'var(--red)',      bg:'var(--red-light)'},
+      'repair':       {color:'var(--amber)',    bg:'var(--amber-light)'},
+      'Not using':    {color:'var(--red)',      bg:'var(--red-light)'},
+      'switch-on':    {color:'#7F77DD',         bg:'#EEEDFE'},
+    };
+    function devColor(status) {
+      if(!status) return {color:'var(--text-light)',bg:'var(--gray)'};
+      for(const [key,val] of Object.entries(STATUS_COLORS)) {
+        if(status.toLowerCase().includes(key.toLowerCase())) return val;
+      }
+      return {color:'var(--text-light)',bg:'var(--gray)'};
+    }
+
+    const withStatus = cases.filter(c=>c._deviceStatus);
+    const noStatus   = cases.length - withStatus.length;
+    const functional = cases.filter(c=>c._deviceStatus&&c._deviceStatus.includes('Functional')).length;
+    const issues     = withStatus.length - functional;
+
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      ${statBox(functional,'Functional','var(--green)','var(--green-light)')}
+      ${statBox(issues,'Have Issues','var(--red)','var(--red-light)')}
+      ${statBox(noStatus,'Not Recorded','var(--amber)','var(--amber-light)')}
+    </div>`;
+
+    // Device status distribution
+    const devMap = {};
+    cases.forEach(c => {
+      const s = c._deviceStatus || 'Not yet recorded';
+      // Simplify label
+      const label = s.includes('Functional')?'✅ Functional'
+        :s.includes('mapping')?'⚙️ Needs mapping'
+        :s.includes('Coil')?'🔌 Coil issue'
+        :s.includes('Battery')?'🔋 Battery issue'
+        :s.includes('damaged')?'💥 Processor damaged'
+        :s.includes('replacement')?'🔴 Needs replacement'
+        :s.includes('repair')?'🔧 Under repair'
+        :s.includes('Not using')?'❌ Not using'
+        :s.includes('switch-on')?'⏳ Waiting switch-on'
+        :'❓ Not recorded';
+      devMap[label] = (devMap[label]||0) + 1;
+    });
+
+    html += sectionHead('Device Status Distribution');
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">`;
+    Object.entries(devMap).sort((a,b)=>b[1]-a[1]).forEach(([label,n]) => {
+      const c2 = devColor(label);
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1;font-size:12px">${label}</div>
+        <div style="width:80px">${progBar(n,cases.length,c2.color)}</div>
+        <div style="font-size:13px;font-weight:600;width:24px;text-align:right">${n}</div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // Children with device issues — action needed
+    const issueList = cases.filter(c=>c._deviceStatus&&!c._deviceStatus.includes('Functional')&&!c._deviceStatus.includes('switch-on'));
+    if(issueList.length) {
+      html += sectionHead('Children needing device attention', issueList.length);
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          ${tableRow(['Name','Village','Device Issue','Last Contact','Mobile'],true)}
+          ${issueList.map(c => {
+            const mob = cleanMob(c.mobile||'');
+            const c2 = devColor(c._deviceStatus||'');
+            return tableRow([
+              c.name||'—', c.village||'—',
+              `<span style="background:${c2.bg};color:${c2.color};padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600">${c._deviceStatus||'—'}</span>`,
+              c._lastDistFollowup||c.lastContact||'—',
+              mob?`<a href="tel:${mob}" style="color:var(--blue-mid)">${mob}</a>`:'—'
+            ]);
+          }).join('')}
+        </table></div>`;
+    }
+  }
+
+  // ── AT-RISK TAB ───────────────────────────────────────────────────
   else if (_drTab === 'atrisk') {
     const atRisk = cases.filter(c=>c.status!=='paid'&&daysSince(c.lastContact)>=AT_RISK_DAYS)
       .sort((a,b)=>daysSince(b.lastContact)-daysSince(a.lastContact));
@@ -4798,6 +4887,157 @@ function drRender(cases) {
       </table></div>`;
   }
 
+  // ── DEVICE TAB ───────────────────────────────────────────────
+  else if (_drTab === 'device') {
+    const withStatus = cases.filter(c=>c._deviceStatus);
+    const noStatus   = cases.length - withStatus.length;
+    const functional = cases.filter(c=>(c._deviceStatus||'').includes('Functional')).length;
+    const needsAction= cases.filter(c=>c._deviceFlag).length;
+    const notUsing   = cases.filter(c=>(c._deviceStatus||'').includes('Not using')).length;
+    const waitSwitchOn= cases.filter(c=>(c._deviceStatus||'').includes('Waiting')).length;
+
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      ${statBox(functional,'Functional','var(--green)','var(--green-light)')}
+      ${statBox(needsAction,'Needs Action','var(--red)','var(--red-light)')}
+      ${statBox(notUsing,'Not Using','var(--amber)','var(--amber-light)')}
+      ${statBox(noStatus,'Not Yet Reported','var(--text-light)','var(--gray)')}
+    </div>`;
+
+    // Status breakdown
+    const deviceStatuses = [
+      'Functional — working well',
+      'Needs mapping / programming',
+      'Coil issue — not staying / replaced',
+      'Battery issue — draining fast',
+      'Processor damaged — dropped / water damage',
+      'Needs replacement — beyond repair',
+      'Under repair — sent to service centre',
+      'Not using — child refuses / family stopped',
+      'Waiting for switch-on — not yet activated',
+    ];
+    const statusColors = {
+      'Functional':'var(--green)',
+      'Needs mapping':'var(--blue-mid)',
+      'Coil':'var(--amber)',
+      'Battery':'var(--amber)',
+      'Processor':'var(--red)',
+      'Needs replacement':'var(--red)',
+      'Under repair':'var(--amber)',
+      'Not using':'var(--red)',
+      'Waiting':'var(--text-light)',
+    };
+    function getColor(s) {
+      for(const [k,v] of Object.entries(statusColors)) { if(s.includes(k)) return v; }
+      return 'var(--text-light)';
+    }
+
+    html += sectionHead('Device Status Breakdown');
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">`;
+    deviceStatuses.forEach(status => {
+      const n = cases.filter(c=>(c._deviceStatus||'').includes(status.split('—')[0].trim())).length;
+      if(n===0) return;
+      const col = getColor(status);
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1;font-size:12px">${status}</div>
+        <div style="width:80px">${progBar(n,cases.length,col)}</div>
+        <div style="font-size:13px;font-weight:600;width:24px;text-align:right;color:${col}">${n}</div>
+      </div>`;
+    });
+    // Not yet reported
+    if(noStatus>0) {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1;font-size:12px;color:var(--text-light)">Not yet reported</div>
+        <div style="width:80px">${progBar(noStatus,cases.length,'var(--border)')}</div>
+        <div style="font-size:13px;font-weight:500;width:24px;text-align:right;color:var(--text-light)">${noStatus}</div>
+      </div>`;
+    }
+    html += `</div>`;
+
+    // Children needing device action
+    const actionList = cases.filter(c=>c._deviceFlag);
+    if(actionList.length) {
+      html += sectionHead('Children needing device action', actionList.length);
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          ${tableRow(['Name','Village','Device Status','Manufacturer','Mobile'],true)}
+          ${actionList.map(c=>{
+            const mob = cleanMob(c.mobile||'');
+            return tableRow([
+              c.name||'—', c.village||'—',
+              pill((c._deviceStatus||'—').split('—')[0].trim(),'red'),
+              c.manufacturer||'—',
+              mob?`<a href="tel:${mob}" style="color:var(--blue-mid)">${mob}</a>`:'—'
+            ]);
+          }).join('')}
+        </table></div>`;
+    }
+  }
+
+
+  // ── DEVICE TAB ────────────────────────────────────────────────
+  else if (_drTab === 'device') {
+    const withStatus = cases.filter(c=>c._lastDeviceStatus||c._deviceStatus);
+    const noStatus   = cases.length - withStatus.length;
+    const functional = cases.filter(c=>(c._lastDeviceStatus||c._deviceStatus||'').includes('Functional')).length;
+    const needsAction= cases.filter(c=>c._deviceFlag).length;
+    const notUsing   = cases.filter(c=>(c._lastDeviceStatus||c._deviceStatus||'').includes('Not using')).length;
+
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      ${statBox(functional,'Functional','var(--green)','var(--green-light)')}
+      ${statBox(needsAction,'Needs Action','var(--red)','var(--red-light)')}
+      ${statBox(notUsing,'Not Using','var(--amber)','var(--amber-light)')}
+      ${statBox(noStatus,'Not Yet Recorded','#888','#f5f5f5')}
+    </div>`;
+
+    // Status breakdown
+    const statusMap = {};
+    cases.forEach(c => {
+      const s = c._lastDeviceStatus || c._deviceStatus || 'Not yet recorded';
+      const key = s.split(' — ')[0].replace(/[✅⚙️🔌🔋💥🔴🔧🚫⏳]/g,'').trim() || 'Not yet recorded';
+      statusMap[key] = (statusMap[key]||0) + 1;
+    });
+
+    html += sectionHead('Device Status Breakdown');
+    html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">`;
+    const devColors = {
+      'Functional':'var(--green)', 'Needs mapping':'var(--blue-mid)',
+      'Coil issue':'var(--amber)', 'Battery issue':'var(--amber)',
+      'Processor damaged':'var(--red)', 'Needs replacement':'var(--red)',
+      'Under repair':'#7F77DD', 'Not using':'var(--red)',
+      'Waiting for switch-on':'var(--text-light)', 'Not yet recorded':'var(--text-light)'
+    };
+    Object.entries(statusMap).sort((a,b)=>b[1]-a[1]).forEach(([status,n]) => {
+      const col = devColors[status]||'var(--text-light)';
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--border)">
+        <div style="width:10px;height:10px;border-radius:50%;background:${col};flex-shrink:0"></div>
+        <div style="flex:1;font-size:12px">${status}</div>
+        <div style="width:80px">${progBar(n,cases.length,col)}</div>
+        <div style="font-size:13px;font-weight:600;width:24px;text-align:right">${n}</div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // Children needing device action
+    const actionList = cases.filter(c=>c._deviceFlag)
+      .sort((a,b)=>a.name.localeCompare(b.name));
+    if(actionList.length) {
+      html += sectionHead('Children needing device action', actionList.length);
+      html += `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:12px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          ${tableRow(['Name','Village','Device Status','Mobile'],true)}
+          ${actionList.map(c=>{
+            const mob = cleanMob(c.mobile||'');
+            const status = (c._lastDeviceStatus||c._deviceStatus||'Unknown').split('—')[0].trim();
+            return tableRow([
+              c.name||'—', c.village||'—',
+              pill(status,'red'),
+              mob?`<a href="tel:${mob}" style="color:var(--blue-mid)">${mob}</a>`:'—'
+            ]);
+          }).join('')}
+        </table></div>`;
+    }
+  }
+
   html += '</div>';
   body.innerHTML = html;
   drShowTabStyle(_drTab);
@@ -4949,26 +5189,27 @@ function buildFollowupForm(today, cas) {
     +'<option>Grandparent / ಅಜ್ಜ/ಅಜ್ಜಿ</option><option>Other guardian / ಇತರ</option>'
     +'</select></div></div>'
 
-    +'<div style="background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
-    +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🦻 Device · ಸಾಧನ</div>'
-    +'<div class="field"><div class="field-label">Device switched on? · ಸಾಧನ ಆನ್ ಆಗಿದೆಯೇ?</div>'
-    +'<div class="radio-group" id="df-switchon">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-switchon&quot;)"><div class="radio-dot"></div>Yes, working / ಹೌದು, ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿದೆ</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-switchon&quot;)"><div class="radio-dot"></div>Not switched on yet / ಇನ್ನೂ ಆನ್ ಆಗಿಲ್ಲ</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-switchon&quot;)"><div class="radio-dot"></div>Device issue / ಸಾಧನ ಸಮಸ್ಯೆ</div>'
-    +'</div></div>'
+
     +'<div class="field"><div class="field-label">Worn daily? · ಪ್ರತಿದಿನ ಧರಿಸುತ್ತಾರೆಯೇ?</div>'
     +'<div class="radio-group" id="df-worn">'
     +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-worn&quot;)"><div class="radio-dot"></div>Yes / ಹೌದು</div>'
     +'<div class="radio-item" onclick="selectRadio(this,&quot;df-worn&quot;)"><div class="radio-dot"></div>Sometimes / ಕೆಲವೊಮ್ಮೆ</div>'
     +'<div class="radio-item" onclick="selectRadio(this,&quot;df-worn&quot;)"><div class="radio-dot"></div>Rarely / ವಿರಳವಾಗಿ</div>'
     +'</div></div>'
-    +'<div class="field"><div class="field-label">Device issues · ಸಾಧನ ಸಮಸ್ಯೆ</div>'
-    +'<select class="field-input" id="df-device-issue"><option value="">None / ಇಲ್ಲ</option>'
-    +'<option>Coil / ಕಾಯಿಲ್ ಸಮಸ್ಯೆ</option><option>Battery / ಬ್ಯಾಟರಿ</option>'
-    +'<option>Processor damaged / ಪ್ರೊಸೆಸರ್ ಹಾನಿ</option><option>Needs mapping / ಮ್ಯಾಪಿಂಗ್ ಬೇಕು</option>'
-    +'<option>Warranty issue / ವಾರಂಟಿ ಸಮಸ್ಯೆ</option><option>Other / ಇತರ</option>'
-    +'</select></div></div>'
+    +'<div class="field"><div class="field-label">Device status · ಸಾಧನ ಸ್ಥಿತಿ <span class="req">*</span></div>'
+    +'<div class="radio-group" id="df-device-status">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>✅ Functional — working well / ಸರಿಯಾಗಿ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿದೆ</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>🔧 Needs mapping / programming / ಮ್ಯಾಪಿಂಗ್ ಬೇಕು</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>🔌 Coil issue — not staying / replaced / ಕಾಯಿಲ್ ಸಮಸ್ಯೆ</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>🔋 Battery issue — draining fast / ಬ್ಯಾಟರಿ ಸಮಸ್ಯೆ</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>💥 Processor damaged — dropped / water damage / ಪ್ರೊಸೆಸರ್ ಹಾನಿ</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>🔴 Needs replacement — beyond repair / ಬದಲಾವಣೆ ಬೇಕು</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>🛠️ Under repair — sent to service centre / ಸೇವಾ ಕೇಂದ್ರಕ್ಕೆ ಕಳುಹಿಸಲಾಗಿದೆ</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>❌ Not using — child refuses / family stopped / ಬಳಸುತ್ತಿಲ್ಲ</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-device-status&quot;)"><div class="radio-dot"></div>⏳ Waiting for switch-on — not yet activated / ಸ್ವಿಚ್-ಆನ್ ಕಾಯುತ್ತಿದ್ದಾರೆ</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Device notes · ಸಾಧನ ಟಿಪ್ಪಣಿ</div>'
+    +'<input class="field-input" id="df-device-note" placeholder="Details about the issue... / ಸಮಸ್ಯೆ ವಿವರ..."></div></div>'
 
     +'<div style="background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
     +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🗣️ Speech Progress · ಮಾತಿನ ಪ್ರಗತಿ</div>'
@@ -5315,9 +5556,10 @@ async function submitDistrictFollowup() {
     month:       month,
     reachable:   getRadio('df-reachable'),
     spoke:       document.getElementById('df-spoke').value,
-    deviceOn:    getRadio('df-switchon'),
-    wornDaily:   getRadio('df-worn'),
-    deviceIssue: document.getElementById('df-device-issue').value.trim(),
+    deviceStatus: getRadio('df-device-status'),
+    wornDaily:    getRadio('df-worn'),
+    deviceStatus: getRadio('df-device-status'),
+    deviceNote:   document.getElementById('df-device-note') ? document.getElementById('df-device-note').value.trim() : '',
     milestone:   milestone,
     progress:    getRadio('df-progress'),
     school:      getRadio('df-school'),
@@ -5343,9 +5585,13 @@ async function submitDistrictFollowup() {
       _lastDistFollowup:  date,
       _lastDistMonth:     month,
       _lastMilestone:     milestone,
+      _deviceStatus:      entry.deviceStatus || '',
       _lastModified:      new Date().toISOString()
     };
-    if (entry.flag !== 'No concerns') caseUpdates.risk = true;
+    if (entry.flag !== 'No concerns / ಸಮಸ್ಯೆ ಇಲ್ಲ') caseUpdates.risk = true;
+    // Flag device issues
+    var needsAction = ['Needs mapping','Coil issue','Battery issue','Processor damaged','Needs replacement','Under repair','Not using'];
+    caseUpdates._deviceFlag = needsAction.some(function(s){ return (entry.deviceStatus||'').includes(s); });
 
     await _upd(_doc(window._fbDb, 'cases', String(selectedCase.id)), caseUpdates);
     var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(selectedCase.id); });

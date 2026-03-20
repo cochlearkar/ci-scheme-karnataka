@@ -954,6 +954,52 @@ body {
   <div class="form-scroll" id="oa-body"></div>
 </div>
 
+
+<!-- ══════════════════ SCREEN: AVT MISSING (Children missing AVT) ══════════════════ -->
+<div class="screen hidden" id="screen-avt-missing">
+  <div class="app-header" style="background:#8a2a2a">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff">Children Missing AVT</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.6)" id="avt-missing-sub">Flagged cases</div>
+      </div>
+    </div>
+    <div class="role-chip chip-rehab">Rehab</div>
+  </div>
+  <div class="form-scroll" id="avt-missing-body"></div>
+</div>
+
+<!-- ══════════════════ SCREEN: AVT SESSION LOG (with backlog split) ══════════════════ -->
+<div class="screen hidden" id="screen-avt-log">
+  <div class="app-header" style="background:var(--blue)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff">AVT Session Log</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.6)" id="avt-log-sub">Select a child to log sessions</div>
+      </div>
+    </div>
+    <div class="role-chip chip-rehab">Rehab</div>
+  </div>
+  <div class="form-scroll" id="avt-log-body"></div>
+</div>
+
+<!-- ══════════════════ SCREEN: QUARTERLY EVALUATION ══════════════════ -->
+<div class="screen hidden" id="screen-quarterly-eval">
+  <div class="app-header" style="background:var(--purple)">
+    <div class="header-left">
+      <div class="back-btn" onclick="goBack()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.2);color:#fff">&#8592;</div>
+      <div>
+        <div class="header-title" style="color:#fff" id="qe-title">Quarterly Evaluation</div>
+        <div class="header-sub" style="color:rgba(255,255,255,0.6)" id="qe-sub">Rehab Update + Mapping Report</div>
+      </div>
+    </div>
+    <div class="role-chip" style="background:rgba(255,255,255,.2);color:#fff;border:none">&#127919;</div>
+  </div>
+  <div class="form-scroll" id="qe-body"></div>
+</div>
+
 <!-- ══════════════════ SCREEN: HOSPITAL UPDATE ══════════════════ -->
 <div class="screen hidden" id="screen-hospupdate">
   <div class="app-header" style="background:var(--green-dark)">
@@ -1936,6 +1982,577 @@ function openDistrictAVTCallList() {
   overlay.innerHTML = hdr + '<div style="padding:8px 0">' + rows + '</div>' + ftr;
   document.body.appendChild(overlay);
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB — AVT LOG SCREEN (overlaid fullscreen, shows backlog vs current split)
+// ══════════════════════════════════════════════════════════════════════════════
+function openAVTLog() {
+  var allCases = filterCasesByUser(SAMPLE_CASES);
+
+  function expectedSessions(cas) {
+    var soStr = cas.switchOn || cas.switchOnDate || '';
+    if (!soStr || isNaN(new Date(soStr))) return 0;
+    var mo = Math.max(0, Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000)));
+    if (mo <= 12) return Math.min(Math.round(mo * 8.67), 104);
+    return Math.min(104 + Math.round((mo-12)*4.33), 156);
+  }
+
+  // Backlog: active cases significantly behind (logged < 60% of expected)
+  var backlog = allCases.filter(function(c) {
+    var exp = expectedSessions(c);
+    return exp > 10 && (c.sessions||0) < exp * 0.6;
+  });
+  // Current: on-track or slightly behind active cases
+  var current = allCases.filter(function(c) {
+    var soStr = c.switchOn || c.switchOnDate || '';
+    if (!soStr || isNaN(new Date(soStr))) return false;
+    var exp = expectedSessions(c);
+    return exp > 0 && (c.sessions||0) >= exp * 0.6;
+  });
+
+  var existing = document.getElementById('avt-log-overlay');
+  if (existing) existing.remove();
+  var ov = document.createElement('div');
+  ov.id = 'avt-log-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f9fafb;z-index:9999;overflow-y:auto';
+
+  function caseRow(c, isBacklog) {
+    var exp = expectedSessions(c);
+    var actual = c.sessions||0;
+    var pct = exp > 0 ? Math.round(actual/exp*100) : 0;
+    var nm = isDemo() ? maskName(c.name) : (c.name||'—');
+    var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
+    var mo = soStr ? Math.max(0,Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000))) : '?';
+    var flagDot = c._attendanceFlag==='red' ? '<span style="color:#dc2626;font-weight:700">&#128308; </span>'
+                : c._attendanceFlag==='yellow' ? '<span style="color:#d97706;font-weight:700">&#9888;&#65039; </span>' : '';
+    return '<div onclick="selectedCase=SAMPLE_CASES.find(x=>String(x.id)===\''+c.id+'\');openRehabSession(selectedCase)" '
+      + 'style="padding:12px 16px;border-bottom:1px solid #e5e7eb;cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+      + '<div>'
+      + '<div style="font-size:13px;font-weight:600;color:#111">'+flagDot+nm+'</div>'
+      + '<div style="font-size:10px;color:#666;margin-top:2px">Switch-on: '+soStr+' ('+mo+' mo) &middot; Sessions: '+actual+'/'+exp+'</div>'
+      + (isBacklog ? '<div style="font-size:10px;color:#dc2626;margin-top:1px;font-weight:600">Behind: '+pct+'% logged</div>' : '')
+      + '</div>'
+      + '<div style="font-size:20px;color:#9ca3af">&#8250;</div>'
+      + '</div>';
+  }
+
+  var backlogRows = backlog.length
+    ? '<div style="padding:8px 16px 4px;font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.05em">Backlog — Needs data entry</div>'
+      + backlog.map(function(c){ return caseRow(c,true); }).join('')
+    : '';
+  var currentRows = current.length
+    ? '<div style="padding:8px 16px 4px;font-size:10px;font-weight:700;color:#0a3d2e;text-transform:uppercase;letter-spacing:.05em">Current — Log this month\'s sessions</div>'
+      + current.map(function(c){ return caseRow(c,false); }).join('')
+    : '';
+
+  var noActive = !backlog.length && !current.length
+    ? '<div style="padding:48px 24px;text-align:center;color:#9ca3af">No active AVT cases assigned to this centre</div>' : '';
+
+  ov.innerHTML =
+    '<div style="background:var(--blue);padding:16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">'
+    + '<div onclick="document.getElementById(\'avt-log-overlay\').remove()" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#128203; AVT Session Log</div>'
+    + '<div style="color:rgba(255,255,255,.7);font-size:11px">'+allCases.filter(function(c){return c.switchOn||c.switchOnDate;}).length+' active cases &middot; '+backlog.length+' backlog</div></div></div>'
+    + '<div style="background:#fff;margin:12px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">'
+    + backlogRows + currentRows + noActive + '</div>';
+
+  document.body.appendChild(ov);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB — MISSING AVT SCREEN (call list with case summary and AVT history)
+// ══════════════════════════════════════════════════════════════════════════════
+function openAVTMissing() {
+  var cases = filterCasesByUser(SAMPLE_CASES).filter(function(c){
+    return c._attendanceFlag === 'red' || c._attendanceFlag === 'yellow';
+  });
+  // Sort: red first, then yellow
+  cases.sort(function(a,b){
+    var pa = a._attendanceFlag==='red'?0:1, pb = b._attendanceFlag==='red'?0:1;
+    return pa - pb;
+  });
+
+  var existing = document.getElementById('avt-missing-overlay');
+  if (existing) existing.remove();
+  var ov = document.createElement('div');
+  ov.id = 'avt-missing-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f9fafb;z-index:9999;overflow-y:auto';
+
+  function missingCard(c) {
+    var isRed = c._attendanceFlag === 'red';
+    var mob = cleanMob(c.mobile||'');
+    var nm = isDemo() ? maskName(c.name) : (c.name||'—');
+    var reason = c._consecAbsent>=4 ? c._consecAbsent+' consecutive absences'
+      : c._missedThisMonth>=4 ? c._missedThisMonth+' sessions missed this month'
+      : (c._monthAttendPct!=null&&c._monthAttendPct<75) ? 'Attendance '+c._monthAttendPct+'% this quarter'
+      : 'No session logged in >14 days';
+    var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
+    var mo = soStr ? Math.max(0,Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000))) : null;
+    var totalDone = c.sessions || 0;
+    var totalExpected = (function(){
+      if (!soStr||isNaN(new Date(soStr))) return '?';
+      if (mo<=12) return Math.min(Math.round(mo*8.67),104);
+      return Math.min(104+Math.round((mo-12)*4.33),156);
+    })();
+    var pct = (totalExpected!=='?'&&totalExpected>0) ? Math.round(totalDone/totalExpected*100) : null;
+    var border = isRed ? '#dc2626' : '#d97706';
+    var bgHeader = isRed ? '#fef2f2' : '#fffbeb';
+    var flagLabel = isRed ? '&#128308; RED — Immediate follow-up' : '&#9888;&#65039; YELLOW — Call family';
+    var flagColor = isRed ? '#dc2626' : '#d97706';
+
+    var callBtn = mob
+      ? '<a href="tel:'+mob+'" style="display:flex;flex-direction:column;align-items:center;gap:2px;background:#22c55e;color:#fff;border-radius:12px;padding:9px 12px;text-decoration:none;min-width:60px;text-align:center">'
+        +'<span style="font-size:18px">&#128222;</span>'
+        +'<span style="font-size:9px;font-weight:700">Call</span></a>'
+      : '';
+
+    var logBtn = '<div onclick="document.getElementById(\'avt-missing-overlay\').remove();selectedCase=SAMPLE_CASES.find(function(x){return String(x.id)===\''+c.id+'\';});openRehabSession(selectedCase)" '
+      +'style="display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--blue);color:#fff;border-radius:12px;padding:9px 12px;cursor:pointer;min-width:60px;text-align:center">'
+      +'<span style="font-size:18px">&#128203;</span>'
+      +'<span style="font-size:9px;font-weight:700">Log</span></div>';
+
+    var evalBtn = '<div onclick="document.getElementById(\'avt-missing-overlay\').remove();selectedCase=SAMPLE_CASES.find(function(x){return String(x.id)===\''+c.id+'\';});openQEScreen(selectedCase)" '
+      +'style="display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--purple);color:#fff;border-radius:12px;padding:9px 12px;cursor:pointer;min-width:60px;text-align:center">'
+      +'<span style="font-size:18px">&#127919;</span>'
+      +'<span style="font-size:9px;font-weight:700">Eval</span></div>';
+
+    return '<div style="background:#fff;border-radius:12px;margin:10px 12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);border-left:4px solid '+border+'">'
+      // Header row
+      + '<div style="background:'+bgHeader+';padding:10px 14px;display:flex;justify-content:space-between;align-items:center">'
+      + '<div>'
+      + '<div style="font-size:14px;font-weight:700;color:#111">'+nm+'</div>'
+      + '<div style="font-size:10px;color:#666;margin-top:1px">'+(c.age||'')+(c.gender?' / '+c.gender:'')+' &middot; '+(c.district||'')+'</div>'
+      + '</div>'
+      + '<span style="font-size:10px;font-weight:700;color:'+flagColor+'">'+flagLabel+'</span>'
+      + '</div>'
+      // AVT summary
+      + '<div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;border-bottom:1px solid #f3f4f6">'
+      + '<div style="text-align:center"><div style="font-size:16px;font-weight:800;color:#111">'+totalDone+'</div><div style="font-size:9px;color:#666">Sessions done</div></div>'
+      + '<div style="text-align:center"><div style="font-size:16px;font-weight:800;color:#111">'+totalExpected+'</div><div style="font-size:9px;color:#666">Expected</div></div>'
+      + '<div style="text-align:center"><div style="font-size:16px;font-weight:800;color:'+(pct!=null&&pct<75?'#dc2626':'#16a34a')+'">'+( pct!=null ? pct+'%' : '—' )+'</div><div style="font-size:9px;color:#666">Attendance</div></div>'
+      + '</div>'
+      // Reason + details
+      + '<div style="padding:8px 14px;font-size:11px;color:'+flagColor+';font-weight:600;border-bottom:1px solid #f3f4f6">'+reason+'</div>'
+      + '<div style="padding:8px 14px;font-size:10px;color:#666">Switch-on: '+(soStr||'—')+(mo?' ('+mo+' months)':'')+'&nbsp;&middot;&nbsp;Last session: '+(c._lastRehabDate||'Never')+'</div>'
+      + '<div style="padding:6px 14px;font-size:10px;color:#555">Guardian: '+(isDemo()?'***':c.guardian||'—')+'&nbsp;&middot;&nbsp;Address: '+(isDemo()?'***':(c.village||'')+(c.taluk?' · '+c.taluk:''))+'</div>'
+      // Action buttons
+      + '<div style="padding:10px 14px;display:flex;gap:8px;justify-content:flex-end">'
+      + callBtn + logBtn + evalBtn
+      + '</div>'
+      + '</div>';
+  }
+
+  var cards = cases.length
+    ? cases.map(missingCard).join('')
+    : '<div style="padding:48px 24px;text-align:center;color:#9ca3af">&#10003; No missing AVT cases right now</div>';
+
+  ov.innerHTML =
+    '<div style="background:#8a2a2a;padding:16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">'
+    + '<div onclick="document.getElementById(\'avt-missing-overlay\').remove()" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#9888;&#65039; Children missing AVT</div>'
+    + '<div style="color:rgba(255,255,255,.7);font-size:11px">'+cases.filter(function(c){return c._attendanceFlag==='red';}).length+' red &middot; '+cases.filter(function(c){return c._attendanceFlag==='yellow';}).length+' yellow</div></div></div>'
+    + cards;
+
+  document.body.appendChild(ov);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB — EVAL CASE LIST (children due for quarterly evaluation)
+// ══════════════════════════════════════════════════════════════════════════════
+function openAVTEvalList() {
+  var DAYS91 = 91.31 * 24 * 3600 * 1000; // ~3 months
+  var cases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
+    var soStr = c.switchOn || c.switchOnDate || '';
+    if (!soStr || isNaN(new Date(soStr))) return false;
+    var soD = new Date(soStr);
+    var now = Date.now();
+    for (var q = 1; q <= 8; q++) {
+      var dueTs = soD.getTime() + q * DAYS91;
+      if (dueTs > now + 14*24*3600*1000) break; // not due yet (allow 2 weeks early)
+      if (!c['_evalQ'+q]) return true;
+    }
+    return false;
+  });
+
+  var existing = document.getElementById('avt-eval-list-overlay');
+  if (existing) existing.remove();
+  var ov = document.createElement('div');
+  ov.id = 'avt-eval-list-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f9fafb;z-index:9999;overflow-y:auto';
+
+  function evalRow(c) {
+    var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
+    var soD = new Date(soStr);
+    var now = Date.now();
+    // Find next due quarter
+    var nextQ = 1;
+    for (var q = 1; q <= 8; q++) {
+      var dueTs = soD.getTime() + q * 91.31*24*3600*1000;
+      if (dueTs <= now + 14*24*3600*1000 && !c['_evalQ'+q]) { nextQ = q; break; }
+    }
+    var dueDate = new Date(soD.getTime() + nextQ * 91.31*24*3600*1000).toISOString().substring(0,10);
+    var nm = isDemo() ? maskName(c.name) : (c.name||'—');
+    var overdue = new Date(dueDate) < new Date() ? ' <span style="color:#dc2626;font-weight:700">Overdue</span>' : '';
+    return '<div onclick="document.getElementById(\'avt-eval-list-overlay\').remove();selectedCase=SAMPLE_CASES.find(function(x){return String(x.id)===\''+c.id+'\';});openQEScreen(selectedCase,'+nextQ+')" '
+      + 'style="padding:12px 16px;border-bottom:1px solid #e5e7eb;cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
+      + '<div>'
+      + '<div style="font-size:13px;font-weight:600;color:#111">'+nm+'</div>'
+      + '<div style="font-size:10px;color:#666;margin-top:2px">Switch-on: '+soStr+' &middot; Q'+nextQ+' evaluation due: '+dueDate+overdue+'</div>'
+      + '<div style="font-size:10px;color:#5a3580;margin-top:1px">Sessions done: '+(c.sessions||0)+' &middot; Centre: '+(c.rehabCentre||'—')+'</div>'
+      + '</div>'
+      + '<div style="font-size:20px;color:#9ca3af">&#8250;</div>'
+      + '</div>';
+  }
+
+  var rows = cases.length
+    ? cases.map(evalRow).join('')
+    : '<div style="padding:48px 24px;text-align:center;color:#9ca3af">No quarterly evaluations due right now</div>';
+
+  ov.innerHTML =
+    '<div style="background:#5a3580;padding:16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">'
+    + '<div onclick="document.getElementById(\'avt-eval-list-overlay\').remove()" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#127919; Children due for Quarterly Evaluation</div>'
+    + '<div style="color:rgba(255,255,255,.7);font-size:11px">'+cases.length+' pending &middot; Tap to open forms</div></div></div>'
+    + '<div style="background:#fff;margin:12px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">'
+    + rows + '</div>';
+
+  document.body.appendChild(ov);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB — QUARTERLY EVALUATION SCREEN (Form A + Form B, paper-matched)
+// ══════════════════════════════════════════════════════════════════════════════
+function openQEScreen(cas, quarterNum) {
+  selectedCase = cas;
+  if (!quarterNum) {
+    // Determine which quarter
+    var soStr = cas.switchOn || cas.switchOnDate || '';
+    var soD = soStr && !isNaN(new Date(soStr)) ? new Date(soStr) : null;
+    quarterNum = 1;
+    if (soD) {
+      for (var q = 8; q >= 1; q--) {
+        var dueTs = soD.getTime() + q * 91.31*24*3600*1000;
+        if (dueTs <= Date.now() + 14*24*3600*1000) { quarterNum = q; break; }
+      }
+    }
+  }
+  document.getElementById('qe-title').textContent = cas.name || 'Quarterly Evaluation';
+  var qLabel = ['I','II','III','IV','V','VI','VII','VIII'][quarterNum-1]||String(quarterNum);
+  document.getElementById('qe-sub').textContent = 'Quarter ' + qLabel + ' (' + (quarterNum*3) + '-month) \u00b7 Rehab Update + Mapping Report';
+
+  var soStr = (cas.switchOn || cas.switchOnDate || '').substring(0,10);
+  var today = new Date().toISOString().substring(0,10);
+  var dueDate = soStr && !isNaN(new Date(soStr))
+    ? new Date(new Date(soStr).getTime() + quarterNum*91.31*24*3600*1000).toISOString().substring(0,10)
+    : today;
+
+  var ordinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th'];
+  var qOrd = ordinals[quarterNum-1]||quarterNum+'th';
+
+  function field(label, id, val, type) {
+    type = type || 'text';
+    return '<div class="field"><div class="field-label">'+label+'</div>'
+      +'<input class="field-input" id="qe-'+id+'" type="'+type+'" value="'+( val||'' )+'" placeholder="'+label+'"></div>';
+  }
+  function ro(label, val) {
+    return '<div class="field"><div class="field-label">'+label+'</div>'
+      +'<div class="field-input has-value" style="color:#374151;background:#f9fafb">'+( val||'—' )+'</div></div>';
+  }
+  function yesno(label, id, def) {
+    var yes = def==='yes'?' checked':'', no = def!=='yes'?' checked':'';
+    return '<div class="field"><div class="field-label">'+label+'</div>'
+      +'<div style="display:flex;gap:12px;margin-top:4px">'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">'
+      +'<input type="radio" name="qe-'+id+'" value="yes"'+yes+'> Yes</label>'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">'
+      +'<input type="radio" name="qe-'+id+'" value="no"'+no+'> No</label>'
+      +'</div></div>';
+  }
+  function sec(title) {
+    return '<div style="background:var(--blue-light);padding:9px 14px;font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">'+title+'</div>';
+  }
+  function evalRow(label, schedDate, completedId, resultId, resultPlaceholder) {
+    return '<tr style="border-bottom:1px solid var(--border)">'
+      +'<td style="padding:8px 10px;font-size:12px;font-weight:600;color:#374151;vertical-align:top">'+label+'</td>'
+      +'<td style="padding:8px 6px;font-size:12px;color:#555;vertical-align:top;white-space:nowrap">'+schedDate+'</td>'
+      +'<td style="padding:4px 6px;vertical-align:top"><input type="date" class="field-input" id="'+completedId+'" value="'+today+'" style="padding:4px 6px;font-size:12px;min-width:120px"></td>'
+      +'<td style="padding:4px 6px;vertical-align:top"><input class="field-input" id="'+resultId+'" placeholder="'+resultPlaceholder+'" style="padding:4px 6px;font-size:12px"></td>'
+      +'</tr>';
+  }
+
+  var mapsSection = '';
+  // Patient profile auto-fill
+  var profile =
+    '<div style="padding:12px 16px 0">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'
+    + ro('Patient Name', isDemo()?maskName(cas.name):cas.name)
+    + ro('Age / Gender', (cas.age||'—')+(cas.gender?' / '+cas.gender:''))
+    + ro('Patient ID', cas.id)
+    + ro('Guardian', isDemo()?'***':(cas.guardian||'—'))
+    + ro('Address', isDemo()?'***':((cas.village||'')+(cas.taluk?' · '+cas.taluk:'')+' · '+(cas.district||'')))
+    + ro('Surgical Hospital', cas.hospital||'—')
+    + ro('Rehabilitation Centre', cas.rehabCentre || (window.currentUser&&window.currentUser.unit)||'—')
+    + ro('Surgery Date', cas.surgAdmit||'—')
+    + ro('Switch-on Date', soStr||'—')
+    + ro('Implant Model', cas.implantModel||cas.implantCompany||'—')
+    + ro('Implant Number', cas.implantNumber||'—')
+    + ro('Speech Processor', cas.speechProcessor||'—')
+    +'</div>'
+    + field('Hearing Age at Surgery', 'hearing-age', cas.hearingAge||'', 'text')
+    + yesno('Warranty card issued', 'warranty', 'yes')
+    + '<div class="field"><div class="field-label">Issues regarding intra-operative testing</div>'
+    + '<input class="field-input" id="qe-intraop" placeholder="NIL or describe"></div>'
+    +'</div>';
+
+  var postImplant =
+    '<div style="padding:0 16px">'
+    + ro('AVT Start Date', soStr||'—')
+    + ro('Mapping Start Date', soStr||'—')
+    + field('Speech Processor Details', 'processor-detail', cas.speechProcessor||'', 'text')
+    + yesno('AV Therapy Completed', 'avt-complete', 'no')
+    +'</div>';
+
+  var evalTable =
+    '<div style="padding:0 16px;overflow-x:auto">'
+    +'<table style="width:100%;border-collapse:collapse;min-width:460px;border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+    +'<thead><tr style="background:var(--blue-light)">'
+    +'<th style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--blue);text-align:left">Evaluation</th>'
+    +'<th style="padding:8px 6px;font-size:11px;font-weight:700;color:var(--blue);text-align:left;white-space:nowrap">Scheduled</th>'
+    +'<th style="padding:8px 6px;font-size:11px;font-weight:700;color:var(--blue);text-align:left;white-space:nowrap">Completed</th>'
+    +'<th style="padding:8px 6px;font-size:11px;font-weight:700;color:var(--blue);text-align:left">Result / Progress</th>'
+    +'</tr></thead><tbody>'
+    + evalRow('Aided Audiogram',dueDate,'qe-aud-done','qe-aud-result','e.g. Upper border of speech spectrum')
+    + evalRow('Speech Perception',dueDate,'qe-spi-done','qe-spi-result','e.g. 20/25 Open set')
+    + evalRow('MAIS Score (out of 40)',dueDate,'qe-mais-done','qe-mais','e.g. 40/40')
+    + evalRow('Speech & Language (ACSLS)',dueDate,'qe-lang-done','qe-lang-result','e.g. RLA: 3.7-4.6 yrs, ELA: 2.7-2.9 yrs')
+    +'</tbody></table>'
+    +'<div style="margin-top:8px">'
+    + yesno('Video of therapy session (3 min) taken', 'video-taken', 'yes')
+    +'</div>'
+    + field('Number of maps this quarter', 'num-maps', '1', 'number')
+    +'<div class="field"><div class="field-label">Issues if any</div>'
+    +'<input class="field-input" id="qe-issues" placeholder="NIL or describe"></div>'
+    +'<div class="field"><div class="field-label">Remarks</div>'
+    +'<input class="field-input" id="qe-remarks" placeholder="NIL or additional notes"></div>'
+    + yesno('Daily attendance noted', 'daily-att', 'yes')
+    + yesno('Weekly and Monthly Reports submitted', 'monthly-rep', 'yes')
+    +'</div>';
+
+  var sigFields =
+    '<div style="padding:0 16px">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'
+    + field('Supervisor name', 'supervisor', '', 'text')
+    + field('Audiologist name', 'audiologist', '', 'text')
+    + field('Date', 'sig-date', today, 'date')
+    +'</div></div>';
+
+  // Form B — Mapping Report
+  var mapForm =
+    '<div style="padding:0 16px">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'
+    + ro('Client Name', isDemo()?maskName(cas.name):cas.name)
+    + ro('Surgery Centre', cas.hospital||'—')
+    + ro('Mapping Centre', cas.rehabCentre||(window.currentUser&&window.currentUser.unit)||'AIISH, Mysore')
+    + ro('CI Surgeon', cas.doctor||'—')
+    + field('Mapping Audiologist', 'map-audiologist', '', 'text')
+    + ro('Date of Surgery', cas.surgAdmit||'—')
+    + ro('Switch-on Date', soStr||'—')
+    +'</div>'
+    +'<div style="margin:8px 0;font-size:12px;font-weight:600;color:#374151">Quarter: '+qOrd+' (Q'+quarterNum+')</div>'
+    +'<div style="overflow-x:auto;margin-top:8px">'
+    +'<table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden">'
+    +'<thead><tr style="background:var(--blue-light)">'
+    +'<th style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--blue);text-align:left">Field</th>'
+    +'<th style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--blue);text-align:left">Details</th>'
+    +'</tr></thead><tbody>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Mapping session date(s)</td>'
+    +'<td style="padding:4px 6px"><input class="field-input" id="qe-map-dates" placeholder="e.g. 08.10.2025" style="padding:4px 6px;font-size:12px"></td></tr>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Sound field testing done</td>'
+    +'<td style="padding:8px 10px">'
+    +'<label style="margin-right:12px;font-size:12px;cursor:pointer"><input type="radio" name="qe-sft" value="Yes" checked> Yes</label>'
+    +'<label style="font-size:12px;cursor:pointer"><input type="radio" name="qe-sft" value="No"> No</label></td></tr>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">ECAP done</td>'
+    +'<td style="padding:8px 10px">'
+    +'<label style="margin-right:12px;font-size:12px;cursor:pointer"><input type="radio" name="qe-ecap" value="Yes"> Yes</label>'
+    +'<label style="font-size:12px;cursor:pointer"><input type="radio" name="qe-ecap" value="No" checked> No</label></td></tr>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Comfort with magnetic coupling</td>'
+    +'<td style="padding:8px 10px">'
+    +'<label style="margin-right:12px;font-size:12px;cursor:pointer"><input type="radio" name="qe-magnet" value="Yes" checked> Yes</label>'
+    +'<label style="font-size:12px;cursor:pointer"><input type="radio" name="qe-magnet" value="No"> No</label></td></tr>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">ENT referral required</td>'
+    +'<td style="padding:8px 10px">'
+    +'<label style="margin-right:12px;font-size:12px;cursor:pointer"><input type="radio" name="qe-ent" value="Yes"> Yes</label>'
+    +'<label style="font-size:12px;cursor:pointer"><input type="radio" name="qe-ent" value="No" checked> No</label></td></tr>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Issues in mapping</td>'
+    +'<td style="padding:4px 6px"><input class="field-input" id="qe-map-issues" placeholder="NIL or describe" style="padding:4px 6px;font-size:12px"></td></tr>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Use of processor</td>'
+    +'<td style="padding:4px 6px"><input class="field-input" id="qe-processor-use" placeholder="e.g. Regular use" style="padding:4px 6px;font-size:12px"></td></tr>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Status of sutures</td>'
+    +'<td style="padding:4px 6px"><input class="field-input" id="qe-sutures" placeholder="e.g. Good" style="padding:4px 6px;font-size:12px"></td></tr>'
+    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Status of skin under coil</td>'
+    +'<td style="padding:4px 6px"><input class="field-input" id="qe-skin" placeholder="e.g. Normal" style="padding:4px 6px;font-size:12px"></td></tr>'
+    +'<tr><td style="padding:8px 10px;font-size:12px;font-weight:600">Others</td>'
+    +'<td style="padding:4px 6px"><input class="field-input" id="qe-map-others" placeholder="NIL or notes" style="padding:4px 6px;font-size:12px"></td></tr>'
+    +'</tbody></table></div>'
+    + yesno('Session report enclosed', 'map-session-enclosed', 'yes')
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'
+    + field('Mapping Audiologist name', 'map-sig-aud', '', 'text')
+    + field('Scheme Coordinator name', 'map-sig-coord', '', 'text')
+    + field('Date', 'map-sig-date', today, 'date')
+    +'</div>'
+    +'</div>';
+
+  var body =
+    sec('PATIENT PROFILE') + profile
+    + sec('POST IMPLANT REHABILITATION') + postImplant
+    + sec('QUARTER '+qLabel+' EVALUATION ('+qOrd+' Quarter — '+quarterNum*3+' months)') + evalTable
+    + sec('SIGNATURES') + sigFields
+    + '<div style="height:1px;background:#e5e7eb;margin:16px 0"></div>'
+    + '<div style="padding:10px 16px;background:#f5f3ff;border-top:2px solid #5a3580">'
+    + '<div style="font-size:12px;font-weight:700;color:#5a3580;margin-bottom:8px">APPENDIX C — QUARTERLY MAPPING REPORT</div>'
+    + '</div>'
+    + sec('MAPPING SESSION DETAILS') + mapForm
+    +'<div id="qe-error" style="display:none;margin:8px 16px;padding:10px 14px;background:var(--red-light);border-radius:8px;font-size:12px;color:var(--red)"></div>'
+    +'<div style="padding:12px 16px 48px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    +'<button onclick="submitQEForm('+quarterNum+')" style="padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="qe-submit-btn">Save &amp; Submit &#8594;</button>'
+    +'<button onclick="exportQEPDF('+quarterNum+')" style="padding:14px;background:#374151;color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">&#128196; Export PDF</button>'
+    +'</div>';
+
+  document.getElementById('qe-body').innerHTML = body;
+  window._qe_quarterNum = quarterNum;
+  showScreen('quarterly-eval');
+}
+
+async function submitQEForm(quarterNum) {
+  if (isDemo()) { alert('Demo account — submissions disabled.'); return; }
+  var cas = selectedCase;
+  var btn = document.getElementById('qe-submit-btn');
+  var errEl = document.getElementById('qe-error');
+  errEl.style.display = 'none';
+
+  var g = function(id) { var el=document.getElementById('qe-'+id); return el?el.value.trim():''; };
+  var r = function(name) { var el=document.querySelector('input[name="qe-'+name+'"]:checked'); return el?el.value:''; };
+
+  // Validate required
+  if (!g('mais')) { errEl.textContent='MAIS score is required.'; errEl.style.display='block'; return; }
+
+  btn.textContent = 'Saving\u2026'; btn.disabled = true;
+
+  var qLabel = ['I','II','III','IV','V','VI','VII','VIII'][quarterNum-1]||String(quarterNum);
+  var record = {
+    type: 'quarterly_evaluation',
+    quarter: quarterNum,
+    quarterLabel: qLabel,
+    caseId: String(cas.id),
+    caseName: cas.name||'',
+    caseDistrict: cas.district||'',
+    rehabCentre: (window.currentUser&&window.currentUser.unit)||'',
+    submittedBy: (window.currentUser&&window.currentUser.username)||'',
+    timestamp: new Date().toISOString(),
+    evalDate: g('sig-date'),
+    // Form A
+    hearingAge: g('hearing-age'),
+    warrantyIssued: r('warranty'),
+    intraopIssues: g('intraop'),
+    processorDetails: g('processor-detail'),
+    avtCompleted: r('avt-complete'),
+    audDateCompleted: g('aud-done'),
+    audResult: g('aud-result'),
+    spiDateCompleted: g('spi-done'),
+    spiResult: g('spi-result'),
+    maisScore: g('mais'),
+    langDateCompleted: g('lang-done'),
+    langResult: g('lang-result'),
+    videoTaken: r('video-taken'),
+    numMaps: g('num-maps'),
+    issues: g('issues'),
+    remarks: g('remarks'),
+    dailyAttendance: r('daily-att'),
+    monthlyReports: r('monthly-rep'),
+    supervisor: g('supervisor'),
+    audiologist: g('audiologist'),
+    // Form B — mapping
+    mapDates: g('map-dates'),
+    soundField: r('sft'),
+    ecapDone: r('ecap'),
+    magnetComfort: r('magnet'),
+    entReferral: r('ent'),
+    mapIssues: g('map-issues'),
+    processorUse: g('processor-use'),
+    sutureStatus: g('sutures'),
+    skinStatus: g('skin'),
+    mapOthers: g('map-others'),
+    sessionEnclosed: r('map-session-enclosed'),
+    mapAudiologist: g('map-sig-aud'),
+    mapCoordinator: g('map-sig-coord'),
+    mapDate: g('map-sig-date'),
+    entryId: 'QE-' + Date.now()
+  };
+
+  try {
+    var _col = window._fbFns.collection;
+    var _add = window._fbFns.addDoc;
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+
+    await _add(_col(window._fbDb, 'evaluations'), record);
+
+    // Mark this quarter as evaluated on the case
+    var caseUpdates = { _lastEvalDate: record.evalDate };
+    caseUpdates['_evalQ'+quarterNum] = { date: record.evalDate, mais: record.maisScore };
+    if (record.avtCompleted === 'yes') caseUpdates.avtComplete = true;
+
+    await _upd(_doc(window._fbDb, 'cases', String(cas.id)), caseUpdates);
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(cas.id); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
+
+    document.getElementById('success-msg').textContent = 'Q'+quarterNum+' evaluation saved for '+cas.name+' (MAIS: '+record.maisScore+'/40)';
+    document.getElementById('success-id').textContent = record.entryId;
+    document.getElementById('offline-note').style.display = 'none';
+    screenHistory = ['home'];
+    showScreen('success');
+  } catch(e) {
+    errEl.textContent = 'Error saving: '+e.message;
+    errEl.style.display = 'block';
+    btn.textContent = 'Save & Submit \u2192';
+    btn.disabled = false;
+  }
+}
+
+function exportQEPDF(quarterNum) {
+  var cas = selectedCase || {};
+  var nm = isDemo() ? maskName(cas.name) : (cas.name||'Patient');
+  var qLabel = ['I','II','III','IV','V','VI','VII','VIII'][quarterNum-1]||String(quarterNum);
+
+  // Use browser print on just the form body
+  var content = document.getElementById('qe-body').innerHTML;
+  var win = window.open('', '_blank');
+  win.document.write(
+    '<html><head><title>Q'+quarterNum+' Evaluation \u2014 '+nm+'</title>'
+    +'<meta charset="utf-8">'
+    +'<style>'
+    +'body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:20px;max-width:800px;margin:0 auto}'
+    +'h1{font-size:15px;text-align:center;margin-bottom:4px}'
+    +'h2{font-size:12px;text-align:center;color:#555;margin-bottom:16px}'
+    +'.field{margin-bottom:8px}'
+    +'.field-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#555;margin-bottom:2px}'
+    +'.field-input{border:1px solid #ccc;border-radius:4px;padding:4px 8px;width:100%;box-sizing:border-box;font-size:12px}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:12px}'
+    +'th,td{border:1px solid #ccc;padding:5px 8px;font-size:11px;text-align:left}'
+    +'th{background:#e8f0fe;font-weight:700}'
+    +'input[type="radio"]{margin-right:4px}'
+    +'@media print{.no-print{display:none}button{display:none}}'
+    +'</style></head><body>'
+    +'<h1>Cochlear Implant Scheme, Karnataka</h1>'
+    +'<h2>Rehabilitation Quarterly Update Form &amp; Mapping Report &mdash; Quarter '+qLabel+' ('+quarterNum*3+' months)</h2>'
+    +'<div style="margin-bottom:12px;font-size:12px"><strong>Patient:</strong> '+nm+' &nbsp;&nbsp; <strong>ID:</strong> '+(cas.id||'')+'  &nbsp;&nbsp; <strong>Switch-on:</strong> '+((cas.switchOn||cas.switchOnDate||''))+'</div>'
+    + content
+    +'</body></html>'
+  );
+  win.document.close();
+  setTimeout(function(){ win.print(); }, 500);
+}
+
 function buildHome() {
   _stateHospFilter = null;
   if (SAMPLE_CASES.length === 0 && typeof PRELOADED_CASES_DATA !== 'undefined') {
@@ -1998,25 +2615,70 @@ function buildHome() {
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'rehab') {
-    const rehabRed    = allMyCases.filter(c => c._attendanceFlag === 'red').length;
-    const rehabYellow = allMyCases.filter(c => c._attendanceFlag === 'yellow').length;
-    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">📋</div><div><div class="action-title">Log Monthly Sessions</div><div class="action-desc">Mark attendance for each child this month</div></div><div class="action-arrow">→</div></div>`;
-    const dueEval = allMyCases.filter(c => {
+    // ── Backlog: cases where sessions logged < 80% of expected given months elapsed ──
+    const rehabBacklog = allMyCases.filter(function(c) {
       var soStr = c.switchOn || c.switchOnDate || '';
       if (!soStr || isNaN(new Date(soStr))) return false;
-      var mo = Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000));
-      if (mo < 3) return false;
-      if (c._lastEvalDate) return Math.floor((Date.now()-new Date(c._lastEvalDate))/86400000) > 80;
-      return true;
+      var moElapsed = Math.max(0, Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000)));
+      // Expected sessions: Year 1 = 2/week, Year 2 = 1/week, max 156
+      var expectedSessions = moElapsed <= 12
+        ? Math.min(moElapsed * 8.67, 104)   // ~8.67 sessions/month in Y1
+        : Math.min(104 + (moElapsed-12)*4.33, 156); // ~4.33/month in Y2
+      var actual = c.sessions || 0;
+      // Backlog = logged less than 60% of expected (significantly behind)
+      return expectedSessions > 10 && actual < expectedSessions * 0.6;
     });
+    // ── Due for Quarterly Evaluation ──
+    const dueEval = allMyCases.filter(function(c) {
+      var soStr = c.switchOn || c.switchOnDate || '';
+      if (!soStr || isNaN(new Date(soStr))) return false;
+      var soD = new Date(soStr);
+      var now = new Date();
+      // Find which quarter ends have passed
+      for (var q = 1; q <= 8; q++) {
+        var dueDate = new Date(soD.getTime() + q * 91.31 * 24 * 3600 * 1000); // ~3 months
+        if (dueDate > now) break; // future quarters
+        // Check if this quarter already has an eval
+        var evalKey = '_evalQ' + q;
+        if (!c[evalKey]) return true; // this quarter has no eval — due
+      }
+      return false;
+    });
+    // ── Missing AVT (red + yellow flagged) ──
+    const rehabMissing = allMyCases.filter(c => c._attendanceFlag === 'red' || c._attendanceFlag === 'yellow');
+
+    // Button 1: AVT Session Log
+    html += `<div class="action-card primary" onclick="openAVTLog()" style="background:var(--blue);border-color:var(--blue)">
+      <div class="action-icon">📋</div>
+      <div>
+        <div class="action-title">AVT Session Log</div>
+        <div class="action-desc">${allMyCases.filter(c=>c.switchOn||c.switchOnDate).length} active cases${rehabBacklog.length>0?' · '+rehabBacklog.length+' backlog':''}</div>
+      </div>
+      <div class="action-arrow">→</div>
+    </div>`;
+
+    // Button 2: Children due for Quarterly Evaluation
     if (dueEval.length > 0) {
-      html += `<div class="action-card primary" onclick="buildCaseList('eval-due');showScreen('cases')" style="background:#5a3580;border-color:#5a3580"><div class="action-icon">🎯</div><div><div class="action-title">${dueEval.length} child${dueEval.length!==1?'ren':''} due Quarterly Eval</div><div class="action-desc">MAIS · Speech · Language milestone</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
+      html += `<div class="action-card primary" onclick="openAVTEvalList()" style="background:#5a3580;border-color:#5a3580">
+        <div class="action-icon">🎯</div>
+        <div>
+          <div class="action-title">${dueEval.length} child${dueEval.length!==1?'ren':''} due for Quarterly Evaluation</div>
+          <div class="action-desc">Rehabilitation Update · Mapping Report</div>
+        </div>
+        <div class="action-arrow" style="color:#fff">→</div>
+      </div>`;
     }
-    if (rehabRed > 0) {
-      html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🔴</div><div><div class="action-title">${rehabRed} child${rehabRed!==1?'ren':''} — RED alert</div><div class="action-desc">4+ absences — district must be informed</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
-    }
-    if (rehabYellow > 0) {
-      html += `<div class="action-card" style="border-color:#d97706;background:#fffbeb" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:#92400e">${rehabYellow} — follow up ⚠️</div><div class="action-desc">2 consecutive absences — call family</div></div>`;
+
+    // Button 3: Children missing AVT
+    if (rehabMissing.length > 0) {
+      html += `<div class="action-card primary" onclick="openAVTMissing()" style="background:#8a2a2a;border-color:#8a2a2a">
+        <div class="action-icon">⚠️</div>
+        <div>
+          <div class="action-title">${rehabMissing.length} child${rehabMissing.length!==1?'ren':''} missing AVT</div>
+          <div class="action-desc">${allMyCases.filter(c=>c._attendanceFlag==='red').length} red · ${allMyCases.filter(c=>c._attendanceFlag==='yellow').length} yellow — tap to call families</div>
+        </div>
+        <div class="action-arrow" style="color:#fff">→</div>
+      </div>`;
     }
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse all cases</div><div class="action-desc">All assigned cases</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
@@ -4090,18 +4752,7 @@ function openCaseSummary(cas) {
 }
 
 
-function openQuarterlyEval(cas) {
-  if (!cas) return;
-  var soStr = cas.switchOn || cas.switchOnDate || '';
-  var evalPeriod = 'Quarterly Evaluation';
-  if (soStr && !isNaN(new Date(soStr))) {
-    var mo = Math.round((Date.now() - new Date(soStr)) / (30.44*24*3600*1000));
-    var nearest = [3,6,12,18,24].reduce(function(p,c){ return Math.abs(c-mo)<Math.abs(p-mo)?c:p; });
-    evalPeriod = nearest + '-month Evaluation (Switch-on: ' + soStr.substring(0,10) + ')';
-  }
-  cas._evalContext = evalPeriod;
-  openOutcomeAssessment(cas);
-}
+function openQuarterlyEval(cas) { openQEScreen(cas); }
 
 function summaryAction() {
   const cas = selectedCase;

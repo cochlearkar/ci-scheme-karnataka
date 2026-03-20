@@ -1986,77 +1986,140 @@ function openDistrictAVTCallList() {
 // ══════════════════════════════════════════════════════════════════════════════
 // REHAB — AVT LOG SCREEN (overlaid fullscreen, shows backlog vs current split)
 // ══════════════════════════════════════════════════════════════════════════════
+function _avtExpectedSessions(cas) {
+  var soStr = cas.switchOn || cas.switchOnDate || '';
+  if (!soStr || isNaN(new Date(soStr))) return 0;
+  var mo = Math.max(0, Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000)));
+  if (mo <= 12) return Math.min(Math.round(mo * 8.67), 104);
+  return Math.min(104 + Math.round((mo-12)*4.33), 156);
+}
+
+function _avtIsBacklog(c) {
+  var exp = _avtExpectedSessions(c);
+  return exp > 10 && (c.sessions||0) < exp * 0.6;
+}
+
 function openAVTLog() {
-  var allCases = filterCasesByUser(SAMPLE_CASES);
+  // Use the existing screen-cases infrastructure with two tabs
+  // Tab A: Backlog (cases needing update)
+  // Tab B: Current ongoing cases
+  // Tapping a case opens openRehabSession exactly as before
+  window._avtLogTab = window._avtLogTab || 'backlog';
 
-  function expectedSessions(cas) {
-    var soStr = cas.switchOn || cas.switchOnDate || '';
-    if (!soStr || isNaN(new Date(soStr))) return 0;
-    var mo = Math.max(0, Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000)));
-    if (mo <= 12) return Math.min(Math.round(mo * 8.67), 104);
-    return Math.min(104 + Math.round((mo-12)*4.33), 156);
-  }
+  var allCases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
+    return (c.switchOn || c.switchOnDate) && (c.status === 'rehab1' || c.status === 'rehab2');
+  });
 
-  // Backlog: active cases significantly behind (logged < 60% of expected)
-  var backlog = allCases.filter(function(c) {
-    var exp = expectedSessions(c);
-    return exp > 10 && (c.sessions||0) < exp * 0.6;
-  });
-  // Current: on-track or slightly behind active cases
-  var current = allCases.filter(function(c) {
-    var soStr = c.switchOn || c.switchOnDate || '';
-    if (!soStr || isNaN(new Date(soStr))) return false;
-    var exp = expectedSessions(c);
-    return exp > 0 && (c.sessions||0) >= exp * 0.6;
-  });
+  var backlog = allCases.filter(_avtIsBacklog);
+  var current = allCases.filter(function(c) { return !_avtIsBacklog(c); });
 
   var existing = document.getElementById('avt-log-overlay');
   if (existing) existing.remove();
   var ov = document.createElement('div');
   ov.id = 'avt-log-overlay';
-  ov.style.cssText = 'position:fixed;inset:0;background:#f9fafb;z-index:9999;overflow-y:auto';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column';
 
-  function caseRow(c, isBacklog) {
-    var exp = expectedSessions(c);
-    var actual = c.sessions||0;
-    var pct = exp > 0 ? Math.round(actual/exp*100) : 0;
-    var nm = isDemo() ? maskName(c.name) : (c.name||'—');
-    var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
-    var mo = soStr ? Math.max(0,Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000))) : '?';
-    var flagDot = c._attendanceFlag==='red' ? '<span style="color:#dc2626;font-weight:700">&#128308; </span>'
-                : c._attendanceFlag==='yellow' ? '<span style="color:#d97706;font-weight:700">&#9888;&#65039; </span>' : '';
-    return '<div onclick="selectedCase=SAMPLE_CASES.find(x=>String(x.id)===\''+c.id+'\');openRehabSession(selectedCase)" '
-      + 'style="padding:12px 16px;border-bottom:1px solid #e5e7eb;cursor:pointer;display:flex;justify-content:space-between;align-items:center">'
-      + '<div>'
-      + '<div style="font-size:13px;font-weight:600;color:#111">'+flagDot+nm+'</div>'
-      + '<div style="font-size:10px;color:#666;margin-top:2px">Switch-on: '+soStr+' ('+mo+' mo) &middot; Sessions: '+actual+'/'+exp+'</div>'
-      + (isBacklog ? '<div style="font-size:10px;color:#dc2626;margin-top:1px;font-weight:600">Behind: '+pct+'% logged</div>' : '')
-      + '</div>'
-      + '<div style="font-size:20px;color:#9ca3af">&#8250;</div>'
-      + '</div>';
+  function renderList(tab) {
+    window._avtLogTab = tab;
+    var cases = tab === 'backlog' ? backlog : current;
+    var listEl = document.getElementById('avt-log-list');
+    if (!listEl) return;
+
+    // Update tab styles
+    var tabBacklog = document.getElementById('avt-tab-backlog');
+    var tabCurrent = document.getElementById('avt-tab-current');
+    if (tabBacklog && tabCurrent) {
+      tabBacklog.style.cssText = tab==='backlog'
+        ? 'flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:700;color:var(--blue);border-bottom:3px solid var(--blue);cursor:pointer;background:#fff'
+        : 'flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:600;color:#9ca3af;border-bottom:3px solid transparent;cursor:pointer;background:#fff';
+      tabCurrent.style.cssText = tab==='current'
+        ? 'flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:700;color:var(--blue);border-bottom:3px solid var(--blue);cursor:pointer;background:#fff'
+        : 'flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:600;color:#9ca3af;border-bottom:3px solid transparent;cursor:pointer;background:#fff';
+    }
+
+    if (!cases.length) {
+      listEl.innerHTML = '<div style="padding:48px 24px;text-align:center;color:#9ca3af;font-size:14px">'
+        + (tab==='backlog' ? '&#10003; No backlog — all cases are up to date' : 'No current ongoing cases')
+        + '</div>';
+      return;
+    }
+
+    listEl.innerHTML = cases.map(function(c) {
+      var exp = _avtExpectedSessions(c);
+      var actual = c.sessions||0;
+      var pct = exp > 0 ? Math.round(actual/exp*100) : 0;
+      var nm = isDemo() ? maskName(c.name) : (c.name||'—');
+      var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
+      var mo = soStr ? Math.max(0,Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000))) : '?';
+      var isBacklog = _avtIsBacklog(c);
+
+      // Flag indicator
+      var flagBorder = c._attendanceFlag==='red' ? 'border-left:4px solid #dc2626'
+                     : c._attendanceFlag==='yellow' ? 'border-left:4px solid #d97706'
+                     : 'border-left:4px solid transparent';
+      var flagBadge = c._attendanceFlag==='red'
+        ? '<span style="font-size:9px;font-weight:700;background:#fee2e2;color:#dc2626;padding:1px 5px;border-radius:4px;margin-left:6px">&#128308; AVT</span>'
+        : c._attendanceFlag==='yellow'
+        ? '<span style="font-size:9px;font-weight:700;background:#fef3c7;color:#d97706;padding:1px 5px;border-radius:4px;margin-left:6px">&#9888; AVT</span>' : '';
+
+      // Status pill colours matching existing caseCardHTML
+      var statusPill = c.status==='rehab1'
+        ? '<span style="font-size:9px;padding:2px 7px;border-radius:20px;background:#e0f2fe;color:#0369a1;font-weight:600">Rehab 1</span>'
+        : '<span style="font-size:9px;padding:2px 7px;border-radius:20px;background:#f0fdf4;color:#166534;font-weight:600">Rehab 2</span>';
+
+      var behindBadge = isBacklog
+        ? '<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:2px">&#9888; Behind — '+pct+'% logged ('+actual+' of '+exp+' expected)</div>'
+        : '<div style="font-size:10px;color:#16a34a;margin-top:2px">&#10003; On track — '+actual+' sessions logged</div>';
+
+      return '<div onclick="document.getElementById(&quot;avt-log-overlay&quot;).remove();'
+        + 'selectedCase=SAMPLE_CASES.find(function(x){return String(x.id)===&quot;'+c.id+'&quot;;});'
+        + 'openRehabSession(selectedCase);" '
+        + 'style="padding:13px 16px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#fff;'+flagBorder+'">'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        + '<span style="font-size:14px;font-weight:600;color:#111">'+nm+'</span>'
+        + statusPill + flagBadge
+        + '</div>'
+        + '<div style="font-size:11px;color:#6b7280;margin-top:3px">'
+        + (c.gender||'') + (c.age?', '+c.age:'') + ' &middot; ' + (c.district||'')
+        + '</div>'
+        + '<div style="font-size:11px;color:#6b7280;margin-top:1px">'
+        + 'Switch-on: '+soStr+(mo!=='?'?' ('+mo+' months)':'')
+        + '</div>'
+        + behindBadge
+        + '</div>'
+        + '<div style="font-size:22px;color:#d1d5db;margin-left:8px">&#8250;</div>'
+        + '</div>';
+    }).join('');
   }
 
-  var backlogRows = backlog.length
-    ? '<div style="padding:8px 16px 4px;font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.05em">Backlog — Needs data entry</div>'
-      + backlog.map(function(c){ return caseRow(c,true); }).join('')
-    : '';
-  var currentRows = current.length
-    ? '<div style="padding:8px 16px 4px;font-size:10px;font-weight:700;color:#0a3d2e;text-transform:uppercase;letter-spacing:.05em">Current — Log this month\'s sessions</div>'
-      + current.map(function(c){ return caseRow(c,false); }).join('')
-    : '';
-
-  var noActive = !backlog.length && !current.length
-    ? '<div style="padding:48px 24px;text-align:center;color:#9ca3af">No active AVT cases assigned to this centre</div>' : '';
-
   ov.innerHTML =
-    '<div style="background:var(--blue);padding:16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10">'
-    + '<div onclick="document.getElementById(\'avt-log-overlay\').remove()" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
-    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#128203; AVT Session Log</div>'
-    + '<div style="color:rgba(255,255,255,.7);font-size:11px">'+allCases.filter(function(c){return c.switchOn||c.switchOnDate;}).length+' active cases &middot; '+backlog.length+' backlog</div></div></div>'
-    + '<div style="background:#fff;margin:12px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">'
-    + backlogRows + currentRows + noActive + '</div>';
+    // Sticky header
+    '<div style="background:var(--blue);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    + '<div onclick="document.getElementById(&quot;avt-log-overlay&quot;).remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px;flex-shrink:0">&#8592;</div>'
+    + '<div>'
+    + '<div style="color:#fff;font-weight:700;font-size:15px">&#128203; AVT Session Log</div>'
+    + '<div style="color:rgba(255,255,255,.7);font-size:11px">'+allCases.length+' active cases &middot; '+backlog.length+' need update</div>'
+    + '</div></div>'
+    // Tab bar
+    + '<div style="display:flex;background:#fff;border-bottom:1px solid #e5e7eb;flex-shrink:0">'
+    + '<div id="avt-tab-backlog" onclick="renderList(&quot;backlog&quot;)" '
+    + 'style="flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:700;color:var(--blue);border-bottom:3px solid var(--blue);cursor:pointer;background:#fff">'
+    + '&#9888; Cases need your update'
+    + '<div style="font-size:10px;font-weight:600;color:#dc2626;margin-top:1px">'+backlog.length+' backlog</div>'
+    + '</div>'
+    + '<div id="avt-tab-current" onclick="renderList(&quot;current&quot;)" '
+    + 'style="flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:600;color:#9ca3af;border-bottom:3px solid transparent;cursor:pointer;background:#fff">'
+    + '&#9989; Current Ongoing Cases'
+    + '<div style="font-size:10px;font-weight:600;color:#16a34a;margin-top:1px">'+current.length+' cases</div>'
+    + '</div>'
+    + '</div>'
+    // Scrollable list
+    + '<div id="avt-log-list" style="flex:1;overflow-y:auto"></div>';
 
   document.body.appendChild(ov);
+  renderList(window._avtLogTab || 'backlog');
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

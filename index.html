@@ -4919,11 +4919,17 @@ async function submitToSheet(formData) {
       const updates = { _lastSubmission: serverTimestamp(), _lastRole: role };
 
       if (role === 'hospital') {
-        if (formData['f-surgdate'])    updates.surgAdmit   = formData['f-surgdate'];
-        if (formData['f-switchon'])    updates.switchOn    = formData['f-switchon'];
-        if (formData['f-rehabcentre']) updates.rehabCentre = formData['f-rehabcentre'];
-        if (formData['f-res-district']) updates.district   = formData['f-res-district'];
+        if (formData['f-surgdate'])       updates.surgAdmit      = formData['f-surgdate'];
+        if (formData['f-switchon'])       updates.switchOn       = formData['f-switchon'];
+        if (formData['f-rehabcentre'])    updates.rehabCentre    = formData['f-rehabcentre'];
+        if (formData['f-res-district'])   updates.district       = formData['f-res-district'];
+        // Device details — save to case so QE form can pre-fill
+        if (formData['f-mfr'])            updates.implantCompany = formData['f-mfr'];
+        if (formData['f-model'])          updates.implantModel   = formData['f-model'];
+        if (formData['f-serial'])         updates.implantNumber  = formData['f-serial'];
+        if (formData['f-processor-model'])updates.speechProcessor= formData['f-processor-model'];
         updates.status = 'rehab1';
+        updates.hospSubmitted = true;
       }
       if (role === 'rehab') {
         updates.lastContact = formData['f-sessdate'] || new Date().toISOString().split('T')[0];

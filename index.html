@@ -2044,53 +2044,82 @@ function openAVTLog() {
       return;
     }
 
-    listEl.innerHTML = cases.map(function(c) {
-      var exp = _avtExpectedSessions(c);
-      var actual = c.sessions||0;
-      var pct = exp > 0 ? Math.round(actual/exp*100) : 0;
-      var nm = isDemo() ? maskName(c.name) : (c.name||'—');
-      var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
-      var mo = soStr ? Math.max(0,Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000))) : '?';
-      var isBacklog = _avtIsBacklog(c);
+    // Group by Hospital → Financial Year
+    var groups = {};
+    cases.forEach(function(c) {
+      var hosp = c.hospital || 'Unknown Hospital';
+      var fy   = c.fy || 'Unknown Year';
+      if (!groups[hosp]) groups[hosp] = {};
+      if (!groups[hosp][fy]) groups[hosp][fy] = [];
+      groups[hosp][fy].push(c);
+    });
 
-      // Flag indicator
-      var flagBorder = c._attendanceFlag==='red' ? 'border-left:4px solid #dc2626'
-                     : c._attendanceFlag==='yellow' ? 'border-left:4px solid #d97706'
-                     : 'border-left:4px solid transparent';
-      var flagBadge = c._attendanceFlag==='red'
-        ? '<span style="font-size:9px;font-weight:700;background:#fee2e2;color:#dc2626;padding:1px 5px;border-radius:4px;margin-left:6px">&#128308; AVT</span>'
-        : c._attendanceFlag==='yellow'
-        ? '<span style="font-size:9px;font-weight:700;background:#fef3c7;color:#d97706;padding:1px 5px;border-radius:4px;margin-left:6px">&#9888; AVT</span>' : '';
+    var html = '';
+    Object.keys(groups).sort().forEach(function(hosp) {
+      var hospCases = Object.values(groups[hosp]).reduce(function(a,b){return a.concat(b);}, []);
+      var hospTotal = hospCases.length;
+      var hospBehind = hospCases.filter(_avtIsBacklog).length;
+      var hospColor = hospBehind > 0 ? '#7c3aed' : '#0a3d2e';
+      var hospBg    = hospBehind > 0 ? '#f5f3ff' : '#f0fdf4';
 
-      // Status pill colours matching existing caseCardHTML
-      var statusPill = c.status==='rehab1'
-        ? '<span style="font-size:9px;padding:2px 7px;border-radius:20px;background:#e0f2fe;color:#0369a1;font-weight:600">Rehab 1</span>'
-        : '<span style="font-size:9px;padding:2px 7px;border-radius:20px;background:#f0fdf4;color:#166534;font-weight:600">Rehab 2</span>';
+      html += '<div style="margin:10px 12px 0;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb">';
 
-      var behindBadge = isBacklog
-        ? '<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:2px">&#9888; Behind — '+pct+'% logged ('+actual+' of '+exp+' expected)</div>'
-        : '<div style="font-size:10px;color:#16a34a;margin-top:2px">&#10003; On track — '+actual+' sessions logged</div>';
-
-      return '<div onclick="document.getElementById(&quot;avt-log-overlay&quot;).remove();'
-        + 'selectedCase=SAMPLE_CASES.find(function(x){return String(x.id)===&quot;'+c.id+'&quot;;});'
-        + 'openRehabSession(selectedCase);" '
-        + 'style="padding:13px 16px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#fff;'+flagBorder+'">'
-        + '<div style="flex:1;min-width:0">'
-        + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-        + '<span style="font-size:14px;font-weight:600;color:#111">'+nm+'</span>'
-        + statusPill + flagBadge
-        + '</div>'
-        + '<div style="font-size:11px;color:#6b7280;margin-top:3px">'
-        + (c.gender||'') + (c.age?', '+c.age:'') + ' &middot; ' + (c.district||'')
-        + '</div>'
-        + '<div style="font-size:11px;color:#6b7280;margin-top:1px">'
-        + 'Switch-on: '+soStr+(mo!=='?'?' ('+mo+' months)':'')
-        + '</div>'
-        + behindBadge
-        + '</div>'
-        + '<div style="font-size:22px;color:#d1d5db;margin-left:8px">&#8250;</div>'
+      // Hospital header
+      html += '<div style="background:'+hospBg+';padding:10px 14px;display:flex;justify-content:space-between;align-items:center">'
+        + '<div style="font-size:13px;font-weight:700;color:'+hospColor+'">&#127963; '+hosp+'</div>'
+        + '<span style="font-size:11px;font-weight:600;color:#6b7280">'+hospTotal+' case'+(hospTotal!==1?'s':'')
+        + (hospBehind>0?' &middot; <span style="color:#dc2626">'+hospBehind+' behind</span>':'')+'</span>'
         + '</div>';
-    }).join('');
+
+      // Year sub-groups
+      Object.keys(groups[hosp]).sort().forEach(function(fy) {
+        var fyCases = groups[hosp][fy];
+        var fyBehind = fyCases.filter(_avtIsBacklog).length;
+
+        html += '<div style="background:#f9fafb;padding:7px 14px 4px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">'
+          + '<span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">FY '+fy+'</span>'
+          + '<span style="font-size:10px;color:#6b7280">'+fyCases.length+' cases'
+          + (fyBehind>0?' &middot; <span style="color:#dc2626;font-weight:600">'+fyBehind+' behind</span>':'')+'</span>'
+          + '</div>';
+
+        fyCases.forEach(function(c) {
+          var exp    = _avtExpectedSessions(c);
+          var actual = c.sessions||0;
+          var pct    = exp > 0 ? Math.round(actual/exp*100) : 0;
+          var nm     = isDemo() ? maskName(c.name) : (c.name||'—');
+          var isBack = _avtIsBacklog(c);
+
+          // Compact progress bar
+          var barPct   = Math.min(pct, 100);
+          var barColor = isBack ? '#dc2626' : '#16a34a';
+          var flagDot  = c._attendanceFlag==='red'
+            ? ' <span style="font-size:9px;background:#fee2e2;color:#dc2626;padding:1px 4px;border-radius:3px;font-weight:700">&#128308;</span>'
+            : c._attendanceFlag==='yellow'
+            ? ' <span style="font-size:9px;background:#fef3c7;color:#d97706;padding:1px 4px;border-radius:3px;font-weight:700">&#9888;</span>' : '';
+
+          html += '<div onclick="document.getElementById(&quot;avt-log-overlay&quot;).remove();'
+            + 'selectedCase=SAMPLE_CASES.find(function(x){return String(x.id)===&quot;'+c.id+'&quot;;});'
+            + 'openRehabSession(selectedCase);" '
+            + 'style="padding:9px 14px;border-top:1px solid #f1f5f9;cursor:pointer;background:#fff;display:flex;align-items:center;gap:10px">'
+            + '<div style="flex:1;min-width:0">'
+            + '<div style="font-size:13px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm+flagDot+'</div>'
+            + '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
+            + '<div style="flex:1;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden">'
+            + '<div style="width:'+barPct+'%;height:100%;background:'+barColor+';border-radius:2px"></div>'
+            + '</div>'
+            + '<span style="font-size:10px;color:'+barColor+';font-weight:700;white-space:nowrap">'+actual+'/'+exp+'</span>'
+            + '</div>'
+            + '</div>'
+            + '<div style="font-size:18px;color:#d1d5db">&#8250;</div>'
+            + '</div>';
+        });
+      });
+
+      html += '</div>'; // close hospital group
+    });
+
+    html += '<div style="height:16px"></div>'; // bottom padding
+    listEl.innerHTML = html;
   }
 
   ov.innerHTML =

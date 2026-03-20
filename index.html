@@ -1999,17 +1999,19 @@ function _avtIsBacklog(c) {
   return exp > 10 && (c.sessions||0) < exp * 0.6;
 }
 
+function _avtDaysPending(c) {
+  var ref = c._lastRehabDate || c.switchOn || c.switchOnDate || '';
+  if (!ref || isNaN(new Date(ref))) return null;
+  return Math.floor((Date.now() - new Date(ref)) / 86400000);
+}
+
 function openAVTLog() {
-  // Use the existing screen-cases infrastructure with two tabs
-  // Tab A: Backlog (cases needing update)
-  // Tab B: Current ongoing cases
-  // Tapping a case opens openRehabSession exactly as before
   window._avtLogTab = window._avtLogTab || 'backlog';
+  window._avtSearch = window._avtSearch || '';
 
   var allCases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
     return (c.switchOn || c.switchOnDate) && (c.status === 'rehab1' || c.status === 'rehab2');
   });
-
   var backlog = allCases.filter(_avtIsBacklog);
   var current = allCases.filter(function(c) { return !_avtIsBacklog(c); });
 
@@ -2017,143 +2019,253 @@ function openAVTLog() {
   if (existing) existing.remove();
   var ov = document.createElement('div');
   ov.id = 'avt-log-overlay';
-  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
 
-  function renderList(tab) {
+  // ── case card — proper card with name, district, switch-on, pending days ────
+  function caseCard(c) {
+    var nm     = isDemo() ? maskName(c.name) : (c.name || '\u2014');
+    var soStr  = (c.switchOn || c.switchOnDate || '').substring(0, 10);
+    var dist   = isDemo() ? '***' : (c.district || '\u2014');
+    var vill   = isDemo() ? '***' : (c.village  || '');
+    var days   = _avtDaysPending(c);
+    var exp    = _avtExpectedSessions(c);
+    var actual = c.sessions || 0;
+    var pct    = exp > 0 ? Math.round(actual / exp * 100) : 0;
+    var isBack = _avtIsBacklog(c);
+
+    // Pending badge
+    var pendingBadge = days === null
+      ? '<span style="background:#f1f5f9;color:#64748b;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px">Not started</span>'
+      : isBack
+        ? '<span style="background:#fef2f2;color:#dc2626;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">Pending ' + days + ' days</span>'
+        : '<span style="background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px">Logged ' + days + 'd ago</span>';
+
+    // AVT flag badge
+    var flagBadge = c._attendanceFlag === 'red'
+      ? ' <span style="font-size:9px;background:#fee2e2;color:#dc2626;padding:1px 5px;border-radius:3px;font-weight:700">&#128308; AVT</span>'
+      : c._attendanceFlag === 'yellow'
+      ? ' <span style="font-size:9px;background:#fef3c7;color:#d97706;padding:1px 5px;border-radius:3px;font-weight:700">&#9888; AVT</span>' : '';
+
+    // Progress bar
+    var barPct   = Math.min(pct, 100);
+    var barColor = isBack ? '#dc2626' : '#16a34a';
+
+    return '<div class="avt-case-row" data-id="' + c.id + '" '
+      + 'style="margin:0;border-top:1px solid #f1f5f9;cursor:pointer;background:#fff;padding:12px 14px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'
+      // Name + flag
+      + '<div style="font-size:13px;font-weight:700;color:#111">' + nm + flagBadge + '</div>'
+      + pendingBadge
+      + '</div>'
+      // District · Village · Switch-on
+      + '<div style="font-size:11px;color:#6b7280;margin-bottom:6px">'
+      + dist + (vill ? ' &middot; ' + vill : '') + ' &nbsp;&middot;&nbsp; Switch-on: ' + (soStr || '\u2014')
+      + '</div>'
+      // Progress bar + session count
+      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<div style="flex:1;height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden">'
+      + '<div style="width:' + barPct + '%;height:100%;background:' + barColor + ';border-radius:3px"></div>'
+      + '</div>'
+      + '<span style="font-size:10px;color:' + barColor + ';font-weight:700;white-space:nowrap">' + actual + ' / ' + exp + ' sessions</span>'
+      + '<div style="font-size:18px;color:#d1d5db">&#8250;</div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  // ── render grouped list ───────────────────────────────────────────────────
+  function renderList(tab, searchQ) {
     window._avtLogTab = tab;
-    var cases = tab === 'backlog' ? backlog : current;
+    window._avtSearch = searchQ || '';
+    var allTabCases = tab === 'backlog' ? backlog : current;
     var listEl = document.getElementById('avt-log-list');
     if (!listEl) return;
 
-    // Update tab styles
-    var tabBacklog = document.getElementById('avt-tab-backlog');
-    var tabCurrent = document.getElementById('avt-tab-current');
-    if (tabBacklog && tabCurrent) {
-      tabBacklog.style.cssText = tab==='backlog'
-        ? 'flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:700;color:var(--blue);border-bottom:3px solid var(--blue);cursor:pointer;background:#fff'
-        : 'flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:600;color:#9ca3af;border-bottom:3px solid transparent;cursor:pointer;background:#fff';
-      tabCurrent.style.cssText = tab==='current'
-        ? 'flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:700;color:var(--blue);border-bottom:3px solid var(--blue);cursor:pointer;background:#fff'
-        : 'flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:600;color:#9ca3af;border-bottom:3px solid transparent;cursor:pointer;background:#fff';
-    }
+    // Tab style update
+    ['backlog','current'].forEach(function(t) {
+      var el = document.getElementById('avt-tab-' + t);
+      if (!el) return;
+      el.style.fontWeight = t === tab ? '700' : '600';
+      el.style.color = t === tab ? 'var(--blue)' : '#9ca3af';
+      el.style.borderBottom = t === tab ? '3px solid var(--blue)' : '3px solid transparent';
+    });
+
+    // Search filter
+    var q = (searchQ || '').trim().toLowerCase();
+    var cases = q ? allTabCases.filter(function(c) {
+      return (c.name||'').toLowerCase().includes(q)
+          || (c.village||'').toLowerCase().includes(q)
+          || (c.district||'').toLowerCase().includes(q)
+          || (c.hospital||'').toLowerCase().includes(q)
+          || (c.rehabCentre||'').toLowerCase().includes(q);
+    }) : allTabCases;
 
     if (!cases.length) {
       listEl.innerHTML = '<div style="padding:48px 24px;text-align:center;color:#9ca3af;font-size:14px">'
-        + (tab==='backlog' ? '&#10003; No backlog — all cases are up to date' : 'No current ongoing cases')
+        + (q ? 'No cases match &ldquo;' + q + '&rdquo;'
+             : tab === 'backlog' ? '&#10003; No backlog \u2014 all cases up to date' : 'No current ongoing cases')
         + '</div>';
       return;
     }
 
-    // Group by Hospital → Financial Year
-    var groups = {};
+    // Group: Hospital (closed by default) → FY (closed) → case cards
+    var hospMap = {};
     cases.forEach(function(c) {
-      var hosp = c.hospital || 'Unknown Hospital';
-      var fy   = c.fy || 'Unknown Year';
-      if (!groups[hosp]) groups[hosp] = {};
-      if (!groups[hosp][fy]) groups[hosp][fy] = [];
-      groups[hosp][fy].push(c);
+      var h  = c.hospital || 'Unknown Hospital';
+      var fy = c.fy || 'Unknown Year';
+      if (!hospMap[h]) hospMap[h] = {};
+      if (!hospMap[h][fy]) hospMap[h][fy] = [];
+      hospMap[h][fy].push(c);
     });
 
+    var searchActive = q !== '';
+    var singleHosp   = Object.keys(hospMap).length === 1;
     var html = '';
-    Object.keys(groups).sort().forEach(function(hosp) {
-      var hospCases = Object.values(groups[hosp]).reduce(function(a,b){return a.concat(b);}, []);
-      var hospTotal = hospCases.length;
-      var hospBehind = hospCases.filter(_avtIsBacklog).length;
-      var hospColor = hospBehind > 0 ? '#7c3aed' : '#0a3d2e';
-      var hospBg    = hospBehind > 0 ? '#f5f3ff' : '#f0fdf4';
 
-      html += '<div style="margin:10px 12px 0;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb">';
+    Object.keys(hospMap).sort().forEach(function(hosp, hi) {
+      var hCases  = Object.values(hospMap[hosp]).reduce(function(a,b){return a.concat(b);}, []);
+      var hBehind = hCases.filter(_avtIsBacklog).length;
+      var hColor  = hBehind > 0 ? '#7c3aed' : '#0a3d2e';
+      var hBg     = hBehind > 0 ? '#f5f3ff' : '#f0fdf4';
+      var hBorder = hBehind > 0 ? '#ddd6fe' : '#bbf7d0';
+      var hId     = 'avth-' + hi;
+      var hOpen   = (searchActive || singleHosp) ? 'block' : 'none';
 
-      // Hospital header
-      html += '<div style="background:'+hospBg+';padding:10px 14px;display:flex;justify-content:space-between;align-items:center">'
-        + '<div style="font-size:13px;font-weight:700;color:'+hospColor+'">&#127963; '+hosp+'</div>'
-        + '<span style="font-size:11px;font-weight:600;color:#6b7280">'+hospTotal+' case'+(hospTotal!==1?'s':'')
-        + (hospBehind>0?' &middot; <span style="color:#dc2626">'+hospBehind+' behind</span>':'')+'</span>'
-        + '</div>';
-
-      // Year sub-groups
-      Object.keys(groups[hosp]).sort().forEach(function(fy) {
-        var fyCases = groups[hosp][fy];
+      var innerHtml = '';
+      Object.keys(hospMap[hosp]).sort().forEach(function(fy, fi) {
+        var fyCases  = hospMap[hosp][fy];
         var fyBehind = fyCases.filter(_avtIsBacklog).length;
+        var fyId     = hId + 'f' + fi;
+        var fyOpen   = searchActive ? 'block' : 'none';
 
-        html += '<div style="background:#f9fafb;padding:7px 14px 4px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">'
-          + '<span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">FY '+fy+'</span>'
-          + '<span style="font-size:10px;color:#6b7280">'+fyCases.length+' cases'
-          + (fyBehind>0?' &middot; <span style="color:#dc2626;font-weight:600">'+fyBehind+' behind</span>':'')+'</span>'
+        innerHtml +=
+          '<div id="fyh-' + fyId + '" '
+          + 'style="background:#f1f5f9;padding:9px 14px;border-top:1px solid #e2e8f0;'
+          + 'display:flex;justify-content:space-between;align-items:center;cursor:pointer">'
+          + '<div>'
+          + '<span style="font-size:12px;font-weight:700;color:#374151">FY ' + fy + '</span>'
+          + (fyBehind > 0
+              ? ' &nbsp;<span style="font-size:10px;background:#fef2f2;color:#dc2626;padding:1px 6px;border-radius:4px;font-weight:700">' + fyBehind + ' behind</span>'
+              : ' &nbsp;<span style="font-size:10px;background:#f0fdf4;color:#16a34a;padding:1px 6px;border-radius:4px;font-weight:600">up to date</span>')
+          + '</div>'
+          + '<div style="display:flex;align-items:center;gap:6px">'
+          + '<span style="font-size:10px;color:#6b7280">' + fyCases.length + ' case' + (fyCases.length !== 1 ? 's' : '') + '</span>'
+          + '<span style="font-size:14px;color:#64748b" id="fyarr-' + fyId + '">' + (fyOpen==='block'?'&#8963;':'&#8964;') + '</span>'
+          + '</div>'
+          + '</div>'
+          + '<div id="' + fyId + '" style="display:' + fyOpen + ';background:#fff">'
+          + fyCases.map(caseCard).join('')
           + '</div>';
-
-        fyCases.forEach(function(c) {
-          var exp    = _avtExpectedSessions(c);
-          var actual = c.sessions||0;
-          var pct    = exp > 0 ? Math.round(actual/exp*100) : 0;
-          var nm     = isDemo() ? maskName(c.name) : (c.name||'—');
-          var isBack = _avtIsBacklog(c);
-
-          // Compact progress bar
-          var barPct   = Math.min(pct, 100);
-          var barColor = isBack ? '#dc2626' : '#16a34a';
-          var flagDot  = c._attendanceFlag==='red'
-            ? ' <span style="font-size:9px;background:#fee2e2;color:#dc2626;padding:1px 4px;border-radius:3px;font-weight:700">&#128308;</span>'
-            : c._attendanceFlag==='yellow'
-            ? ' <span style="font-size:9px;background:#fef3c7;color:#d97706;padding:1px 4px;border-radius:3px;font-weight:700">&#9888;</span>' : '';
-
-          html += '<div onclick="document.getElementById(&quot;avt-log-overlay&quot;).remove();'
-            + 'selectedCase=SAMPLE_CASES.find(function(x){return String(x.id)===&quot;'+c.id+'&quot;;});'
-            + 'openRehabSession(selectedCase);" '
-            + 'style="padding:9px 14px;border-top:1px solid #f1f5f9;cursor:pointer;background:#fff;display:flex;align-items:center;gap:10px">'
-            + '<div style="flex:1;min-width:0">'
-            + '<div style="font-size:13px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+nm+flagDot+'</div>'
-            + '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
-            + '<div style="flex:1;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden">'
-            + '<div style="width:'+barPct+'%;height:100%;background:'+barColor+';border-radius:2px"></div>'
-            + '</div>'
-            + '<span style="font-size:10px;color:'+barColor+';font-weight:700;white-space:nowrap">'+actual+'/'+exp+'</span>'
-            + '</div>'
-            + '</div>'
-            + '<div style="font-size:18px;color:#d1d5db">&#8250;</div>'
-            + '</div>';
-        });
       });
 
-      html += '</div>'; // close hospital group
+      html +=
+        '<div style="margin:10px 12px 0;border-radius:10px;overflow:hidden;border:1px solid ' + hBorder + '">'
+        + '<div id="hdr-' + hId + '" style="background:' + hBg + ';padding:12px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">'
+        + '<div>'
+        + '<div style="font-size:13px;font-weight:700;color:' + hColor + '">&#127963; ' + hosp + '</div>'
+        + '<div style="font-size:10px;color:#6b7280;margin-top:2px">'
+        + hCases.length + ' case' + (hCases.length !== 1 ? 's' : '')
+        + (hBehind > 0 ? ' &nbsp;&middot;&nbsp; <span style="color:#dc2626;font-weight:600">' + hBehind + ' need update</span>' : ' &nbsp;&middot;&nbsp; <span style="color:#16a34a">all up to date</span>')
+        + '</div>'
+        + '</div>'
+        + '<span style="font-size:18px;color:' + hColor + '" id="harr-' + hId + '">' + (hOpen==='block'?'&#8963;':'&#8964;') + '</span>'
+        + '</div>'
+        + '<div id="' + hId + '" style="display:' + hOpen + '">' + innerHtml + '</div>'
+        + '</div>';
     });
 
-    html += '<div style="height:16px"></div>'; // bottom padding
+    html += '<div style="height:20px"></div>';
     listEl.innerHTML = html;
+
+    // Wire hospital toggles
+    Object.keys(hospMap).forEach(function(hosp, hi) {
+      var hId  = 'avth-' + hi;
+      var hdr  = document.getElementById('hdr-' + hId);
+      var body = document.getElementById(hId);
+      var arr  = document.getElementById('harr-' + hId);
+      if (hdr && body) hdr.addEventListener('click', function() {
+        var open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : 'block';
+        if (arr) arr.innerHTML = open ? '&#8964;' : '&#8963;';
+      });
+      // Wire FY toggles
+      Object.keys(hospMap[hosp]).sort().forEach(function(fy, fi) {
+        var fyId  = hId + 'f' + fi;
+        var fyHdr = document.getElementById('fyh-' + fyId);
+        var fyBod = document.getElementById(fyId);
+        var fyArr = document.getElementById('fyarr-' + fyId);
+        if (fyHdr && fyBod) fyHdr.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var open = fyBod.style.display !== 'none';
+          fyBod.style.display = open ? 'none' : 'block';
+          if (fyArr) fyArr.innerHTML = open ? '&#8964;' : '&#8963;';
+        });
+      });
+    });
+
+    // Wire case card taps
+    listEl.querySelectorAll('.avt-case-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        var id  = row.getAttribute('data-id');
+        var cas = SAMPLE_CASES.find(function(x){ return String(x.id) === String(id); });
+        if (!cas) return;
+        document.getElementById('avt-log-overlay').remove();
+        selectedCase = cas;
+        openRehabSession(cas);
+      });
+    });
   }
 
+  // ── build overlay HTML ────────────────────────────────────────────────────
   ov.innerHTML =
-    // Sticky header
     '<div style="background:var(--blue);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
-    + '<div onclick="document.getElementById(&quot;avt-log-overlay&quot;).remove()" '
-    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px;flex-shrink:0">&#8592;</div>'
+    + '<div id="avt-log-back" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;'
+    + 'display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px;flex-shrink:0">&#8592;</div>'
     + '<div>'
     + '<div style="color:#fff;font-weight:700;font-size:15px">&#128203; AVT Session Log</div>'
-    + '<div style="color:rgba(255,255,255,.7);font-size:11px">'+allCases.length+' active cases &middot; '+backlog.length+' need update</div>'
+    + '<div style="color:rgba(255,255,255,.7);font-size:11px">' + allCases.length + ' active cases &middot; ' + backlog.length + ' need update</div>'
     + '</div></div>'
-    // Tab bar
+    // Search bar
+    + '<div style="background:#fff;padding:8px 12px;border-bottom:1px solid #e5e7eb;flex-shrink:0">'
+    + '<div style="display:flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:10px;padding:8px 12px">'
+    + '<span style="font-size:15px;color:#9ca3af">&#128269;</span>'
+    + '<input id="avt-search-inp" type="search" placeholder="Search by name, village, district, institution\u2026" '
+    + 'autocomplete="off" style="border:none;background:transparent;flex:1;font-size:13px;color:#111;outline:none;font-family:inherit">'
+    + '</div></div>'
+    // Tabs
     + '<div style="display:flex;background:#fff;border-bottom:1px solid #e5e7eb;flex-shrink:0">'
-    + '<div id="avt-tab-backlog" onclick="renderList(&quot;backlog&quot;)" '
-    + 'style="flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:700;color:var(--blue);border-bottom:3px solid var(--blue);cursor:pointer;background:#fff">'
-    + '&#9888; Cases need your update'
-    + '<div style="font-size:10px;font-weight:600;color:#dc2626;margin-top:1px">'+backlog.length+' backlog</div>'
+    + '<div id="avt-tab-backlog" style="flex:1;padding:11px 4px;text-align:center;cursor:pointer;font-size:13px;'
+    + 'font-weight:700;color:var(--blue);border-bottom:3px solid var(--blue)">'
+    + '&#9888;&#65039; Cases need your update'
+    + '<div style="font-size:10px;color:#dc2626;font-weight:600;margin-top:1px">' + backlog.length + ' backlog</div>'
     + '</div>'
-    + '<div id="avt-tab-current" onclick="renderList(&quot;current&quot;)" '
-    + 'style="flex:1;padding:11px 4px;text-align:center;font-size:13px;font-weight:600;color:#9ca3af;border-bottom:3px solid transparent;cursor:pointer;background:#fff">'
+    + '<div id="avt-tab-current" style="flex:1;padding:11px 4px;text-align:center;cursor:pointer;font-size:13px;'
+    + 'font-weight:600;color:#9ca3af;border-bottom:3px solid transparent">'
     + '&#9989; Current Ongoing Cases'
-    + '<div style="font-size:10px;font-weight:600;color:#16a34a;margin-top:1px">'+current.length+' cases</div>'
+    + '<div style="font-size:10px;color:#16a34a;font-weight:600;margin-top:1px">' + current.length + ' cases</div>'
     + '</div>'
     + '</div>'
     // Scrollable list
     + '<div id="avt-log-list" style="flex:1;overflow-y:auto"></div>';
 
   document.body.appendChild(ov);
-  renderList(window._avtLogTab || 'backlog');
+
+  // Wire events after DOM insertion
+  document.getElementById('avt-log-back').addEventListener('click', function() {
+    document.getElementById('avt-log-overlay').remove();
+  });
+  document.getElementById('avt-tab-backlog').addEventListener('click', function() {
+    renderList('backlog', window._avtSearch);
+  });
+  document.getElementById('avt-tab-current').addEventListener('click', function() {
+    renderList('current', window._avtSearch);
+  });
+  document.getElementById('avt-search-inp').addEventListener('input', function() {
+    renderList(window._avtLogTab || 'backlog', this.value);
+  });
+
+  renderList(window._avtLogTab || 'backlog', '');
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// REHAB — MISSING AVT SCREEN (call list with case summary and AVT history)
-// ══════════════════════════════════════════════════════════════════════════════
 function openAVTMissing() {
   var cases = filterCasesByUser(SAMPLE_CASES).filter(function(c){
     return c._attendanceFlag === 'red' || c._attendanceFlag === 'yellow';
@@ -2316,206 +2428,244 @@ function openAVTEvalList() {
 // ══════════════════════════════════════════════════════════════════════════════
 function openQEScreen(cas, quarterNum) {
   selectedCase = cas;
+  var soStr = (cas.switchOn || cas.switchOnDate || '').substring(0, 10);
+  var today = new Date().toISOString().substring(0, 10);
+
+  // Auto-detect quarter if not supplied
   if (!quarterNum) {
-    // Determine which quarter
-    var soStr = cas.switchOn || cas.switchOnDate || '';
-    var soD = soStr && !isNaN(new Date(soStr)) ? new Date(soStr) : null;
     quarterNum = 1;
-    if (soD) {
+    if (soStr && !isNaN(new Date(soStr))) {
       for (var q = 8; q >= 1; q--) {
-        var dueTs = soD.getTime() + q * 91.31*24*3600*1000;
-        if (dueTs <= Date.now() + 14*24*3600*1000) { quarterNum = q; break; }
+        if (new Date(soStr).getTime() + q * 91.31*24*3600*1000 <= Date.now() + 14*24*3600*1000) {
+          quarterNum = q; break;
+        }
       }
     }
   }
-  document.getElementById('qe-title').textContent = cas.name || 'Quarterly Evaluation';
-  var qLabel = ['I','II','III','IV','V','VI','VII','VIII'][quarterNum-1]||String(quarterNum);
-  document.getElementById('qe-sub').textContent = 'Quarter ' + qLabel + ' (' + (quarterNum*3) + '-month) \u00b7 Rehab Update + Mapping Report';
 
-  var soStr = (cas.switchOn || cas.switchOnDate || '').substring(0,10);
-  var today = new Date().toISOString().substring(0,10);
-  var dueDate = soStr && !isNaN(new Date(soStr))
+  var qRomans  = ['I','II','III','IV','V','VI','VII','VIII'];
+  var qOrdinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th'];
+  var qLabel   = qRomans[quarterNum-1]   || String(quarterNum);
+  var qOrd     = qOrdinals[quarterNum-1] || quarterNum+'th';
+  var dueDate  = soStr && !isNaN(new Date(soStr))
     ? new Date(new Date(soStr).getTime() + quarterNum*91.31*24*3600*1000).toISOString().substring(0,10)
     : today;
 
-  var ordinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th'];
-  var qOrd = ordinals[quarterNum-1]||quarterNum+'th';
+  // Load any previously saved eval for this quarter
+  // Load saved data: prefer full draft/submission record stored on case, fall back to evalQ marker
+  var saved = {};
+  var evalMarker = cas['_evalQ' + quarterNum];
+  if (evalMarker && typeof evalMarker === 'object') {
+    // Full record was cached on the case object (set by submitQEForm)
+    saved = evalMarker;
+  }
 
-  function field(label, id, val, type) {
+  document.getElementById('qe-title').textContent = cas.name || 'Quarterly Evaluation';
+  document.getElementById('qe-sub').textContent =
+    'Quarter ' + qLabel + ' \u00b7 ' + (quarterNum*3) + '-month \u00b7 Rehab Update + Mapping Report';
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+  function pv(val) { return val || ''; }
+
+  // Read-only info strip — grey pill style
+  function infoStrip(pairs) {
+    return '<div style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:10px 16px;background:#f1f5f9;border-bottom:1px solid #e2e8f0">'
+      + pairs.map(function(p) {
+          return '<div style="font-size:11px">'
+            + '<span style="color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.03em">' + p[0] + '</span>'
+            + ' <span style="color:#1e293b;font-weight:700">' + (p[1]||'\u2014') + '</span>'
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  // Paper-style section divider
+  function paperSec(title) {
+    return '<div style="background:#1e3a5f;padding:7px 16px;font-size:11px;font-weight:700;'
+      + 'color:#fff;text-transform:uppercase;letter-spacing:.06em;margin-top:0">' + title + '</div>';
+  }
+
+  // Paper row: label on left, input spanning right
+  function paperRow(label, inputHtml) {
+    return '<div style="display:flex;align-items:baseline;border-bottom:1px solid #e2e8f0;padding:0">'
+      + '<div style="flex:0 0 160px;padding:7px 10px;font-size:11px;font-weight:600;color:#374151;'
+      + 'background:#f8fafc;border-right:1px solid #e2e8f0">' + label + '</div>'
+      + '<div style="flex:1;padding:4px 8px">' + inputHtml + '</div>'
+      + '</div>';
+  }
+
+  function inp(id, val, ph, type) {
     type = type || 'text';
-    return '<div class="field"><div class="field-label">'+label+'</div>'
-      +'<input class="field-input" id="qe-'+id+'" type="'+type+'" value="'+( val||'' )+'" placeholder="'+label+'"></div>';
-  }
-  function ro(label, val) {
-    return '<div class="field"><div class="field-label">'+label+'</div>'
-      +'<div class="field-input has-value" style="color:#374151;background:#f9fafb">'+( val||'—' )+'</div></div>';
-  }
-  function yesno(label, id, def) {
-    var yes = def==='yes'?' checked':'', no = def!=='yes'?' checked':'';
-    return '<div class="field"><div class="field-label">'+label+'</div>'
-      +'<div style="display:flex;gap:12px;margin-top:4px">'
-      +'<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">'
-      +'<input type="radio" name="qe-'+id+'" value="yes"'+yes+'> Yes</label>'
-      +'<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">'
-      +'<input type="radio" name="qe-'+id+'" value="no"'+no+'> No</label>'
-      +'</div></div>';
-  }
-  function sec(title) {
-    return '<div style="background:var(--blue-light);padding:9px 14px;font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-top:2px">'+title+'</div>';
-  }
-  function evalRow(label, schedDate, completedId, resultId, resultPlaceholder) {
-    return '<tr style="border-bottom:1px solid var(--border)">'
-      +'<td style="padding:8px 10px;font-size:12px;font-weight:600;color:#374151;vertical-align:top">'+label+'</td>'
-      +'<td style="padding:8px 6px;font-size:12px;color:#555;vertical-align:top;white-space:nowrap">'+schedDate+'</td>'
-      +'<td style="padding:4px 6px;vertical-align:top"><input type="date" class="field-input" id="'+completedId+'" value="'+today+'" style="padding:4px 6px;font-size:12px;min-width:120px"></td>'
-      +'<td style="padding:4px 6px;vertical-align:top"><input class="field-input" id="'+resultId+'" placeholder="'+resultPlaceholder+'" style="padding:4px 6px;font-size:12px"></td>'
-      +'</tr>';
+    return '<input id="qe-' + id + '" type="' + type + '" value="' + pv(val) + '" placeholder="' + (ph||'') + '" '
+      + 'style="width:100%;border:none;background:transparent;font-size:12px;color:#111;padding:4px 0;font-family:inherit;outline:none">';
   }
 
-  var mapsSection = '';
-  // Patient profile auto-fill
-  var profile =
-    '<div style="padding:12px 16px 0">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'
-    + ro('Patient Name', isDemo()?maskName(cas.name):cas.name)
-    + ro('Age / Gender', (cas.age||'—')+(cas.gender?' / '+cas.gender:''))
-    + ro('Patient ID', cas.id)
-    + ro('Guardian', isDemo()?'***':(cas.guardian||'—'))
-    + ro('Address', isDemo()?'***':((cas.village||'')+(cas.taluk?' · '+cas.taluk:'')+' · '+(cas.district||'')))
-    + ro('Surgical Hospital', cas.hospital||'—')
-    + ro('Rehabilitation Centre', cas.rehabCentre || (window.currentUser&&window.currentUser.unit)||'—')
-    + ro('Surgery Date', cas.surgAdmit||'—')
-    + ro('Switch-on Date', soStr||'—')
-    + ro('Implant Model', cas.implantModel||cas.implantCompany||'—')
-    + ro('Implant Number', cas.implantNumber||'—')
-    + ro('Speech Processor', cas.speechProcessor||'—')
-    +'</div>'
-    + field('Hearing Age at Surgery', 'hearing-age', cas.hearingAge||'', 'text')
-    + yesno('Warranty card issued', 'warranty', 'yes')
-    + '<div class="field"><div class="field-label">Issues regarding intra-operative testing</div>'
-    + '<input class="field-input" id="qe-intraop" placeholder="NIL or describe"></div>'
-    +'</div>';
+  function roPaper(val) {
+    return '<span style="font-size:12px;color:#374151;font-weight:600">' + (val||'\u2014') + '</span>';
+  }
 
-  var postImplant =
-    '<div style="padding:0 16px">'
-    + ro('AVT Start Date', soStr||'—')
-    + ro('Mapping Start Date', soStr||'—')
-    + field('Speech Processor Details', 'processor-detail', cas.speechProcessor||'', 'text')
-    + yesno('AV Therapy Completed', 'avt-complete', 'no')
-    +'</div>';
+  function yesnoPaper(id, def, saved_val) {
+    var cur = saved_val || def;
+    var yc = cur==='yes' ? 'checked' : '', nc = cur!=='yes' ? 'checked' : '';
+    return '<label style="margin-right:14px;font-size:12px;cursor:pointer">'
+      + '<input type="radio" name="qe-' + id + '" value="yes" ' + yc + '> Yes</label>'
+      + '<label style="font-size:12px;cursor:pointer">'
+      + '<input type="radio" name="qe-' + id + '" value="no" ' + nc + '> No</label>';
+  }
 
-  var evalTable =
-    '<div style="padding:0 16px;overflow-x:auto">'
-    +'<table style="width:100%;border-collapse:collapse;min-width:460px;border:1px solid var(--border);border-radius:8px;overflow:hidden">'
-    +'<thead><tr style="background:var(--blue-light)">'
-    +'<th style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--blue);text-align:left">Evaluation</th>'
-    +'<th style="padding:8px 6px;font-size:11px;font-weight:700;color:var(--blue);text-align:left;white-space:nowrap">Scheduled</th>'
-    +'<th style="padding:8px 6px;font-size:11px;font-weight:700;color:var(--blue);text-align:left;white-space:nowrap">Completed</th>'
-    +'<th style="padding:8px 6px;font-size:11px;font-weight:700;color:var(--blue);text-align:left">Result / Progress</th>'
-    +'</tr></thead><tbody>'
-    + evalRow('Aided Audiogram',dueDate,'qe-aud-done','qe-aud-result','e.g. Upper border of speech spectrum')
-    + evalRow('Speech Perception',dueDate,'qe-spi-done','qe-spi-result','e.g. 20/25 Open set')
-    + evalRow('MAIS Score (out of 40)',dueDate,'qe-mais-done','qe-mais','e.g. 40/40')
-    + evalRow('Speech & Language (ACSLS)',dueDate,'qe-lang-done','qe-lang-result','e.g. RLA: 3.7-4.6 yrs, ELA: 2.7-2.9 yrs')
-    +'</tbody></table>'
-    +'<div style="margin-top:8px">'
-    + yesno('Video of therapy session (3 min) taken', 'video-taken', 'yes')
-    +'</div>'
-    + field('Number of maps this quarter', 'num-maps', '1', 'number')
-    +'<div class="field"><div class="field-label">Issues if any</div>'
-    +'<input class="field-input" id="qe-issues" placeholder="NIL or describe"></div>'
-    +'<div class="field"><div class="field-label">Remarks</div>'
-    +'<input class="field-input" id="qe-remarks" placeholder="NIL or additional notes"></div>'
-    + yesno('Daily attendance noted', 'daily-att', 'yes')
-    + yesno('Weekly and Monthly Reports submitted', 'monthly-rep', 'yes')
-    +'</div>';
+  function evalTableRow(label, doneId, resultId, savedDone, savedResult, ph) {
+    return '<tr>'
+      + '<td style="padding:6px 10px;font-size:11px;font-weight:600;color:#374151;background:#f8fafc;'
+      + 'border-right:1px solid #e2e8f0;white-space:nowrap;width:160px">' + label + '</td>'
+      + '<td style="padding:4px 6px;border-right:1px solid #e2e8f0;white-space:nowrap">'
+      + '<span style="font-size:10px;color:#64748b">Sch: </span>'
+      + '<span style="font-size:11px;color:#374151">' + dueDate + '</span><br>'
+      + '<input id="qe-' + doneId + '" type="date" value="' + pv(savedDone||today) + '" '
+      + 'style="font-size:11px;border:none;background:transparent;color:#111;font-family:inherit;outline:none;padding:0;width:120px">'
+      + '</td>'
+      + '<td style="padding:4px 8px">'
+      + '<input id="qe-' + resultId + '" value="' + pv(savedResult) + '" placeholder="' + (ph||'') + '" '
+      + 'style="width:100%;border:none;background:transparent;font-size:12px;color:#111;font-family:inherit;outline:none;padding:2px 0">'
+      + '</td>'
+      + '</tr>';
+  }
 
-  var sigFields =
-    '<div style="padding:0 16px">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'
-    + field('Supervisor name', 'supervisor', '', 'text')
-    + field('Audiologist name', 'audiologist', '', 'text')
-    + field('Date', 'sig-date', today, 'date')
-    +'</div></div>';
+  // ── Case info strip (auto-filled, always visible) ─────────────────────────
+  var nm   = isDemo() ? maskName(cas.name) : (cas.name||'\u2014');
+  var addr = isDemo() ? '***' : [(cas.village||''), (cas.taluk||''), (cas.district||'')].filter(Boolean).join(', ');
 
-  // Form B — Mapping Report
-  var mapForm =
-    '<div style="padding:0 16px">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'
-    + ro('Client Name', isDemo()?maskName(cas.name):cas.name)
-    + ro('Surgery Centre', cas.hospital||'—')
-    + ro('Mapping Centre', cas.rehabCentre||(window.currentUser&&window.currentUser.unit)||'AIISH, Mysore')
-    + ro('CI Surgeon', cas.doctor||'—')
-    + field('Mapping Audiologist', 'map-audiologist', '', 'text')
-    + ro('Date of Surgery', cas.surgAdmit||'—')
-    + ro('Switch-on Date', soStr||'—')
-    +'</div>'
-    +'<div style="margin:8px 0;font-size:12px;font-weight:600;color:#374151">Quarter: '+qOrd+' (Q'+quarterNum+')</div>'
-    +'<div style="overflow-x:auto;margin-top:8px">'
-    +'<table style="width:100%;border-collapse:collapse;border:1px solid var(--border);border-radius:8px;overflow:hidden">'
-    +'<thead><tr style="background:var(--blue-light)">'
-    +'<th style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--blue);text-align:left">Field</th>'
-    +'<th style="padding:8px 10px;font-size:11px;font-weight:700;color:var(--blue);text-align:left">Details</th>'
-    +'</tr></thead><tbody>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Mapping session date(s)</td>'
-    +'<td style="padding:4px 6px"><input class="field-input" id="qe-map-dates" placeholder="e.g. 08.10.2025" style="padding:4px 6px;font-size:12px"></td></tr>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Sound field testing done</td>'
-    +'<td style="padding:8px 10px">'
-    +'<label style="margin-right:12px;font-size:12px;cursor:pointer"><input type="radio" name="qe-sft" value="Yes" checked> Yes</label>'
-    +'<label style="font-size:12px;cursor:pointer"><input type="radio" name="qe-sft" value="No"> No</label></td></tr>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">ECAP done</td>'
-    +'<td style="padding:8px 10px">'
-    +'<label style="margin-right:12px;font-size:12px;cursor:pointer"><input type="radio" name="qe-ecap" value="Yes"> Yes</label>'
-    +'<label style="font-size:12px;cursor:pointer"><input type="radio" name="qe-ecap" value="No" checked> No</label></td></tr>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Comfort with magnetic coupling</td>'
-    +'<td style="padding:8px 10px">'
-    +'<label style="margin-right:12px;font-size:12px;cursor:pointer"><input type="radio" name="qe-magnet" value="Yes" checked> Yes</label>'
-    +'<label style="font-size:12px;cursor:pointer"><input type="radio" name="qe-magnet" value="No"> No</label></td></tr>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">ENT referral required</td>'
-    +'<td style="padding:8px 10px">'
-    +'<label style="margin-right:12px;font-size:12px;cursor:pointer"><input type="radio" name="qe-ent" value="Yes"> Yes</label>'
-    +'<label style="font-size:12px;cursor:pointer"><input type="radio" name="qe-ent" value="No" checked> No</label></td></tr>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Issues in mapping</td>'
-    +'<td style="padding:4px 6px"><input class="field-input" id="qe-map-issues" placeholder="NIL or describe" style="padding:4px 6px;font-size:12px"></td></tr>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Use of processor</td>'
-    +'<td style="padding:4px 6px"><input class="field-input" id="qe-processor-use" placeholder="e.g. Regular use" style="padding:4px 6px;font-size:12px"></td></tr>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Status of sutures</td>'
-    +'<td style="padding:4px 6px"><input class="field-input" id="qe-sutures" placeholder="e.g. Good" style="padding:4px 6px;font-size:12px"></td></tr>'
-    +'<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px;font-size:12px;font-weight:600">Status of skin under coil</td>'
-    +'<td style="padding:4px 6px"><input class="field-input" id="qe-skin" placeholder="e.g. Normal" style="padding:4px 6px;font-size:12px"></td></tr>'
-    +'<tr><td style="padding:8px 10px;font-size:12px;font-weight:600">Others</td>'
-    +'<td style="padding:4px 6px"><input class="field-input" id="qe-map-others" placeholder="NIL or notes" style="padding:4px 6px;font-size:12px"></td></tr>'
-    +'</tbody></table></div>'
-    + yesno('Session report enclosed', 'map-session-enclosed', 'yes')
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'
-    + field('Mapping Audiologist name', 'map-sig-aud', '', 'text')
-    + field('Scheme Coordinator name', 'map-sig-coord', '', 'text')
-    + field('Date', 'map-sig-date', today, 'date')
-    +'</div>'
-    +'</div>';
+  var caseStrip = infoStrip([
+    ['Name', nm], ['ID', cas.id], ['Age', cas.age||(cas.dob?'':'')],
+    ['Guardian', isDemo()?'***':cas.guardian], ['Address', addr],
+    ['Hospital', cas.hospital], ['Rehab Centre', cas.rehabCentre || (window.currentUser&&window.currentUser.unit)],
+    ['Surgery', cas.surgAdmit], ['Switch-on', soStr], ['Implant', cas.implantModel||cas.implantCompany],
+    ['Implant No.', cas.implantNumber], ['Processor', cas.speechProcessor]
+  ]);
 
-  var body =
-    sec('PATIENT PROFILE') + profile
-    + sec('POST IMPLANT REHABILITATION') + postImplant
-    + sec('QUARTER '+qLabel+' EVALUATION ('+qOrd+' Quarter — '+quarterNum*3+' months)') + evalTable
-    + sec('SIGNATURES') + sigFields
-    + '<div style="height:1px;background:#e5e7eb;margin:16px 0"></div>'
-    + '<div style="padding:10px 16px;background:#f5f3ff;border-top:2px solid #5a3580">'
-    + '<div style="font-size:12px;font-weight:700;color:#5a3580;margin-bottom:8px">APPENDIX C — QUARTERLY MAPPING REPORT</div>'
+  // ── Quarter selector ──────────────────────────────────────────────────────
+  var qSelector =
+    '<div style="padding:10px 16px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px">'
+    + '<span style="font-size:12px;font-weight:700;color:#374151">Quarter:</span>'
+    + qRomans.map(function(ql, i) {
+        var qn = i+1;
+        var sel = qn === quarterNum ? 'background:var(--blue);color:#fff' : 'background:#f1f5f9;color:#374151';
+        return '<div onclick="openQEScreen(selectedCase,' + qn + ')" '
+          + 'style="' + sel + ';padding:4px 10px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">' + ql + '</div>';
+      }).join('')
+    + '<span style="font-size:11px;color:#64748b;margin-left:4px">(' + qOrd + ' &mdash; ' + (quarterNum*3) + ' months)</span>'
+    + '</div>';
+
+  // ── FORM A: Rehabilitation Quarterly Update ───────────────────────────────
+  var formA =
+    '<div style="background:#fff;border:1px solid #e2e8f0;margin:12px;border-radius:8px;overflow:hidden">'
+    + '<div style="background:#1e3a5f;padding:10px 16px;text-align:center">'
+    + '<div style="color:#fff;font-size:14px;font-weight:700">Cochlear Implant Scheme, Karnataka</div>'
+    + '<div style="color:rgba(255,255,255,.8);font-size:12px;margin-top:2px">Rehabilitation Quarterly Update Form &mdash; Quarter ' + qLabel + '</div>'
     + '</div>'
-    + sec('MAPPING SESSION DETAILS') + mapForm
-    +'<div id="qe-error" style="display:none;margin:8px 16px;padding:10px 14px;background:var(--red-light);border-radius:8px;font-size:12px;color:var(--red)"></div>'
-    +'<div style="padding:12px 16px 48px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-    +'<button onclick="submitQEForm('+quarterNum+')" style="padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="qe-submit-btn">Save &amp; Submit &#8594;</button>'
-    +'<button onclick="exportQEPDF('+quarterNum+')" style="padding:14px;background:#374151;color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">&#128196; Export PDF</button>'
-    +'</div>';
 
+    + paperSec('Post Implant Rehabilitation')
+    + paperRow('AVT Start Date',       roPaper(soStr))
+    + paperRow('Mapping Start Date',   roPaper(soStr))
+    + paperRow('Processor Details',    inp('processor-detail', pv(cas.speechProcessor||saved.processorDetails), 'e.g. CP802'))
+    + paperRow('Warranty Card Issued', yesnoPaper('warranty', 'yes', saved.warrantyIssued))
+    + paperRow('Issues if any',        inp('intraop', pv(saved.intraopIssues), 'NIL or describe'))
+
+    + paperSec('Quarter ' + qLabel + ' Evaluation (' + qOrd + ' Quarter &mdash; ' + (quarterNum*3) + ' months)')
+    + '<div style="overflow-x:auto">'
+    + '<table style="width:100%;border-collapse:collapse;border-top:1px solid #e2e8f0">'
+    + '<thead><tr style="background:#e8f0fe">'
+    + '<th style="padding:7px 10px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;width:160px">Evaluation</th>'
+    + '<th style="padding:7px 6px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;width:150px">Scheduled / Completed</th>'
+    + '<th style="padding:7px 6px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left">Progress / Result</th>'
+    + '</tr></thead><tbody style="border-top:1px solid #e2e8f0">'
+    + evalTableRow('Aided Audiogram',         'aud-done',  'aud-result',  saved.audDateCompleted,  saved.audResult,  'e.g. Upper border of speech spectrum')
+    + evalTableRow('Speech Perception',       'spi-done',  'spi-result',  saved.spiDateCompleted,  saved.spiResult,  'e.g. 20/25 Open set')
+    + evalTableRow('MAIS Score (/40)',         'mais-done', 'mais',        saved.maisDateCompleted, saved.maisScore,  'e.g. 40/40')
+    + evalTableRow('Speech & Language (ACSLS)','lang-done', 'lang-result', saved.langDateCompleted, saved.langResult, 'e.g. RLA: 3.7-4.6 yrs, ELA: 2.7-2.9 yrs')
+    + '</tbody></table></div>'
+
+    + paperRow('Video session (3 min)',    yesnoPaper('video-taken', 'yes', saved.videoTaken))
+    + paperRow('Number of maps',          inp('num-maps', pv(saved.numMaps||'1'), '', 'number'))
+    + paperRow('Issues if any',           inp('issues', pv(saved.issues), 'NIL or describe'))
+    + paperRow('Remarks',                 inp('remarks', pv(saved.remarks), 'NIL'))
+    + paperRow('Daily attendance noted',  yesnoPaper('daily-att', 'yes', saved.dailyAttendance))
+    + paperRow('Monthly reports submitted', yesnoPaper('monthly-rep', 'yes', saved.monthlyReports))
+    + paperRow('AV Therapy Completed',    yesnoPaper('avt-complete', 'no', saved.avtCompleted))
+
+    + '<div style="background:#f8fafc;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr 1fr">'
+    + paperRow('Supervisor name', inp('supervisor',  pv(saved.supervisor),  'Full name'))
+    + paperRow('Audiologist name',inp('audiologist', pv(saved.audiologist), 'Full name'))
+    + paperRow('Date',            inp('sig-date',    pv(saved.evalDate||today), '', 'date'))
+    + '</div>'
+    + '</div>';
+
+  // ── FORM B: Quarterly Mapping Report (Appendix C) ─────────────────────────
+  // Patient info already shown in strip — not repeated here
+  var formB =
+    '<div style="background:#fff;border:1px solid #e2e8f0;margin:12px;border-radius:8px;overflow:hidden">'
+    + '<div style="background:#2d4a1e;padding:10px 16px;text-align:center">'
+    + '<div style="color:#fff;font-size:14px;font-weight:700">All India Institute of Speech and Hearing</div>'
+    + '<div style="color:rgba(255,255,255,.8);font-size:12px;margin-top:2px">Quarterly Mapping Report &mdash; Appendix C &mdash; Quarter ' + qLabel + '</div>'
+    + '</div>'
+    + '<div style="padding:8px 16px;background:#f0fdf4;border-bottom:1px solid #e2e8f0;font-size:11px;color:#374151">'
+    + '<strong>Surgery centre:</strong> ' + (cas.hospital||'\u2014') + ' &nbsp;&middot;&nbsp; '
+    + '<strong>Mapping centre:</strong> ' + (cas.rehabCentre||(window.currentUser&&window.currentUser.unit)||'\u2014') + ' &nbsp;&middot;&nbsp; '
+    + '<strong>Switch-on:</strong> ' + (soStr||'\u2014')
+    + '</div>'
+
+    + paperSec('Mapping Details')
+    + paperRow('Mapping session date(s)', inp('map-dates',      pv(saved.mapDates),      'e.g. 08.10.2025'))
+    + paperRow('Mapping Audiologist',     inp('map-audiologist', pv(saved.mapAudiologist||cas.doctor), 'Name'))
+    + paperRow('Sound field testing',     yesnoPaper('sft',    'yes', saved.soundField))
+    + paperRow('ECAP done',               yesnoPaper('ecap',   'no',  saved.ecapDone))
+    + paperRow('Magnetic coupling',       yesnoPaper('magnet', 'yes', saved.magnetComfort))
+    + paperRow('ENT referral required',   yesnoPaper('ent',    'no',  saved.entReferral))
+    + paperRow('Issues in mapping',       inp('map-issues',      pv(saved.mapIssues),     'NIL or describe'))
+    + paperRow('Use of processor',        inp('processor-use',   pv(saved.processorUse),  'e.g. Regular use'))
+    + paperRow('Status of sutures',       inp('sutures',         pv(saved.sutureStatus),  'e.g. Good'))
+    + paperRow('Skin under coil',         inp('skin',            pv(saved.skinStatus),    'e.g. Normal'))
+    + paperRow('Others',                  inp('map-others',      pv(saved.mapOthers),     'NIL'))
+    + paperRow('Session report enclosed', yesnoPaper('map-session-enclosed', 'yes', saved.sessionEnclosed))
+
+    + '<div style="background:#f8fafc;border-top:1px solid #e2e8f0;display:grid;grid-template-columns:1fr 1fr 1fr">'
+    + paperRow('Mapping Audiologist', inp('map-sig-aud',   pv(saved.mapAudiologist||cas.doctor), 'Full name'))
+    + paperRow('Scheme Coordinator',  inp('map-sig-coord', pv(saved.mapCoordinator), 'Full name'))
+    + paperRow('Date',                inp('map-sig-date',  pv(saved.mapDate||today), '', 'date'))
+    + '</div>'
+    + '</div>';
+
+  // ── Error + action buttons ─────────────────────────────────────────────────
+  var footer =
+    '<div id="qe-saved-note" style="display:none;margin:0 12px 8px;padding:8px 14px;background:#f0fdf4;'
+    + 'border-radius:8px;font-size:12px;color:#16a34a;border:1px solid #86efac">'  
+    + '&#10003; Draft saved — continue filling and tap Save &amp; Submit when ready</div>'
+    + '<div id="qe-error" style="display:none;margin:0 12px 8px;padding:10px 14px;background:#fef2f2;'
+    + 'border-radius:8px;font-size:12px;color:#dc2626;border:1px solid #fca5a5"></div>'
+    + '<div style="padding:8px 12px 48px;display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<button id="qe-submit-btn" style="padding:13px;background:var(--blue);color:#fff;border:none;'
+    + 'border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'
+    + 'Save &amp; Submit &#8594;</button>'
+    + '<button id="qe-draft-btn" style="padding:13px;background:#475569;color:#fff;border:none;'
+    + 'border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'
+    + '&#128190; Save Draft</button>'
+    + '<button id="qe-pdf-btn" style="padding:13px;background:#374151;color:#fff;border:none;'
+    + 'border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;grid-column:span 2">'
+    + '&#128196; Export PDF</button>'
+    + '</div>';
+
+  var body = caseStrip + qSelector + formA + formB + footer;
   document.getElementById('qe-body').innerHTML = body;
   window._qe_quarterNum = quarterNum;
+
+  // Wire buttons after render
+  document.getElementById('qe-submit-btn').addEventListener('click', function() { submitQEForm(quarterNum, false); });
+  document.getElementById('qe-draft-btn').addEventListener('click',  function() { submitQEForm(quarterNum, true);  });
+  document.getElementById('qe-pdf-btn').addEventListener('click', function() { exportQEPDF(quarterNum); });
+
   showScreen('quarterly-eval');
 }
 
-async function submitQEForm(quarterNum) {
+async function submitQEForm(quarterNum, isDraft) {
   if (isDemo()) { alert('Demo account — submissions disabled.'); return; }
   var cas = selectedCase;
   var btn = document.getElementById('qe-submit-btn');
@@ -2525,14 +2675,14 @@ async function submitQEForm(quarterNum) {
   var g = function(id) { var el=document.getElementById('qe-'+id); return el?el.value.trim():''; };
   var r = function(name) { var el=document.querySelector('input[name="qe-'+name+'"]:checked'); return el?el.value:''; };
 
-  // Validate required
-  if (!g('mais')) { errEl.textContent='MAIS score is required.'; errEl.style.display='block'; return; }
+  // Validate required (skip for draft)
+  if (!isDraft && !g('mais')) { errEl.textContent='MAIS score is required to submit. Save as Draft if not complete.'; errEl.style.display='block'; return; }
 
   btn.textContent = 'Saving\u2026'; btn.disabled = true;
 
   var qLabel = ['I','II','III','IV','V','VI','VII','VIII'][quarterNum-1]||String(quarterNum);
   var record = {
-    type: 'quarterly_evaluation',
+    type: isDraft ? 'quarterly_evaluation_draft' : 'quarterly_evaluation',
     quarter: quarterNum,
     quarterLabel: qLabel,
     caseId: String(cas.id),
@@ -2590,19 +2740,28 @@ async function submitQEForm(quarterNum) {
     await _add(_col(window._fbDb, 'evaluations'), record);
 
     // Mark this quarter as evaluated on the case
-    var caseUpdates = { _lastEvalDate: record.evalDate };
-    caseUpdates['_evalQ'+quarterNum] = { date: record.evalDate, mais: record.maisScore };
+    var caseUpdates = {};
+    caseUpdates._lastEvalDate = record.evalDate;
+    // Cache full record so form reloads with all data
+    caseUpdates['_evalQ'+quarterNum] = record;
+    caseUpdates._draftQ = isDraft ? quarterNum : null;
     if (record.avtCompleted === 'yes') caseUpdates.avtComplete = true;
 
     await _upd(_doc(window._fbDb, 'cases', String(cas.id)), caseUpdates);
     var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(cas.id); });
     if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
 
-    document.getElementById('success-msg').textContent = 'Q'+quarterNum+' evaluation saved for '+cas.name+' (MAIS: '+record.maisScore+'/40)';
-    document.getElementById('success-id').textContent = record.entryId;
-    document.getElementById('offline-note').style.display = 'none';
-    screenHistory = ['home'];
-    showScreen('success');
+    if (isDraft) {
+      var note = document.getElementById('qe-saved-note');
+      if (note) { note.style.display='block'; note.textContent='\u2713 Draft saved — continue filling and tap Save & Submit when ready'; }
+      btn.textContent = 'Save & Submit \u2192'; btn.disabled = false;
+    } else {
+      document.getElementById('success-msg').textContent = 'Q'+quarterNum+' evaluation saved for '+cas.name+' (MAIS: '+record.maisScore+'/40)';
+      document.getElementById('success-id').textContent = record.entryId;
+      document.getElementById('offline-note').style.display = 'none';
+      screenHistory = ['home'];
+      showScreen('success');
+    }
   } catch(e) {
     errEl.textContent = 'Error saving: '+e.message;
     errEl.style.display = 'block';

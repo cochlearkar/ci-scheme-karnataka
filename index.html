@@ -1340,7 +1340,7 @@ function buildJourneyInfographic(cas) {
   // ── Status ────────────────────────────────────────────────────────────────
   let stIcon = '', stTxt = '', stClr = '#9ca3af';
   if      (hasAVTDone)    { stIcon='✅'; stTxt='Complete';                        stClr=G;    }
-  else if (!hasRehabData) {              stTxt='AVT not yet started';             stClr='#9ca3af'; }
+  else if (!hasRehabData) {              stTxt='AVT not yet started';             stClr=R;    }
   else if (isBehind)      { stIcon='⚠️'; stTxt=Math.abs(sessDiff)+' behind';     stClr=R;    }
   else if (isAhead)       { stIcon='⬆️'; stTxt=sessDiff+' sessions ahead';       stClr=G;    }
   else                    { stIcon='✅'; stTxt='On track';                        stClr=G;    }
@@ -1408,7 +1408,7 @@ function buildJourneyInfographic(cas) {
   // flex:1 fills the space between the two fixed-width node columns.
   // We use padding-top to push the bar to BAR_T px from the top of the flex item,
   // which aligns its centre at DOT_CY — exactly matching the connector line.
-  const barBg = inAVT ? (hasAVTDone ? '#c6e8d9' : '#e5e7eb') : MUTED;
+  const barBg = inAVT ? (hasAVTDone ? '#c6e8d9' : (!hasRehabData ? '#fee2e2' : '#e5e7eb')) : MUTED;
 
   // Legend text: shown BELOW the bar in a small line
   const legendHTML = inAVT ? `
@@ -1455,10 +1455,14 @@ function buildJourneyInfographic(cas) {
 
   // ── Bottom message ────────────────────────────────────────────────────────
   let botMsg = '', botClr = G;
-  if      (hasAVTDone)   { botMsg = '\ud83c\udf89 AVT complete \u2014 programme finished'; }
-  else if (isRisk)       { botMsg = '\u26a0 At risk \u2014 needs follow-up'; botClr = R; }
-  else if (!hasSurg)     { botMsg = '\u2192 Enrolled \u2014 awaiting surgery'; }
-  else if (!hasSwitchOn) { botMsg = '\u2192 Surgery done \u2014 awaiting switch-on'; }
+  if      (hasAVTDone)        { botMsg = '\ud83c\udf89 AVT complete \u2014 programme finished';          botClr = G; }
+  else if (isRisk)            { botMsg = '\u26a0 At risk \u2014 needs follow-up';                         botClr = R; }
+  else if (!hasSurg)          { botMsg = '\u2192 Enrolled \u2014 awaiting surgery';                       botClr = '#64748b'; }
+  else if (!hasSwitchOn)      { botMsg = '\u2192 Surgery done \u2014 awaiting switch-on';                 botClr = '#64748b'; }
+  else if (!hasRehabData)     { botMsg = '\u26a0 Switched on \u2014 AVT not yet started';                 botClr = R; }
+  else if (isBehind)          { botMsg = '\u26a0 AVT ongoing \u2014 ' + Math.abs(sessDiff) + ' sessions behind expected'; botClr = R; }
+  else if (isAhead)           { botMsg = '\u2b06 AVT ongoing \u2014 ' + sessDiff + ' sessions ahead \u2014 excellent progress'; botClr = G; }
+  else                        { botMsg = '\u2714 AVT ongoing \u2014 on track';                            botClr = G; }
 
   return `<div style="padding:2px 0 6px">
     <div style="display:flex;align-items:stretch;padding-left:8px;padding-right:8px;position:relative">

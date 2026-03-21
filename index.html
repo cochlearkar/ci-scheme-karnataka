@@ -1323,13 +1323,11 @@ function buildJourneyInfographic(cas) {
       (new Date().getFullYear() - new Date(soStr).getFullYear()) * 12 +
       (new Date().getMonth()   - new Date(soStr).getMonth())
     );
-    monthsElapsed = Math.min(monthsElapsed, 24);
-    sessExpected = monthsElapsed <= 12
-      ? Math.min(Math.round(monthsElapsed * 8.67), 104)
-      : Math.min(104 + Math.round((monthsElapsed - 12) * 4.33), 156);
+    monthsElapsed = Math.min(monthsElapsed, 12);
+    sessExpected = Math.min(Math.round(monthsElapsed * 8.67), 104);
   }
-  const pctFill   = hasAVTDone ? 100 : Math.min(Math.round(sessNum / 156 * 100), 100);
-  const pctExpect = Math.min(Math.round(sessExpected / 156 * 100), 100);
+  const pctFill   = hasAVTDone ? 100 : Math.min(Math.round(sessNum / 104 * 100), 100);
+  const pctExpect = Math.min(Math.round(sessExpected / 104 * 100), 100);
   const sessDiff  = sessNum - sessExpected;
   const isBehind  = hasRehabData && !hasAVTDone && sessDiff < -5;
   const isAhead   = hasRehabData && !hasAVTDone && sessDiff >  5;
@@ -1396,7 +1394,7 @@ function buildJourneyInfographic(cas) {
     ? `<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
     : `<div style="width:${avtActive?7:6}px;height:${avtActive?7:6}px;border-radius:50%;background:${aClr}"></div>`;
   const aLClr = hasAVTDone ? '#065f46' : avtActive ? (isRisk?R:G) : '#9ca3af';
-  const aSub  = hasAVTDone ? '\u2713 Done' : (avtActive && monthsElapsed > 0 ? (24-monthsElapsed)+'mo left' : '\u00b7');
+  const aSub  = hasAVTDone ? '\u2713 Done' : (avtActive && monthsElapsed > 0 ? (12-monthsElapsed)+'mo left' : '\u00b7');
 
   const avtNodeHTML = `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:${nodeColW}px;padding-top:${ROW_PT}px;position:relative;z-index:3">
     <div style="width:${DOT}px;height:${DOT}px;border-radius:50%;background:${aBg};border:2.5px solid ${aClr};${aShd};display:flex;align-items:center;justify-content:center">${aIco}</div>
@@ -1411,25 +1409,28 @@ function buildJourneyInfographic(cas) {
   const barBg = inAVT ? (hasAVTDone ? '#c6e8d9' : (!hasRehabData ? '#fee2e2' : '#e5e7eb')) : MUTED;
 
   // Legend text: shown BELOW the bar in a small line
+  // Legend + status sit below the bar, indented 20px from left
+  // (compensates for the -13px bar margin + 7px breathing room from Switch-on node)
   const legendHTML = inAVT ? `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding:0 1px">
-      <div style="display:flex;align-items:center;gap:6px">
-        ${hasRehabData ? `<span style="font-size:8px;color:#374151;display:flex;align-items:center;gap:3px">
-          <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${barFill}"></span>
-          <strong>${sessNum}</strong> done
-        </span>` : ''}
-        ${showMark ? `<span style="font-size:8px;color:#374151;display:flex;align-items:center;gap:3px">
-          <span style="display:inline-block;width:2px;height:8px;background:${mrkColor};border-radius:1px"></span>
-          exp <strong>${sessExpected}</strong>
-        </span>` : ''}
-        <span style="font-size:8px;color:#9ca3af">/ 156</span>
+    <div style="padding-left:20px;padding-right:4px;margin-top:5px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          ${hasRehabData ? `<span style="font-size:8px;color:#374151;display:flex;align-items:center;gap:3px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${barFill}"></span>
+            <strong>${sessNum}</strong>&thinsp;/&thinsp;104
+          </span>` : ''}
+          ${showMark ? `<span style="font-size:8px;color:#6b7280;display:flex;align-items:center;gap:3px">
+            <span style="display:inline-block;width:2px;height:8px;background:${mrkColor};border-radius:1px"></span>
+            exp&thinsp;<strong style="color:${mrkColor}">${sessExpected}</strong>
+          </span>` : ''}
+        </div>
+        <span style="font-size:9px;font-weight:700;color:${barFill}">${pctFill}%</span>
       </div>
-      <span style="font-size:9px;font-weight:700;color:${barFill}">${pctFill}%</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
-      ${stIcon ? `<span style="font-size:10px">${stIcon}</span>` : ''}
-      <span style="font-size:9px;font-weight:600;color:${stClr}">${stTxt}</span>
-      ${hasSwitchOn ? `<span style="font-size:8px;color:#9ca3af;margin-left:auto">Mo ${monthsElapsed}/24</span>` : ''}
+      <div style="display:flex;align-items:center;gap:3px;margin-top:2px">
+        ${stIcon ? `<span style="font-size:10px;line-height:1">${stIcon}</span>` : ''}
+        <span style="font-size:9px;font-weight:600;color:${stClr}">${stTxt}</span>
+        <span style="font-size:8px;color:#9ca3af;margin-left:auto">Mo&thinsp;${monthsElapsed}/12</span>
+      </div>
     </div>` : '';
 
   const barHTML = `<div style="flex:1;min-width:0;padding-top:${BAR_T}px;position:relative;z-index:1;margin-left:-13px;margin-right:-13px;">
@@ -2052,8 +2053,7 @@ function _avtExpectedSessions(cas) {
   var soStr = cas.switchOn || cas.switchOnDate || '';
   if (!soStr || isNaN(new Date(soStr))) return 0;
   var mo = Math.max(0, Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000)));
-  if (mo <= 12) return Math.min(Math.round(mo * 8.67), 104);
-  return Math.min(104 + Math.round((mo-12)*4.33), 156);
+  return Math.min(Math.round(mo * 8.67), 104);
 }
 
 function _avtIsBacklog(c) {
@@ -2631,8 +2631,8 @@ function openQEScreen(cas, quarterNum) {
     }
   }
 
-  var qRomans   = ['I','II','III','IV','V','VI','VII','VIII'];
-  var qOrdinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th'];
+  var qRomans   = ['I','II','III','IV'];
+  var qOrdinals = ['1st','2nd','3rd','4th'];
   var qLabel    = qRomans[quarterNum-1]   || String(quarterNum);
   var qOrd      = qOrdinals[quarterNum-1] || quarterNum+'th';
 
@@ -2928,7 +2928,7 @@ async function submitQEForm(quarterNum, isDraft) {
 
   btn.textContent = 'Saving\u2026'; btn.disabled = true;
 
-  var qLabel = ['I','II','III','IV','V','VI','VII','VIII'][quarterNum-1]||String(quarterNum);
+  var qLabel = ['I','II','III','IV'][quarterNum-1]||String(quarterNum);
   var record = {
     type: isDraft ? 'quarterly_evaluation_draft' : 'quarterly_evaluation',
     quarter: quarterNum,
@@ -3032,7 +3032,7 @@ async function submitQEForm(quarterNum, isDraft) {
 function exportQEPDF(quarterNum) {
   var cas = selectedCase || {};
   var nm = isDemo() ? maskName(cas.name) : (cas.name||'Patient');
-  var qLabel = ['I','II','III','IV','V','VI','VII','VIII'][quarterNum-1]||String(quarterNum);
+  var qLabel = ['I','II','III','IV'][quarterNum-1]||String(quarterNum);
 
   // Use browser print on just the form body
   var content = document.getElementById('qe-body').innerHTML;
@@ -3130,10 +3130,9 @@ function buildHome() {
       var soStr = c.switchOn || c.switchOnDate || '';
       if (!soStr || isNaN(new Date(soStr))) return false;
       var moElapsed = Math.max(0, Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000)));
-      // Expected sessions: Year 1 = 2/week, Year 2 = 1/week, max 156
-      var expectedSessions = moElapsed <= 12
-        ? Math.min(moElapsed * 8.67, 104)   // ~8.67 sessions/month in Y1
-        : Math.min(104 + (moElapsed-12)*4.33, 156); // ~4.33/month in Y2
+      // Expected sessions: 2/week × 52 weeks = 104 over 12 months
+      var moElapsedCapped = Math.min(moElapsed, 12);
+      var expectedSessions = Math.min(Math.round(moElapsedCapped * 8.67), 104);
       var actual = _rehabSess(c) !== null ? _rehabSess(c) : 0;  // rehab app only
       // Backlog = logged less than 60% of expected (significantly behind)
       return expectedSessions > 10 && actual < expectedSessions * 0.6;
@@ -5352,180 +5351,12 @@ function buildSummaryHTML(c) {
     +row('Village / Taluk',[c.village,c.taluk].filter(Boolean).join(' · '))
     +row('District',c.district,true)+row('Residential District',c.resDistrict||c.resDist)
     +row('Pincode',c.pincode)+row('Zone',c.zone)+row('FY',c.fy)+row('Scheme',c.scheme)+'</div>'
-    +'<div class="form-section">'+sec('Hospital & Surgery','&#127973;')
-    +row('Hospital',c.hospital,true)+row('Hospital District',c.hospDist)
-    +row('Hospital Type',c.hospType)+row('Treating Doctor',c.doctor)
-    +row('Mentor Surgeon',c.mentorSurgeon)+row('Admission Date',fmtDate(c.surgAdmit))
-    +row('Surgery Date',fmtDate(c.surgDate))+row('Discharge Date',fmtDate(c.surgDisch))
-    +row('Surgery Date',fmtDate(c.surgAdmit),true)+row('Switch-on Date',fmtDate(c.switchOn),true)+row('AVT Start',fmtDate(c.switchOn))+row('SAST Ref No.',c.surgRefNo)
-    +row('Pre-auth Status',c.surgStatus)+row('Package',c.surgPkg)
-    +(c.surgNet?row('Surgery Net Paid','&#8377;'+Number(c.surgNet).toLocaleString('en-IN'),true):'')
-    +rowFull('Complications / Remarks',c.hospRemarks||c.remarks)+'</div>'
-    +((c.manufacturer||c.serialNo)?'<div class="form-section">'+sec('Device Details','&#129ear;')
-    +row('Manufacturer',c.manufacturer)+row('Model',c.model)
-    +row('Implanted Side',c.side)+row('Serial Number',c.serialNo)
-    +row('Recommended Rehab',c.rehabCentre)+'</div>':'')
-    +((c.r1RefNo||c.r1Admit||c.r1Status)?'<div class="form-section">'+sec('AVT Ongoing','&#127911;')
-    +row('Ref No.',c.r1RefNo)+row('Preauth Date',fmtDate(c.r1Admit))+row('Claim Status',c.r1Status)
-    +(c.r1Net?row('Net Paid','&#8377;'+Number(c.r1Net).toLocaleString('en-IN'),true):'')+'</div>':'')
-    +((c.r2RefNo||c.r2Admit||c.r2Status)?'<div class="form-section">'+sec('AVT Complete','&#127911;')
-    +row('Ref No.',c.r2RefNo)+row('Preauth Date',fmtDate(c.r2Admit))+row('Claim Status',c.r2Status)
-    +(c.r2Net?row('Net Paid','&#8377;'+Number(c.r2Net).toLocaleString('en-IN'),true):'')+'</div>':'')
-    +(_rehabSess(c)!==null?'<div class="form-section">'+sec('Rehab Sessions (App Data)','&#128202;')
-    +row('Sessions logged via app',_rehabSess(c)+' / 156')
-    +row('Expected by now',_avtExpectedSessions(c)+' / 156')
-    +row('Last rehab session',fmtDate(c._lastRehabDate))
-    +'</div>':'')
-    +'<div style="height:24px"></div></div>';
-}
-
-// ======== REHAB SESSION FORM ========
-
-function openRehabSession(cas) {
-  selectedCase = cas;
-  if (isDemo()) { demoBanner(); return; }
-
-  // Use rehab-app session count only — SAST seed data must not influence quarter
-  var sessFromApp = _rehabSess(cas);
-  var sessionsDone = sessFromApp !== null ? sessFromApp : 0;
-
-  // 156 sessions over 2 years: Year 1 = 104 (2/week), Year 2 = 52 (1/week)
-  // 8 quarters total: Y1-Q1..Q4 (26 each), Y2-Q1..Q4 (13 each)
-  var QTRS = [
-    {id:1, label:'Year 1 — Q1 (Month 1–3)',   year:1, spw:2, rows:26, start:1},
-    {id:2, label:'Year 1 — Q2 (Month 4–6)',   year:1, spw:2, rows:26, start:27},
-    {id:3, label:'Year 1 — Q3 (Month 7–9)',   year:1, spw:2, rows:26, start:53},
-    {id:4, label:'Year 1 — Q4 (Month 10–12)', year:1, spw:2, rows:26, start:79},
-    {id:5, label:'Year 2 — Q1 (Month 13–15)', year:2, spw:1, rows:13, start:105},
-    {id:6, label:'Year 2 — Q2 (Month 16–18)', year:2, spw:1, rows:13, start:118},
-    {id:7, label:'Year 2 — Q3 (Month 19–21)', year:2, spw:1, rows:13, start:131},
-    {id:8, label:'Year 2 — Q4 (Month 22–24)', year:2, spw:1, rows:13, start:144},
-  ];
-  // Auto-detect quarter using switch-on date if available, else sessions count
-  var curQtr = QTRS[0];
-  (function() {
-    var switchOnStr = cas.switchOn || cas.switchOnDate || '';
-    if (switchOnStr) {
-      // Parse switch-on date and compute months elapsed
-      var soDate = new Date(switchOnStr);
-      if (!isNaN(soDate)) {
-        var now = new Date();
-        var monthsElapsed = (now.getFullYear() - soDate.getFullYear()) * 12
-                          + (now.getMonth() - soDate.getMonth());
-        // Add partial-month credit: if we're past the 15th, count as next month
-        if (now.getDate() >= 15) monthsElapsed++;
-        monthsElapsed = Math.max(0, monthsElapsed);
-        // Map months to quarter
-        // Y1: M1-3=Q1, M4-6=Q2, M7-9=Q3, M10-12=Q4
-        // Y2: M13-15=Q5, M16-18=Q6, M19-21=Q7, M22-24=Q8
-        if      (monthsElapsed < 1)  curQtr = QTRS[0]; // before Q1 even starts
-        else if (monthsElapsed <= 3)  curQtr = QTRS[0]; // Month 1-3 → Y1Q1
-        else if (monthsElapsed <= 6)  curQtr = QTRS[1]; // Month 4-6 → Y1Q2
-        else if (monthsElapsed <= 9)  curQtr = QTRS[2]; // Month 7-9 → Y1Q3
-        else if (monthsElapsed <= 12) curQtr = QTRS[3]; // Month 10-12 → Y1Q4
-        else if (monthsElapsed <= 15) curQtr = QTRS[4]; // Month 13-15 → Y2Q1
-        else if (monthsElapsed <= 18) curQtr = QTRS[5]; // Month 16-18 → Y2Q2
-        else if (monthsElapsed <= 21) curQtr = QTRS[6]; // Month 19-21 → Y2Q3
-        else                          curQtr = QTRS[7]; // Month 22+ → Y2Q4
-        return; // date-based selection done
-      }
-    }
-    // Fallback: use sessions count
-    for (var qi = 0; qi < QTRS.length; qi++) {
-      if (sessionsDone >= QTRS[qi].start - 1) curQtr = QTRS[qi];
-    }
-  })();
-  var sessYear     = curQtr.year;
-  var sessPerWeek  = curQtr.spw;
-  var today        = new Date();
-  var todayStr     = today.toISOString().split('T')[0];
-  var monthName    = today.toLocaleString('en-IN', {month:'long', year:'numeric'});
-
-  document.getElementById('rs-title').textContent = cas.name || 'Weekly Session Log';
-  var switchOnInfo = '';
-  if (cas.switchOn || cas.switchOnDate) {
-    var soStr = cas.switchOn || cas.switchOnDate;
-    var soD = new Date(soStr);
-    if (!isNaN(soD)) {
-      var moEl = Math.max(0, (new Date().getFullYear()-soD.getFullYear())*12+(new Date().getMonth()-soD.getMonth()));
-      switchOnInfo = ' · Switch-on: ' + soStr.substring(0,10) + ' (' + moEl + ' mo)';
-    }
-  }
-  document.getElementById('rs-sub').textContent = (currentUser.unit||'') + '  ·  ' + monthName + switchOnInfo;
-
-  // ── Attendance flag banner ──────────────────────────────────
-  var flag = cas._attendanceFlag || '';
-  var consecAbs = cas._consecAbsent || 0;
-  var missedMo  = cas._missedThisMonth || 0;
-  var lastSess  = cas._lastRehabDate || cas.lastContact || '';
-  var daysSinceLast = lastSess ? Math.floor((Date.now()-new Date(lastSess))/86400000) : 999;
-
-  var alertHTML = '';
-  if (flag==='red' || daysSinceLast>14) {
-    alertHTML = '<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:10px 14px;margin:12px 16px 0;font-size:12px;font-weight:700;color:#991b1b">🔴 ATTENDANCE ALERT — '
-      +(consecAbs>=4?'4 consecutive absences':missedMo>=4?'4+ sessions missed this month':daysSinceLast>14?'No session in '+daysSinceLast+' days':'Low attendance')
-      +' — District Officer should be notified</div>';
-  } else if (flag==='yellow') {
-    alertHTML = '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;margin:12px 16px 0;font-size:12px;font-weight:700;color:#92400e">⚠️ 2 consecutive absences — please follow up with family</div>';
-  }
-
-  // ── Patient info strip ──────────────────────────────────────
-  var mob = cleanMob(cas.mobile);
-  var infoHTML =
-    '<div style="margin:12px 16px 0;background:#e8f5ee;border:1px solid #b7ddc8;border-radius:10px;padding:10px 12px">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:12px">'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Name</span><div style="color:#0a3d2e;font-weight:600">'+(cas.name||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">ID</span><div style="color:#0a3d2e;font-weight:600">'+(cas.id||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Parent</span><div style="color:#0a3d2e">'+(cas.guardian||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Mobile</span><div style="color:#0a3d2e">'+(mob?'<a href="tel:'+mob+'" style="color:#0a3d2e">'+mob+'</a>':'—')+'</div></div>'
-    +'<div style="grid-column:span 2"><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Address</span><div style="color:#0a3d2e">'+(cas.village||'')+(cas.taluk?' · '+cas.taluk:'')+(cas.district?' · '+cas.district:'')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Surgical hospital</span><div style="color:#0a3d2e">'+(cas.hospital||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Rehab centre</span><div style="color:#0a3d2e">'+(currentUser.unit||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Surgery date</span><div style="color:#0a3d2e">'+fmtDate(cas.surgAdmit)+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Switch-on</span><div style="color:#0a3d2e">'+fmtDate(cas.switchOn||cas.switchOnDate)+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">AVT start</span><div style="color:#0a3d2e">'+fmtDate(cas.switchOn||cas.switchOnDate)+'</div></div>'
-    +'</div></div>';
-
-  // ── Quarter selector — 8 quarters across 2 years ─────────────
-  // Explain why this quarter was auto-selected
-  var qtrBasis = '';
-  (function(){
-    var soStr = cas.switchOn || cas.switchOnDate || '';
-    if (soStr && !isNaN(new Date(soStr))) {
-      var soDate = new Date(soStr);
-      var mo = Math.max(0, (new Date().getFullYear()-soDate.getFullYear())*12+(new Date().getMonth()-soDate.getMonth()));
-      qtrBasis = '📅 Auto-selected from Switch-on date ' + soStr.substring(0,10) + ' (' + mo + ' months ago)';
-    } else {
-      qtrBasis = '📊 Auto-selected from session count (' + sessionsDone + ' sessions done)';
-    }
-  })();
-
-  var qtrHTML =
-    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'    +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">TICK ONE ONLY — Select quarter being submitted</div>'    +'<div style="font-size:10px;color:var(--blue);margin-bottom:8px">'+qtrBasis+'</div>'
-    // Year 1 label
-    +'<div style="font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;margin:4px 0 4px">Year 1 &mdash; 2 sessions per week (104 total)</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;margin-bottom:8px">'
-    +QTRS.filter(function(q){return q.year===1;}).map(function(q){
-      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface)">'
-        +'<input type="radio" name="rs-qtr" value="'+q.id+'" '+(curQtr.id===q.id?'checked ':'')+'style="accent-color:var(--green);width:14px;height:14px;flex-shrink:0" onchange="rsUpdateQtrMonth()"> '
-        +'<span><strong>Q'+q.id+'</strong> '+q.label.replace('Year 1 \u2014 ','')+'<br><span style="font-size:10px;color:var(--text-light)">Sessions '+q.start+'\u2013'+(q.start+q.rows-1)+'</span></span>'
-        +'</label>';
-    }).join('')
-    +'</div>'
-    // Year 2 label
-    +'<div style="font-size:10px;font-weight:600;color:var(--blue);text-transform:uppercase;margin:4px 0 4px">Year 2 &mdash; 1 session per week (52 total)</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 10px">'
-    +QTRS.filter(function(q){return q.year===2;}).map(function(q){
-      return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 8px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface)">'
-        +'<input type="radio" name="rs-qtr" value="'+q.id+'" '+(curQtr.id===q.id?'checked ':'')+'style="accent-color:var(--blue);width:14px;height:14px;flex-shrink:0" onchange="rsUpdateQtrMonth()"> '
-        +'<span><strong>Q'+(q.id-4)+'</strong> '+q.label.replace('Year 2 \u2014 ','')+'<br><span style="font-size:10px;color:var(--text-light)">Sessions '+q.start+'\u2013'+(q.start+q.rows-1)+'</span></span>'
-        +'</label>';
-    }).join('')
+    
     +'</div>'
     +'</div>';
 
   // ── Build table rows dynamically for selected quarter ────────
-  // Year 1: 26 rows (2/week x 13 weeks), Year 2: 13 rows (1/week x 13 weeks)
+  // All 4 quarters: 26 rows each (2/week x 13 weeks), 104 sessions total over 12 months
   function buildRsRows(qtr) {
     var rows = [];
     var rowCount = qtr.rows;  // 26 or 13
@@ -6169,11 +6000,10 @@ function openOutcomeAssessment(cas) {
     +'<div class="field"><div class="field-label">Assessment date <span class="req">*</span></div><input type="date" class="field-input has-value" id="oa-date" value="'+today+'"></div>'
     +'<div class="field"><div class="field-label">Assessment period <span class="req">*</span></div>'
     +'<select class="field-input" id="oa-period"><option value="">Select</option>'
-    +'<option>Baseline (3 months post switch-on)</option>'
+    +'<option>Baseline — 3 months post switch-on</option>'
     +'<option>6 months post switch-on</option>'
+    +'<option>9 months post switch-on</option>'
     +'<option>12 months post switch-on</option>'
-    +'<option>18 months post switch-on</option>'
-    +'<option>24 months post switch-on</option>'
     +'<option>Annual review</option>'
     +'</select></div></div>'
     +'<div class="field"><div class="field-label">Assessor</div>'
@@ -7386,9 +7216,11 @@ function buildAssessmentForm(today, cas, usesITMAIS) {
     +'<div class="field"><div class="field-label">Assessment date · ದಿನಾಂಕ <span class="req">*</span></div><input type="date" class="field-input has-value" id="oa-date" value="'+today+'"></div>'
     +'<div class="field"><div class="field-label">Period · ಅವಧಿ <span class="req">*</span></div>'
     +'<select class="field-input" id="oa-period"><option value="">Select</option>'
-    +'<option>Baseline (3 mo post switch-on)</option><option>6 months post switch-on</option>'
-    +'<option>12 months post switch-on</option><option>18 months post switch-on</option>'
-    +'<option>24 months post switch-on</option><option>Annual review</option>'
+    +'<option>Baseline — 3 months post switch-on</option>'
+    +'<option>6 months post switch-on</option>'
+    +'<option>9 months post switch-on</option>'
+    +'<option>12 months post switch-on</option>'
+    +'<option>Annual review</option>'
     +'</select></div></div>'
     +'<div class="field" style="margin-bottom:12px"><div class="field-label">Assessor · ಮೌಲ್ಯಮಾಪಕ</div>'
     +'<input class="field-input" id="oa-assessor" placeholder="Name / ಹೆಸರು" value="'+(window.currentUser?currentUser.username:'')+'"></div>'

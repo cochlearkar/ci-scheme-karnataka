@@ -1309,15 +1309,17 @@ function buildJourneyInfographic(cas) {
   const isRisk  = cas.risk;
 
   // How many stages are done (0-4)
-  const doneCount = [hasSurg, hasR1, hasR2, isDone].filter(Boolean).length;
+  const hasAVT = !!(cas.switchOn||cas.switchOnDate);
+  const hasAVTDone = !!(cas.avtComplete);
+  const doneCount = [hasSurg, hasAVT, hasAVTDone, isDone].filter(Boolean).length;
   // Total gaps = 4 (between 5 nodes)
   const fillPct = Math.round((doneCount / 4) * 100);
 
   const stages = [
     { label: 'Enrolled', date: cas.fy ? cas.fy.replace('-20','–') : '',            done: true,    },
     { label: 'Surgery',  date: cas.surgAdmit ? cas.surgAdmit.substring(0,6) : '',  done: hasSurg, },
-    { label: 'Rehab 1',  date: cas.r1Admit   ? cas.r1Admit.substring(0,6)   : '',  done: hasR1,   },
-    { label: 'Rehab 2',  date: cas.r2Admit   ? cas.r2Admit.substring(0,6)   : '',  done: hasR2,   },
+    { label: 'AVT Ongoing', date: cas.switchOn ? fmtDate(cas.switchOn).substring(0,5) : '', done: !!(cas.switchOn||cas.switchOnDate), },
+    { label: 'AVT Complete', date: cas.avtComplete ? '✓ Done' : '', done: !!(cas.avtComplete), },
     { label: 'Complete', date: isDone ? '✓ Done' : '',                              done: isDone,  },
   ];
 
@@ -1392,7 +1394,7 @@ function buildPatientCard(cas, role) {
   const mob = cleanMob(cas.mobile);
   const isHosp = role === 'hospital';
   const statusClass = cas.status==='paid'?'pill-paid':cas.status==='risk'?'pill-risk':'pill-pending';
-  const statusLabel = cas.status==='paid'?'✓ Complete':cas.status==='risk'?'⚠ At risk':cas.status==='rehab1'?'Rehab 1 due':cas.status==='rehab2'?'Rehab 2 due':'Active';
+  const statusLabel = cas.status==='paid'?'✓ Complete':cas.status==='risk'?'⚠ At risk':cas.status==='rehab1'||cas.status==='rehab2'?'AVT Ongoing':'Active';
 
   const c = (label, val, highlight=false) => {
     if (!val) return `<div class="pic-cell"><span class="info-label">${label}</span><span class="info-val" style="color:var(--text-light)">—</span></div>`;
@@ -1536,7 +1538,7 @@ function buildPatientCard(cas, role) {
       ${cas.surgNet ? c('Net Paid', '₹'+Number(cas.surgNet).toLocaleString('en-IN'), true) : ''}
 
       ${(cas.r1RefNo||cas.r1Admit) ? `
-      ${sec('Rehab Part 1 (2002GP)')}
+      ${sec('AVT Ongoing')}
       ${c('Ref No.', cas.r1RefNo)}
       ${c('Preauth Date', cas.r1Admit)}
       ${c('Claim Status', cas.r1Status)}
@@ -1544,7 +1546,7 @@ function buildPatientCard(cas, role) {
       ` : ''}
 
       ${(cas.r2RefNo||cas.r2Admit) ? `
-      ${sec('Rehab Part 2 (2003GP)')}
+      ${sec('AVT Complete')}
       ${c('Ref No.', cas.r2RefNo)}
       ${c('Preauth Date', cas.r2Admit)}
       ${c('Claim Status', cas.r2Status)}
@@ -1565,36 +1567,18 @@ function buildPatientCard(cas, role) {
 }
 
 
-
-// Format date as '05 March 2025'
 function fmtDate(d) {
-  if (!d) return '—';
-  var dt = new Date(d);
-  if (isNaN(dt.getTime())) return d; // return as-is if not parseable
-  return dt.toLocaleDateString('en-IN', { day:'2-digit', month:'long', year:'numeric' });
-}
-
-
-// Format date as '05 March 2025'
-function fmtDate(d) {
-  if (!d) return '';
-  var months = ['January','February','March','April','May','June',
-                'July','August','September','October','November','December'];
+  if (!d || d === 'Not recorded' || d === '—') return d || '';
   var dt;
-  // Handle DD-Mon-YYYY format (e.g. 12-Nov-2022)
-  if (typeof d === 'string' && d.match(/^\d{2}-[A-Za-z]{3}-\d{4}$/)) {
-    var parts = d.split('-');
-    var monIdx = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(parts[1]);
-    if (monIdx > -1) dt = new Date(parts[2], monIdx, parseInt(parts[0]));
-  }
-  // Handle YYYY-MM-DD format
-  if (!dt && typeof d === 'string' && d.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    var p = d.split('-');
-    dt = new Date(parseInt(p[0]), parseInt(p[1])-1, parseInt(p[2]));
-  }
-  if (!dt) dt = new Date(d);
-  if (isNaN(dt.getTime())) return d; // return original if can't parse
-  return String(dt.getDate()).padStart(2,'0') + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+  if (typeof d === 'string' && /^\d{2}-[A-Za-z]{3}-\d{4}$/.test(d)) {
+    var mo={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    var p=d.split('-'); dt=new Date(parseInt(p[2]),mo[p[1]],parseInt(p[0]));
+  } else if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)) {
+    var pts=d.substring(0,10).split('-');
+    dt=new Date(parseInt(pts[0]),parseInt(pts[1])-1,parseInt(pts[2]));
+  } else { dt=new Date(d); }
+  if (!dt||isNaN(dt.getTime())) return String(d);
+  return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
 }
 
 function cleanMob(m) {
@@ -1860,53 +1844,6 @@ function goBackToRoles() { showScreen('login'); }
 // Only counts explicit app submission — seed data surgery dates do NOT count
 function isHospitalUpdated(c) {
   return c.hospSubmitted === true;
-}
-
-
-// Format date as '05 March 2025'
-function fmtDate(d) {
-  if (!d) return '';
-  // Handle formats: DD-Mon-YYYY, YYYY-MM-DD, DD/MM/YYYY
-  var months = ['January','February','March','April','May','June',
-                'July','August','September','October','November','December'];
-  var dt;
-  // Try YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}/.test(d)) {
-    var parts = d.substring(0,10).split('-');
-    return parseInt(parts[2]) + ' ' + months[parseInt(parts[1])-1] + ' ' + parts[0];
-  }
-  // Try DD-Mon-YYYY (e.g. 12-Nov-2022)
-  if (/^\d{2}-[A-Za-z]{3}-\d{4}/.test(d)) {
-    var p = d.split('-');
-    var mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var mi = mo.indexOf(p[1]);
-    return parseInt(p[0]) + ' ' + (mi>-1?months[mi]:p[1]) + ' ' + p[2];
-  }
-  // Fallback - try native Date
-  try {
-    dt = new Date(d);
-    if (!isNaN(dt)) return dt.getDate() + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
-  } catch(e) {}
-  return d;
-}
-
-
-// Format date as '05 March 2025'
-function fmtDate(d) {
-  if (!d || d === 'Not recorded' || d === '—') return d || '';
-  var months = ['January','February','March','April','May','June',
-                'July','August','September','October','November','December'];
-  var dt;
-  // Handle DD-Mon-YYYY format e.g. "12-Nov-2022"
-  if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(d)) {
-    var parts = d.split('-');
-    var monMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    dt = new Date(parseInt(parts[2]), monMap[parts[1]], parseInt(parts[0]));
-  } else {
-    dt = new Date(d);
-  }
-  if (isNaN(dt.getTime())) return d;
-  return ('0'+dt.getDate()).slice(-2) + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
 }
 
 function filterCasesByUser(cases) {
@@ -2572,23 +2509,34 @@ function openQEScreen(cas, quarterNum) {
   var qOrdinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th'];
   var qLabel    = qRomans[quarterNum-1]   || String(quarterNum);
   var qOrd      = qOrdinals[quarterNum-1] || quarterNum+'th';
-  var dueDate   = soStr && !isNaN(new Date(soStr))
-    ? new Date(new Date(soStr).getTime() + quarterNum*91.31*24*3600*1000).toISOString().substring(0,10)
-    : today;
-  var saved = cas['_evalQ'+quarterNum] || {};
 
+  // Scheduled date = switchOn + quarterNum * 3 months
+  var schedDate = soStr && !isNaN(new Date(soStr))
+    ? (function(){
+        var d = new Date(soStr);
+        d.setMonth(d.getMonth() + quarterNum * 3);
+        return d.toISOString().substring(0,10);
+      })()
+    : today;
+  var schedDisplay = schedDate
+    ? schedDate.substring(8,10)+'/'+schedDate.substring(5,7)+'/'+schedDate.substring(0,4) : today;
+
+  var saved = cas['_evalQ'+quarterNum] || {};
   function pv(v) { return v || ''; }
 
   document.getElementById('qe-title').textContent = cas.name || 'Quarterly Evaluation';
   document.getElementById('qe-sub').textContent =
-    'Quarter ' + qLabel + ' \u00b7 ' + (quarterNum*3) + '-month \u00b7 Rehab Update + Mapping Report';
+    'Quarter ' + qLabel + ' \u00b7 ' + (quarterNum*3) + '-month \u00b7 Scheduled: ' + schedDisplay;
 
   // ── helpers ───────────────────────────────────────────────────────────────
+  function sec(title, icon) {
+    return '<div class="form-section-title" style="margin-top:4px">'+(icon||'')+' '+title+'</div>';
+  }
   function editRow(label, inputHtml) {
     return '<div style="display:flex;align-items:center;border-bottom:0.5px solid var(--border);padding:7px 0">'
-      + '<span style="font-size:11px;color:var(--text-light);flex-shrink:0;width:45%">' + label + '</span>'
-      + '<div style="flex:1;text-align:right">' + inputHtml + '</div>'
-      + '</div>';
+      +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;width:45%">'+label+'</span>'
+      +'<div style="flex:1;text-align:right">'+inputHtml+'</div>'
+      +'</div>';
   }
   function inp(id, val, ph, type) {
     type = type || 'text';
@@ -2605,17 +2553,11 @@ function openQEScreen(cas, quarterNum) {
       +'<input type="radio" name="qe-'+id+'" value="no"'+(cur!=='yes'?' checked':'')+'> No</label>'
       +'</span>';
   }
-  function sec(title, icon) {
-    return '<div class="form-section-title" style="margin-top:4px">'+(icon||'')+' '+title+'</div>';
-  }
-  function paperSec(title) {
-    return '<div style="background:#1e3a5f;padding:7px 16px;font-size:10px;font-weight:700;'
-      +'color:#fff;text-transform:uppercase;letter-spacing:.06em">' + title + '</div>';
-  }
 
-  // ── Patient card — compact 2-column grid ─────────────────────────────────
+  // ── Patient card — compact 2-col ──────────────────────────────────────────
   var nm  = isDemo() ? maskName(cas.name) : (cas.name||'\u2014');
   var mob = cleanMob(cas.mobile||'');
+  var addr = [cas.village,cas.taluk,cas.district].filter(Boolean).join(' \u00b7 ');
 
   function infoCell(label, value) {
     if (!value) return '';
@@ -2624,11 +2566,17 @@ function openQEScreen(cas, quarterNum) {
       +'<div style="font-size:12px;color:#111;font-weight:600;margin-top:1px">'+value+'</div>'
       +'</div>';
   }
-  function infoCell2(label, value) { // spans 2 columns
+  function infoCell2(label, value) {
     if (!value) return '';
     return '<div style="grid-column:span 2;padding:6px 10px;border-bottom:1px solid var(--border)">'
       +'<div style="font-size:9px;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;font-weight:600">'+label+'</div>'
       +'<div style="font-size:12px;color:#111;font-weight:600;margin-top:1px">'+value+'</div>'
+      +'</div>';
+  }
+  function infoEditCell2(label, inputHtml) {
+    return '<div style="grid-column:span 2;padding:6px 10px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:9px;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:2px">'+label+'</div>'
+      +inputHtml
       +'</div>';
   }
 
@@ -2636,11 +2584,10 @@ function openQEScreen(cas, quarterNum) {
     ? '<div style="grid-column:span 2;padding:6px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">'
       +'<div><div style="font-size:9px;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;font-weight:600">Mobile</div>'
       +'<div style="font-size:12px;color:#111;font-weight:600;margin-top:1px">'+mob+'</div></div>'
-      +'<a href="tel:'+mob+'" style="background:#22c55e;color:#fff;border-radius:8px;padding:6px 12px;'
-      +'text-decoration:none;font-size:12px;font-weight:700">\ud83d\udcde Call</a>'
+      +'<a href="tel:'+mob+'" style="background:#22c55e;color:#fff;border-radius:8px;padding:6px 12px;text-decoration:none;font-size:12px;font-weight:700">\ud83d\udcde Call</a>'
       +'</div>' : '';
 
-  var addr = [cas.village,cas.taluk,cas.district].filter(Boolean).join(' \u00b7 ');
+  var implantStr = [cas.implantCompany||cas.implantModel, cas.implantNumber].filter(Boolean).join(' / ');
 
   var patientCard =
     '<div style="margin:12px 16px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden">'
@@ -2650,17 +2597,38 @@ function openQEScreen(cas, quarterNum) {
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--border)">'
     + infoCell('Age / Gender', [cas.age,cas.gender].filter(Boolean).join(' / '))
-    + infoCell('Guardian', isDemo()?'***':cas.guardian)
+    + infoCell('Hearing Age', cas.hearingAge)
     + mobCell
+    + infoCell2('Guardian', isDemo()?'***':cas.guardian)
     + infoCell2('Address', isDemo()?'***':addr)
     + infoCell('Surgical Hospital', cas.hospital)
     + infoCell('Rehab Centre', cas.rehabCentre||(window.currentUser&&window.currentUser.unit))
-    + infoCell('Surgery Date', cas.surgAdmit)
-    + infoCell('Switch-on Date', soStr||'\u2014')
-    + infoCell('Implant Model', cas.implantModel||cas.implantCompany)
-    + infoCell('Implant No.', cas.implantNumber)
+    + infoCell('Surgery Date', fmtDate(cas.surgAdmit))
+    + infoCell('Switch-on Date', fmtDate(soStr||''))
+    + infoCell('AVT Start Date', fmtDate(soStr||''))
     + infoCell('Processor', cas.speechProcessor)
-    + infoCell('Hearing Age', cas.hearingAge)
+    + infoCell2('Implant (Co. / Model / Serial)', implantStr||(cas.implantModel||''))
+    // Parent guidance — editable Yes/No
+    + infoEditCell2('Parent Guidance Done',
+        '<span style="display:inline-flex;gap:14px">'
+        +'<label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px">'
+        +'<input type="radio" name="qe-parent-guidance" value="yes"'+(pv(saved.parentGuidance)==='yes'?' checked':'')+'> Yes</label>'
+        +'<label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px">'
+        +'<input type="radio" name="qe-parent-guidance" value="no"'+(pv(saved.parentGuidance)!=='yes'?' checked':'')+'> No</label>'
+        +'</span>')
+    // Intra-operative testing — editable
+    + infoEditCell2('Intra-operative Testing Issues',
+        '<span style="display:inline-flex;gap:14px;margin-bottom:4px">'
+        +'<label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px">'
+        +'<input type="radio" name="qe-intraop-yn" value="yes" id="qe-intraop-yes"'
+        +(pv(saved.intraopYN)==='yes'?' checked':'')+' onchange="document.getElementById(\'qe-intraop-detail\').style.display=\'block\'"> Yes, clarify</label>'
+        +'<label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px">'
+        +'<input type="radio" name="qe-intraop-yn" value="no"'
+        +(pv(saved.intraopYN)!=='yes'?' checked':'')+' onchange="document.getElementById(\'qe-intraop-detail\').style.display=\'none\'"> No</label>'
+        +'</span>'
+        +'<input id="qe-intraop-detail" value="'+pv(saved.intraopDetail)+'" placeholder="Describe issue..." '
+        +'style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;'
+        +'display:'+(pv(saved.intraopYN)==='yes'?'block':'none')+'">')
     +'</div></div>';
 
   // ── Quarter selector ──────────────────────────────────────────────────────
@@ -2677,8 +2645,58 @@ function openQEScreen(cas, quarterNum) {
           +'padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">'
           +ql+done+'</div>';
       }).join('')
-    +'<span style="font-size:10px;color:var(--text-light);margin-left:2px">'+qOrd+' \u2014 '+(quarterNum*3)+' months</span>'
+    +'<span style="font-size:10px;color:var(--text-light);margin-left:2px">'
+    +qOrd+' \u2014 '+(quarterNum*3)+' months \u00b7 Scheduled: '+schedDisplay+'</span>'
     +'</div>';
+
+  // ── Evaluation table row builder ──────────────────────────────────────────
+  function er(label, doneId, resultId, savedDone, savedResult, ph) {
+    return '<tr style="border-bottom:1px solid var(--border)">'
+      +'<td style="padding:7px 8px;font-size:11px;font-weight:600;color:#374151;background:#f8fafc;min-width:130px">'+label+'</td>'
+      +'<td style="padding:7px 8px;font-size:11px;color:#64748b;white-space:nowrap">'+schedDisplay+'</td>'
+      +'<td style="padding:4px 6px;white-space:nowrap">'
+      +'<input id="qe-'+doneId+'" type="date" value="'+pv(savedDone||today)+'" '
+      +'style="font-size:11px;border:none;background:transparent;color:#111;font-family:inherit;outline:none;padding:2px 0;width:110px">'
+      +'</td>'
+      +'<td style="padding:4px 8px">'
+      +'<input id="qe-'+resultId+'" value="'+pv(savedResult)+'" placeholder="'+ph+'" '
+      +'style="width:100%;border:none;background:transparent;font-size:12px;color:#111;font-family:inherit;outline:none;padding:2px 0">'
+      +'</td>'
+      +'</tr>';
+  }
+
+  function evalTableHeader() {
+    return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">'
+      +'<thead><tr style="background:#e8f0fe">'
+      +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;min-width:130px">Assessment</th>'
+      +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;white-space:nowrap;min-width:90px">Scheduled</th>'
+      +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;white-space:nowrap;min-width:110px">Evaluated</th>'
+      +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left">Result / Progress</th>'
+      +'</tr></thead><tbody>';
+  }
+
+  // ── ISD domain row — 4 small number fields ────────────────────────────────
+  function isdRow(label, domainKey) {
+    var sv = (saved.isd && saved.isd[domainKey]) || {};
+    function nf(id, val, ph) {
+      return '<input id="qe-isd-'+id+'" type="number" min="0" max="30" value="'+(val||'')+'" placeholder="'+ph+'" '
+        +'style="width:36px;border:1px solid var(--border);border-radius:4px;padding:3px 4px;font-size:12px;font-family:inherit;text-align:center">';
+    }
+    return '<tr style="border-bottom:1px solid var(--border)">'
+      +'<td style="padding:7px 8px;font-size:11px;font-weight:600;color:#374151;background:#f8fafc">'+label+'</td>'
+      +'<td colspan="3" style="padding:5px 8px">'
+      +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+      +'<span style="font-size:11px;color:#64748b;font-weight:600">From:</span>'
+      + nf(domainKey+'-fy', sv.fromY, 'Y') +'<span style="font-size:11px;color:#64748b">yr</span>'
+      + nf(domainKey+'-fm', sv.fromM, 'M') +'<span style="font-size:11px;color:#64748b">mo</span>'
+      +'<span style="font-size:16px;color:#9ca3af;margin:0 4px">\u2192</span>'
+      +'<span style="font-size:11px;color:#64748b;font-weight:600">To:</span>'
+      + nf(domainKey+'-ty', sv.toY, 'Y') +'<span style="font-size:11px;color:#64748b">yr</span>'
+      + nf(domainKey+'-tm', sv.toM, 'M') +'<span style="font-size:11px;color:#64748b">mo</span>'
+      +'</div>'
+      +'</td>'
+      +'</tr>';
+  }
 
   // ── FORM A ────────────────────────────────────────────────────────────────
   var formA =
@@ -2688,49 +2706,46 @@ function openQEScreen(cas, quarterNum) {
     +'<div style="color:rgba(255,255,255,.75);font-size:11px;margin-top:1px">'
     +'Rehabilitation Quarterly Update Form \u2014 Quarter '+qLabel+' ('+qOrd+' \u2014 '+(quarterNum*3)+' months)</div>'
     +'</div>'
+
+    // Post Implant Rehab info
     +'<div class="form-section" style="padding:0 16px">'
     + sec('\ud83c\udfe5 Post Implant Rehabilitation')
-    + editRow('AVT Start Date',           '<span style="font-size:13px;color:#374151">'+( soStr||'\u2014' )+'</span>')
-    + editRow('Mapping Start Date',       '<span style="font-size:13px;color:#374151">'+( soStr||'\u2014' )+'</span>')
+    + editRow('AVT Start Date', '<span style="font-size:13px;color:#374151">'+fmtDate(soStr||'')+'</span>')
+    + editRow('Mapping Start Date', '<span style="font-size:13px;color:#374151">'+fmtDate(soStr||'')+'</span>')
     + editRow('Speech Processor Details', inp('processor-detail', pv(cas.speechProcessor||saved.processorDetails), 'e.g. CP802'))
-    + editRow('Warranty Card Issued',     yesno('warranty','yes',saved.warrantyIssued))
-    + editRow('Intra-operative issues',   inp('intraop', pv(saved.intraopIssues), 'NIL or describe'))
+    + editRow('Warranty Card Issued', yesno('warranty','yes',saved.warrantyIssued))
     +'</div>'
 
-    // Evaluation table — 4 columns: Assessment | Scheduled | Evaluated | Result
+    // Section 1: Audiological Evaluation
     +'<div style="padding:0 16px">'
-    + sec('\ud83d\udcca Quarter '+qLabel+' Evaluation')
-    +'<div style="overflow-x:auto">'
+    + sec('\ud83e\udd7a 1. Audiological Evaluation')
+    + evalTableHeader()
+    + er('Aided Audiogram',   'aud-done','aud-result',  saved.audDateCompleted, saved.audResult,  'e.g. Upper border of speech spectrum')
+    + er('Speech Perception', 'spi-done','spi-result',  saved.spiDateCompleted, saved.spiResult,  'e.g. 20/25 Open set')
+    + er('MAIS (/40)',        'mais-done','mais',        saved.maisDateCompleted,saved.maisScore,  'e.g. 40/40')
+    +'</tbody></table></div>'
+    +'</div>'
+
+    // Section 2: Speech and Language Evaluation (ISD)
+    +'<div style="padding:0 16px">'
+    + sec('\ud83d\udde3\ufe0f 2. Speech and Language Evaluation')
+    + editRow('Evaluation date', inp('lang-done', pv(saved.langDateCompleted||today), '', 'date'))
+    +'<div style="overflow-x:auto;margin-top:2px">'
     +'<table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">'
     +'<thead><tr style="background:#e8f0fe">'
-    +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;min-width:120px">Assessment</th>'
-    +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;white-space:nowrap;min-width:90px">Scheduled</th>'
-    +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;white-space:nowrap;min-width:110px">Evaluated</th>'
-    +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left">Result / Progress</th>'
-    +'</tr></thead>'
-    +'<tbody>'
-    +(function(){
-      function er(label, doneId, resultId, savedDone, savedResult, ph) {
-        return '<tr style="border-bottom:1px solid var(--border)">'
-          +'<td style="padding:7px 8px;font-size:11px;font-weight:600;color:#374151;background:#f8fafc">'+label+'</td>'
-          +'<td style="padding:7px 8px;font-size:11px;color:#64748b;white-space:nowrap">'+dueDate+'</td>'
-          +'<td style="padding:4px 6px">'
-          +'<input id="qe-'+doneId+'" type="date" value="'+pv(savedDone||today)+'" '
-          +'style="font-size:11px;border:none;background:transparent;color:#111;font-family:inherit;outline:none;padding:2px 0;width:110px">'
-          +'</td>'
-          +'<td style="padding:4px 8px">'
-          +'<input id="qe-'+resultId+'" value="'+pv(savedResult)+'" placeholder="'+ph+'" '
-          +'style="width:100%;border:none;background:transparent;font-size:12px;color:#111;font-family:inherit;outline:none;padding:2px 0">'
-          +'</td>'
-          +'</tr>';
-      }
-      return er('Aided Audiogram',    'aud-done','aud-result',  saved.audDateCompleted, saved.audResult,  'e.g. Upper border of speech spectrum')
-           + er('Speech Perception',  'spi-done','spi-result',  saved.spiDateCompleted, saved.spiResult,  'e.g. 20/25 Open set')
-           + er('MAIS (/40)',         'mais-done','mais',        saved.maisDateCompleted,saved.maisScore,  'e.g. 40/40')
-           + er('Speech & Language',  'lang-done','lang-result', saved.langDateCompleted,saved.langResult, 'e.g. RLA: 3.7-4.6 yrs');
-    })()
-    +'</tbody></table></div></div>'
+    +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;min-width:160px">ISD Domain</th>'
+    +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left" colspan="3">Developmental Range (From \u2192 To)</th>'
+    +'</tr></thead><tbody>'
+    + isdRow('Listening',            'listen')
+    + isdRow('Receptive Language',   'recep')
+    + isdRow('Expressive Language',  'expres')
+    + isdRow('Speech',               'speech')
+    + isdRow('Cognition',            'cogn')
+    + isdRow('Social Communication', 'social')
+    +'</tbody></table></div>'
+    +'</div>'
 
+    // Closing fields
     +'<div class="form-section" style="padding:0 16px">'
     + editRow('Video session (3 min) taken',   yesno('video-taken','yes',saved.videoTaken))
     + editRow('Number of maps',                inp('num-maps', pv(saved.numMaps||'1'), '', 'number'))
@@ -2746,44 +2761,9 @@ function openQEScreen(cas, quarterNum) {
     + editRow('Audiologist', inp('audiologist', pv(saved.audiologist), 'Full name'))
     + editRow('Date',        inp('sig-date',    pv(saved.evalDate||today), '', 'date'))
     +'</div>'
-    +'</div>';
+    +'</div>'; // end formA
 
-  // ── FORM B ────────────────────────────────────────────────────────────────
-  var formB =
-    '<div style="margin:12px 16px;border:1px solid var(--border);border-radius:10px;overflow:hidden">'
-    +'<div style="background:#2d4a1e;padding:9px 14px;text-align:center">'
-    +'<div style="color:#fff;font-size:13px;font-weight:700">Quarterly Mapping Report \u2014 Appendix C</div>'
-    +'<div style="color:rgba(255,255,255,.75);font-size:11px;margin-top:1px">Quarter '+qLabel+' \u2014 '+(quarterNum*3)+' months</div>'
-    +'</div>'
-    +'<div style="background:#f0fdf4;padding:7px 14px;border-bottom:1px solid var(--border);'
-    +'font-size:11px;color:#374151;display:flex;gap:14px;flex-wrap:wrap">'
-    +'<span><strong>Surgery:</strong> '+(cas.hospital||'\u2014')+'</span>'
-    +'<span><strong>Mapping:</strong> '+(cas.rehabCentre||(window.currentUser&&window.currentUser.unit)||'\u2014')+'</span>'
-    +'<span><strong>Switch-on:</strong> '+(soStr||'\u2014')+'</span>'
-    +'</div>'
-    +'<div class="form-section" style="padding:0 16px">'
-    + editRow('Mapping session date(s)',  inp('map-dates',      pv(saved.mapDates),                   'e.g. 08.10.2025'))
-    + editRow('Mapping Audiologist',      inp('map-audiologist', pv(saved.mapAudiologist||cas.doctor), 'Full name'))
-    + editRow('Sound field testing',      yesno('sft',    'yes', saved.soundField))
-    + editRow('ECAP done',                yesno('ecap',   'no',  saved.ecapDone))
-    + editRow('Magnetic coupling OK',     yesno('magnet', 'yes', saved.magnetComfort))
-    + editRow('ENT referral required',    yesno('ent',    'no',  saved.entReferral))
-    + editRow('Issues in mapping',        inp('map-issues',    pv(saved.mapIssues),    'NIL or describe'))
-    + editRow('Use of processor',         inp('processor-use', pv(saved.processorUse), 'e.g. Regular use'))
-    + editRow('Status of sutures',        inp('sutures',       pv(saved.sutureStatus), 'e.g. Good'))
-    + editRow('Skin under coil',          inp('skin',          pv(saved.skinStatus),   'e.g. Normal'))
-    + editRow('Others',                   inp('map-others',    pv(saved.mapOthers),    'NIL'))
-    + editRow('Session report enclosed',  yesno('map-session-enclosed','yes',saved.sessionEnclosed))
-    +'</div>'
-    +'<div class="form-section" style="padding:0 16px">'
-    + sec('\u270f Signatures')
-    + editRow('Mapping Audiologist', inp('map-sig-aud',   pv(saved.mapAudiologist), 'Full name'))
-    + editRow('Scheme Coordinator',  inp('map-sig-coord', pv(saved.mapCoordinator), 'Full name'))
-    + editRow('Date',                inp('map-sig-date',  pv(saved.mapDate||today),  '', 'date'))
-    +'</div>'
-    +'</div>';
-
-  // ── Footer ────────────────────────────────────────────────────────────────
+  // ── Footer (no Form B — mapping is in AVT therapy report) ─────────────────
   var footer =
     '<div id="qe-error" style="display:none;margin:0 16px 8px;padding:10px 14px;background:#fef2f2;'
     +'border-radius:8px;font-size:12px;color:#dc2626;border:1px solid #fca5a5"></div>'
@@ -2795,7 +2775,7 @@ function openQEScreen(cas, quarterNum) {
     +'border-radius:var(--radius-sm);font-size:18px;cursor:pointer">\ud83d\udcc4</button>'
     +'</div>';
 
-  document.getElementById('qe-body').innerHTML = patientCard + qSelector + formA + formB + footer;
+  document.getElementById('qe-body').innerHTML = patientCard + qSelector + formA + footer;
   window._qe_quarterNum = quarterNum;
 
   document.getElementById('qe-submit-btn').addEventListener('click', function() { submitQEForm(quarterNum, false); });
@@ -2803,6 +2783,7 @@ function openQEScreen(cas, quarterNum) {
 
   showScreen('quarterly-eval');
 }
+
 
 
 
@@ -2845,7 +2826,18 @@ async function submitQEForm(quarterNum, isDraft) {
     spiResult: g('spi-result'),
     maisScore: g('mais'),
     langDateCompleted: g('lang-done'),
-    langResult: g('lang-result'),
+    langResult: '', // replaced by ISD domains
+    parentGuidance: r('parent-guidance'),
+    intraopYN: r('intraop-yn'),
+    intraopDetail: g('intraop-detail'),
+    isd: (function(){
+      var doms=['listen','recep','expres','speech','cogn','social'], out={};
+      doms.forEach(function(d){
+        function n(sfx){var el=document.getElementById('qe-isd-'+d+'-'+sfx);return el?parseInt(el.value)||0:0;}
+        out[d]={fromY:n('fy'),fromM:n('fm'),toY:n('ty'),toM:n('tm')};
+      });
+      return out;
+    })(),
     videoTaken: r('video-taken'),
     numMaps: g('num-maps'),
     issues: g('issues'),
@@ -3531,7 +3523,7 @@ function buildCaseList(filter = 'all') {
   } else {
     const chipOptions = currentRole === 'hospital'
     ? ['All','Needs update','Updated','AVT Alert']
-    : ['All','On track','At risk','AVT Alert','Rehab 1','Rehab 2','Completed'];
+    : ['All','On track','At risk','AVT Alert','AVT Ongoing','Completed'];
   filterRow.innerHTML = chipOptions.map(f =>
       `<div class="filter-chip ${f===activeStatusFilter?'active':''}" onclick="applyFilter('${f}',this)">${f}</div>`
     ).join('');
@@ -3603,10 +3595,8 @@ function applyAllFilters() {
     cases = cases.filter(c => c.risk);
   } else if (activeStatusFilter === 'Completed') {
     cases = cases.filter(c => c.status === 'paid');
-  } else if (activeStatusFilter === 'Rehab 1') {
-    cases = cases.filter(c => c.status === 'rehab1');
-  } else if (activeStatusFilter === 'Rehab 2') {
-    cases = cases.filter(c => c.status === 'rehab2');
+  } else if (activeStatusFilter === 'AVT Ongoing') {
+    cases = cases.filter(c => c.status === 'rehab1' || c.status === 'rehab2');
   } else if (activeStatusFilter === 'AVT Alert') {
     cases = cases.filter(c => c._attendanceFlag === 'red' || c._attendanceFlag === 'yellow');
   } else if (activeStatusFilter === 'AVT Red') {
@@ -3659,7 +3649,7 @@ function caseCardHTML(c) {
     }
   } else {
     pillClass = c.status==='paid'?'pill-paid':c.status==='risk'?'pill-risk':c.status==='rehab1'||c.status==='rehab2'?'pill-rehab':'pill-pending';
-    pillLabel = c.status==='paid'?'&#10003; Complete':c.status==='risk'?'&#9888; At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pending':'Active';
+    pillLabel = c.status==='paid'?'&#10003; Complete':c.status==='risk'?'&#9888; At risk':c.status==='rehab1'||c.status==='rehab2'?'AVT Ongoing':c.status==='pending'?'Pending':'Active';
     if (c._attendanceFlag === 'red')    cardBorder = 'border-left:4px solid var(--red);';
     if (c._attendanceFlag === 'yellow') cardBorder = 'border-left:4px solid var(--amber-mid);';
   }
@@ -4675,7 +4665,7 @@ function buildStateForm(cas) {
     </div>
 
     <div class="form-section">
-      <div class="form-section-title">🎧 Rehab Part 1 (2002GP)</div>
+      <div class="form-section-title">🎧 AVT Ongoing</div>
       <div class="field-row">
         <div class="field">
           <div class="field-label">Preauth submit date</div>
@@ -4709,7 +4699,7 @@ function buildStateForm(cas) {
     </div>
 
     <div class="form-section">
-      <div class="form-section-title">🎧 Rehab Part 2 (2003GP)</div>
+      <div class="form-section-title">🎧 AVT Complete</div>
       <div class="field-row">
         <div class="field">
           <div class="field-label">Preauth submit date</div>
@@ -5015,7 +5005,7 @@ function printReportCard() {
 function buildReportCardHTML(c) {
   const mob = cleanMob(c.mobile);
   const now = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  const statusLabel = c.status==='paid'?'✓ Complete':c.status==='risk'?'⚠ At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':'Pending';
+  const statusLabel = c.status==='paid'?'✓ Complete':c.status==='risk'?'⚠ At risk':c.status==='rehab1'||c.status==='rehab2'?'AVT Ongoing':'Pending';
   const statusColor = c.status==='paid'?'#065f46':c.status==='risk'?'#991b1b':'#1d4ed8';
 
   return `
@@ -5064,7 +5054,7 @@ function buildReportCardHTML(c) {
       <tr><td style="color:#666;font-size:11px">Net paid</td><td>${c.surgNet?'₹'+Number(c.surgNet).toLocaleString('en-IN'):'—'}</td></tr>
     </tbody></table>
 
-    <div class="section-head">🎧 Rehab Part 1 (2002GP)</div>
+    <div class="section-head">🎧 AVT Ongoing</div>
     <table><tbody>
       <tr><td style="width:40%;color:#666;font-size:11px">Ref No.</td><td>${c.r1RefNo||'—'}</td></tr>
       <tr><td style="color:#666;font-size:11px">Preauth approved</td><td>${c.r1Admit||'—'}</td></tr>
@@ -5072,7 +5062,7 @@ function buildReportCardHTML(c) {
       <tr><td style="color:#666;font-size:11px">Net paid</td><td>${c.r1Net?'₹'+Number(c.r1Net).toLocaleString('en-IN'):'—'}</td></tr>
     </tbody></table>
 
-    <div class="section-head">🎧 Rehab Part 2 (2003GP)</div>
+    <div class="section-head">🎧 AVT Complete</div>
     <table><tbody>
       <tr><td style="width:40%;color:#666;font-size:11px">Ref No.</td><td>${c.r2RefNo||'—'}</td></tr>
       <tr><td style="color:#666;font-size:11px">Preauth approved</td><td>${c.r2Admit||'—'}</td></tr>
@@ -5188,7 +5178,7 @@ async function saveSummaryMobile() {
 
 function buildSummaryHTML(c) {
   const mob = cleanMob(c.mobile);
-  const statusLabel = c.status==='paid'?'Complete':c.status==='risk'?'At risk':c.status==='rehab1'?'Rehab 1 due':c.status==='rehab2'?'Rehab 2 due':c.status==='pending'?'Pre-auth / Pending':'Active';
+  const statusLabel = c.status==='paid'?'Complete':c.status==='risk'?'At risk':c.status==='rehab1'||c.status==='rehab2'?'AVT Ongoing':c.status==='pending'?'Pre-auth / Pending':'Active';
   const statusColor = c.status==='paid'?'var(--green)':c.status==='risk'?'var(--red)':c.status==='pending'?'var(--amber)':'var(--blue)';
   const statusBg    = c.status==='paid'?'var(--green-light)':c.status==='risk'?'var(--red-light)':c.status==='pending'?'var(--amber-light)':'var(--blue-light)';
 
@@ -5240,7 +5230,7 @@ function buildSummaryHTML(c) {
     +row('Hospital Type',c.hospType)+row('Treating Doctor',c.doctor)
     +row('Mentor Surgeon',c.mentorSurgeon)+row('Admission Date',fmtDate(c.surgAdmit))
     +row('Surgery Date',fmtDate(c.surgDate))+row('Discharge Date',fmtDate(c.surgDisch))
-    +row('Switch-on Date',fmtDate(c.switchOn))+row('SAST Ref No.',c.surgRefNo)
+    +row('Surgery Date',fmtDate(c.surgAdmit),true)+row('Switch-on Date',fmtDate(c.switchOn),true)+row('AVT Start',fmtDate(c.switchOn))+row('SAST Ref No.',c.surgRefNo)
     +row('Pre-auth Status',c.surgStatus)+row('Package',c.surgPkg)
     +(c.surgNet?row('Surgery Net Paid','&#8377;'+Number(c.surgNet).toLocaleString('en-IN'),true):'')
     +rowFull('Complications / Remarks',c.hospRemarks||c.remarks)+'</div>'
@@ -5248,10 +5238,10 @@ function buildSummaryHTML(c) {
     +row('Manufacturer',c.manufacturer)+row('Model',c.model)
     +row('Implanted Side',c.side)+row('Serial Number',c.serialNo)
     +row('Recommended Rehab',c.rehabCentre)+'</div>':'')
-    +((c.r1RefNo||c.r1Admit||c.r1Status)?'<div class="form-section">'+sec('Rehab Part 1 (2002GP)','&#127911;')
+    +((c.r1RefNo||c.r1Admit||c.r1Status)?'<div class="form-section">'+sec('AVT Ongoing','&#127911;')
     +row('Ref No.',c.r1RefNo)+row('Preauth Date',fmtDate(c.r1Admit))+row('Claim Status',c.r1Status)
     +(c.r1Net?row('Net Paid','&#8377;'+Number(c.r1Net).toLocaleString('en-IN'),true):'')+'</div>':'')
-    +((c.r2RefNo||c.r2Admit||c.r2Status)?'<div class="form-section">'+sec('Rehab Part 2 (2003GP)','&#127911;')
+    +((c.r2RefNo||c.r2Admit||c.r2Status)?'<div class="form-section">'+sec('AVT Complete','&#127911;')
     +row('Ref No.',c.r2RefNo)+row('Preauth Date',fmtDate(c.r2Admit))+row('Claim Status',c.r2Status)
     +(c.r2Net?row('Net Paid','&#8377;'+Number(c.r2Net).toLocaleString('en-IN'),true):'')+'</div>':'')
     +(c.sessions>0?'<div class="form-section">'+sec('Rehab Sessions','&#128202;')
@@ -5360,6 +5350,9 @@ function openRehabSession(cas) {
     +'<div style="grid-column:span 2"><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Address</span><div style="color:#0a3d2e">'+(cas.village||'')+(cas.taluk?' · '+cas.taluk:'')+(cas.district?' · '+cas.district:'')+'</div></div>'
     +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Surgical hospital</span><div style="color:#0a3d2e">'+(cas.hospital||'—')+'</div></div>'
     +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Rehab centre</span><div style="color:#0a3d2e">'+(currentUser.unit||'—')+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Surgery date</span><div style="color:#0a3d2e">'+fmtDate(cas.surgAdmit)+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Switch-on</span><div style="color:#0a3d2e">'+fmtDate(cas.switchOn||cas.switchOnDate)+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">AVT start</span><div style="color:#0a3d2e">'+fmtDate(cas.switchOn||cas.switchOnDate)+'</div></div>'
     +'</div></div>';
 
   // ── Quarter selector — 8 quarters across 2 years ─────────────
@@ -5514,13 +5507,20 @@ function openRehabSession(cas) {
     +'<div class="field"><div class="field-label">Notes / observations</div>'
     +'<textarea class="field-input" id="rs-notes" rows="2" placeholder="Progress, parent feedback..."></textarea></div>'
     +'<div class="field"><div class="field-label">Issues to flag</div>'
-    +'<textarea class="field-input" id="rs-issues" rows="2" placeholder="Device, attendance, family..."></textarea></div>'
+    +'<div style="display:flex;flex-direction:column;gap:7px;margin-top:4px">'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="rs-issue-none" onchange="rsIssueNone(this)"> None</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="rs-issue-proc"> Use of Processor</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="rs-issue-suture"> Status of Sutures</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="rs-issue-skin"> Status of skin under the coil</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="rs-issue-other"> Others</label>'
+    +'<input class="field-input" id="rs-issues" placeholder="Details / notes on flagged issues" style="margin-top:2px">'
+    +'</div></div>'
     +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
     +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-submit-btn">Save Monthly Log \u2192</button>'
     +'</div>';
 
   var commonHTML =
-    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'    +'<div class="field" style="margin:0"><div class="field-label">Therapist name</div>'    +'<input class="field-input" id="rs-therapist" placeholder="Full name"></div>'    +'<div class="field" style="margin:0"><div class="field-label">Rehab stage</div>'    +'<div class="radio-group" id="rs-stage" style="flex-direction:row;gap:4px">'    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-stage\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>Part 1</div>'    +'<div class="radio-item" onclick="selectRadio(this,\'rs-stage\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>Part 2</div>'    +'</div></div>'    +'</div></div>';
+    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'    +'<div class="field" style="margin:0"><div class="field-label">Therapist name</div>'    +'<input class="field-input" id="rs-therapist" placeholder="Full name"></div>'    +'<div class="field" style="margin:0"><div class="field-label">Rehab stage</div>'    +'<div class="radio-group" id="rs-stage" style="flex-direction:row;gap:4px">'    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-stage\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>AVT Ongoing</div>'    +'<div class="radio-item" onclick="selectRadio(this,\'rs-stage\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>AVT Complete</div>'    +'</div></div>'    +'</div></div>';
 
   window._rs_sessStart   = sessStart;
   window._rs_slotCount   = rowCount;
@@ -5606,10 +5606,8 @@ function rsRowAtt(rowIdx, val) {
     var dot = document.getElementById('rs-'+act+'-'+rowIdx);
     if (!dot) return;
     if (isPresent) {
+      // Enable for manual selection — NO auto-tick
       dot.classList.remove('off');
-      if (dot.textContent === '\u2014' || dot.textContent === '') {
-        dot.classList.add('tick'); dot.textContent = '\u2713';
-      }
     } else {
       dot.classList.remove('tick','na'); dot.classList.add('off'); dot.textContent = '\u2014';
     }
@@ -5736,6 +5734,15 @@ function rsSelectAtt(sid, val) {
   if (acts) acts.style.display = (val==='P') ? 'block' : 'none';
 }
 
+function rsIssueNone(el) {
+  if (el.checked) {
+    ['rs-issue-proc','rs-issue-suture','rs-issue-skin','rs-issue-other'].forEach(function(id){
+      var cb=document.getElementById(id); if(cb) cb.checked=false;
+    });
+    var n=document.getElementById('rs-issues'); if(n) n.value='';
+  }
+}
+
 async function submitRehabSession() {
   if (isDemo()) { alert('\uD83D\uDD12 Demo account \u2014 submissions are disabled.'); return; }
   var errEl = document.getElementById('rs-error');
@@ -5851,7 +5858,12 @@ async function submitRehabSession() {
     entReferral:    entEl  ? entEl.textContent.trim()   : '',
     deviceStatus:   (document.getElementById('rs-devicestatus') ||{}).value     || '',
     notes:          (document.getElementById('rs-notes')        ||{}).value     || '',
-    issues:         (document.getElementById('rs-issues')       ||{}).value     || '',
+    issueNone:      !!(document.getElementById('rs-issue-none')  ||{}).checked,
+    issueProcessor: !!(document.getElementById('rs-issue-proc')  ||{}).checked,
+    issueSutures:   !!(document.getElementById('rs-issue-suture')||{}).checked,
+    issueSkin:      !!(document.getElementById('rs-issue-skin')  ||{}).checked,
+    issueOther:     !!(document.getElementById('rs-issue-other') ||{}).checked,
+    issues:         (document.getElementById('rs-issues')        ||{}).value   || '',
     timestamp:      now,
     entryId:        'RSQ-' + Date.now()
   };
@@ -5907,9 +5919,9 @@ async function submitRehabSession() {
 
   // Update claim/stage status from stage field
   var stageText = stage.textContent.trim();
-  if (stageText.indexOf('Part 1') > -1) {
-    if (newTotalSessions >= 104) caseUpdates.status = 'rehab2';
-  } else if (stageText.indexOf('Part 2') > -1) {
+  if (stageText.indexOf('AVT Complete') > -1) {
+    caseUpdates.avtComplete = true; caseUpdates.status = 'paid';
+  } else {
     // No auto-complete — hospital confirms payment
   }
 
@@ -6399,8 +6411,8 @@ function drRender(cases) {
   if (_drTab === 'status') {
     const pending  = cases.filter(c=>!c.surgAdmit&&!c.hospSubmitted).length;
     const surg     = cases.filter(c=>c.surgAdmit||c.hospSubmitted).length;
-    const rehab1   = cases.filter(c=>c.status==='rehab1').length;
-    const rehab2   = cases.filter(c=>c.status==='rehab2').length;
+    const rehab1   = cases.filter(c=>c.status==='rehab1'||c.status==='rehab2').length;
+    const rehab2   = 0;
     const paid     = cases.filter(c=>c.status==='paid').length;
     const risk     = cases.filter(c=>c.risk).length;
 
@@ -6416,8 +6428,8 @@ function drRender(cases) {
     const stages = [
       {label:'Pre-auth / Pending', n:pending, color:'var(--amber)'},
       {label:'Surgery Done',       n:surg,    color:'var(--blue-mid)'},
-      {label:'Rehab 1 (2002GP)',   n:rehab1,  color:'#7F77DD'},
-      {label:'Rehab 2 (2003GP)',   n:rehab2,  color:'#9F77DD'},
+      {label:'AVT Ongoing',   n:rehab1,  color:'#7F77DD'},
+      {label:'AVT Complete',   n:rehab2,  color:'#9F77DD'},
       {label:'Fully Completed',    n:paid,    color:'var(--green-mid)'},
     ];
     stages.forEach(s => {
@@ -7737,20 +7749,13 @@ function roCell(label, val) {
 function buildHospitalReadOnly(cas) {
   function fmtDate(d) {
     if (!d) return '—';
-    var months=['January','February','March','April','May','June',
-                'July','August','September','October','November','December'];
+    var dt;
     var s = String(d);
-    // dd-Mon-yyyy e.g. "12-Nov-2022"
     var m1 = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
-    if (m1) {
-      var mn={'jan':0,'feb':1,'mar':2,'apr':3,'may':4,'jun':5,'jul':6,'aug':7,'sep':8,'oct':9,'nov':10,'dec':11};
-      var mi = mn[m1[2].toLowerCase()];
-      return String(parseInt(m1[1])).padStart(2,'0')+' '+months[mi]+' '+m1[3];
-    }
-    // yyyy-mm-dd
-    var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m2) return String(parseInt(m2[3])).padStart(2,'0')+' '+months[parseInt(m2[2])-1]+' '+m2[1];
-    return d;
+    if (m1) { var mn={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11}; dt=new Date(parseInt(m1[3]),mn[m1[2].toLowerCase()],parseInt(m1[1])); }
+    else { var m2=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m2) dt=new Date(parseInt(m2[1]),parseInt(m2[2])-1,parseInt(m2[3])); else dt=new Date(d); }
+    if(!dt||isNaN(dt.getTime())) return s;
+    return ('0'+dt.getDate()).slice(-2)+'/'+('0'+(dt.getMonth()+1)).slice(-2)+'/'+dt.getFullYear();
   }
   var mob = cleanMob(cas.mobile||'');
 

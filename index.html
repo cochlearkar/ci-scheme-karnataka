@@ -1307,16 +1307,16 @@ function buildJourneyInfographic(cas) {
   const R     = '#dc2626';
   const MUTED = '#d1d5db';
 
-  // ── Data sources — strictly by login role ─────────────────────────────────
-  const hasSurg     = !!(cas.surgAdmit || cas.surgStatus);           // hospital
-  const hasSwitchOn = !!(cas.switchOn   || cas.switchOnDate);        // hospital
-  const soStr       = cas.switchOn || cas.switchOnDate || '';
-  const hasRehabData = (cas._rehabSessionsLogged !== undefined && cas._rehabSessionsLogged !== null);
-  const hasAVTDone   = !!(cas._avtCompleteFromRehab);                // rehab
+  // ── Data by role ──────────────────────────────────────────────────────────
+  const hasSurg      = !!(cas.surgAdmit || cas.surgStatus);
+  const hasSwitchOn  = !!(cas.switchOn || cas.switchOnDate);
+  const soStr        = cas.switchOn || cas.switchOnDate || '';
+  const hasRehabData = cas._rehabSessionsLogged !== undefined && cas._rehabSessionsLogged !== null;
+  const hasAVTDone   = !!(cas._avtCompleteFromRehab);
   const isRisk       = cas.risk;
 
-  // ── Session calculations ───────────────────────────────────────────────────
-  const sessNum  = hasRehabData ? (cas._rehabSessionsLogged || 0) : 0;
+  // ── Session calculations ──────────────────────────────────────────────────
+  const sessNum = hasRehabData ? (cas._rehabSessionsLogged || 0) : 0;
   let sessExpected = 0, monthsElapsed = 0;
   if (soStr && !isNaN(new Date(soStr))) {
     monthsElapsed = Math.max(0,
@@ -1328,144 +1328,131 @@ function buildJourneyInfographic(cas) {
       ? Math.min(Math.round(monthsElapsed * 8.67), 104)
       : Math.min(104 + Math.round((monthsElapsed - 12) * 4.33), 156);
   }
-  const pctActual = Math.min(Math.round(sessNum      / 156 * 100), 100);
-  const pctExpect = Math.min(Math.round(sessExpected / 156 * 100), 100);
-  const sessDiff  = sessNum - sessExpected;
-  const isBehind  = hasRehabData && sessDiff < -5;
-  const isAhead   = hasRehabData && sessDiff >  5;
+  const pctFill    = hasAVTDone ? 100 : Math.min(Math.round(sessNum / 156 * 100), 100);
+  const pctExpect  = Math.min(Math.round(sessExpected / 156 * 100), 100);
+  const sessDiff   = sessNum - sessExpected;
+  const isBehind   = hasRehabData && !hasAVTDone && sessDiff < -5;
+  const isAhead    = hasRehabData && !hasAVTDone && sessDiff >  5;
+  const barFill    = hasAVTDone ? G : isBehind ? R : G;
+  const mrkColor   = isBehind ? AMBER : '#94a3b8';
+  const showMarker = hasRehabData && !hasAVTDone && pctExpect > 0 && pctExpect < 100;
 
-  const barColor = hasAVTDone ? G : isBehind ? R : G;
-  const mrkColor = hasAVTDone ? G : isBehind ? AMBER : '#94a3b8';
-
-  // ── Pre-AVT milestone nodes (Enrolled → Surgery → Switch-on) ─────────────
+  // ── Pre-AVT milestone nodes ───────────────────────────────────────────────
   const milestones = [
-    { label: 'Enrolled',  sub: cas.fy ? cas.fy.replace('-20','\u201320') : '', done: true        },
-    { label: 'Surgery',   sub: hasSurg     ? fmtDate(cas.surgAdmit)      : '', done: hasSurg     },
-    { label: 'Switch-on', sub: hasSwitchOn ? fmtDate(soStr)              : '', done: hasSwitchOn },
+    { label:'Enrolled',  sub: cas.fy ? cas.fy.replace('-20','\u201320') : '', done: true        },
+    { label:'Surgery',   sub: hasSurg    ? fmtDate(cas.surgAdmit)       : '', done: hasSurg     },
+    { label:'Switch-on', sub: hasSwitchOn? fmtDate(soStr)               : '', done: hasSwitchOn },
   ];
-  const inAVTPhase = hasSwitchOn; // once switched on, we're in AVT phase
-  const activeM    = inAVTPhase ? -1 : milestones.findIndex((m, i) => i > 0 && !m.done);
+  const inAVT  = hasSwitchOn;
+  const activeM = inAVT ? -1 : milestones.findIndex((m,i) => i > 0 && !m.done);
+  const preGreenPct = hasSwitchOn ? 100 : hasSurg ? 50 : 0;
 
-  const mDotBg    = i => milestones[i].done ? G : '#fff';
-  const mDotClr   = i => milestones[i].done ? G : (i === activeM ? (isRisk?R:G) : MUTED);
-  const mDotShd   = i => (i === activeM && !inAVTPhase)
-    ? `box-shadow:0 0 0 4px ${isRisk?'rgba(220,38,38,.15)':'rgba(26,138,90,.18)'}` : '';
-  const mDotIcon  = i => milestones[i].done
+  const mDotBg  = i => milestones[i].done ? G : '#fff';
+  const mDotClr = i => milestones[i].done ? G : (i===activeM?(isRisk?R:G):MUTED);
+  const mShd    = i => (i===activeM&&!inAVT) ? `box-shadow:0 0 0 4px ${isRisk?'rgba(220,38,38,.15)':'rgba(26,138,90,.18)'}` : '';
+  const mIcon   = i => milestones[i].done
     ? `<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-    : `<div style="width:${i===activeM?'7':'6'}px;height:${i===activeM?'7':'6'}px;border-radius:50%;background:${mDotClr(i)}"></div>`;
-  const mLblClr   = i => milestones[i].done ? '#065f46' : (i===activeM ? (isRisk?R:G) : '#9ca3af');
+    : `<div style="width:${i===activeM?7:6}px;height:${i===activeM?7:6}px;border-radius:50%;background:${mDotClr(i)}"></div>`;
+  const mLbl    = i => milestones[i].done ? '#065f46' : (i===activeM?(isRisk?R:G):'#9ca3af');
 
-  const milestonesHTML = milestones.map((m, i) => `
-    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:56px;position:relative;z-index:2">
-      <div style="width:28px;height:28px;border-radius:50%;background:${mDotBg(i)};border:2.5px solid ${mDotClr(i)};${mDotShd(i)};display:flex;align-items:center;justify-content:center;transition:all .3s">
-        ${mDotIcon(i)}
+  const preNodesHTML = milestones.map((m,i) => `
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:54px;z-index:2;position:relative">
+      <div style="width:28px;height:28px;border-radius:50%;background:${mDotBg(i)};border:2.5px solid ${mDotClr(i)};${mShd(i)};display:flex;align-items:center;justify-content:center">
+        ${mIcon(i)}
       </div>
-      <div style="font-size:9px;font-weight:${i===activeM&&!inAVTPhase?'700':'600'};color:${mLblClr(i)};margin-top:5px;text-align:center;letter-spacing:.2px;text-transform:uppercase;line-height:1.3">${m.label}</div>
+      <div style="font-size:9px;font-weight:${i===activeM&&!inAVT?700:600};color:${mLbl(i)};margin-top:5px;text-align:center;text-transform:uppercase;letter-spacing:.2px;line-height:1.3">${m.label}</div>
       <div style="font-size:8px;color:#9ca3af;margin-top:1px;text-align:center;line-height:1.2">${m.sub||'\u00b7'}</div>
     </div>`).join('');
 
-  // ── AVT Complete node (right end) ─────────────────────────────────────────
-  const avtDotBg  = hasAVTDone ? G : '#fff';
-  const avtDotClr = hasAVTDone ? G : inAVTPhase ? (isRisk?R:G) : MUTED;
-  const avtDotShd = (inAVTPhase && !hasAVTDone) ? `box-shadow:0 0 0 4px ${isRisk?'rgba(220,38,38,.15)':'rgba(26,138,90,.18)'}` : '';
-  const avtDotIcn = hasAVTDone
+  // ── AVT Complete node ─────────────────────────────────────────────────────
+  const aDotBg  = hasAVTDone ? G : '#fff';
+  const aDotClr = hasAVTDone ? G : inAVT ? (isRisk?R:G) : MUTED;
+  const aShd    = inAVT && !hasAVTDone ? `box-shadow:0 0 0 4px ${isRisk?'rgba(220,38,38,.15)':'rgba(26,138,90,.18)'}` : '';
+  const aIcon   = hasAVTDone
     ? `<svg width="10" height="10" viewBox="0 0 10 10"><polyline points="1.5,5 4,7.5 8.5,2.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-    : `<div style="width:${inAVTPhase?'7':'6'}px;height:${inAVTPhase?'7':'6'}px;border-radius:50%;background:${avtDotClr}"></div>`;
-  const avtLblClr = hasAVTDone ? '#065f46' : inAVTPhase ? (isRisk?R:G) : '#9ca3af';
-  const avtSub    = hasAVTDone ? '\u2713 Done' : (inAVTPhase && monthsElapsed > 0 && !hasAVTDone ? (24-monthsElapsed)+'mo left' : '\u00b7');
+    : `<div style="width:${inAVT?7:6}px;height:${inAVT?7:6}px;border-radius:50%;background:${aDotClr}"></div>`;
+  const aLbl    = hasAVTDone ? '#065f46' : inAVT ? (isRisk?R:G) : '#9ca3af';
+  const aSub    = hasAVTDone ? '\u2713 Done' : (inAVT && monthsElapsed>0 ? (24-monthsElapsed)+'mo left' : '\u00b7');
 
   const avtNodeHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:56px;position:relative;z-index:2">
-      <div style="width:28px;height:28px;border-radius:50%;background:${avtDotBg};border:2.5px solid ${avtDotClr};${avtDotShd};display:flex;align-items:center;justify-content:center;transition:all .3s">
-        ${avtDotIcn}
+    <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:54px;z-index:2;position:relative">
+      <div style="width:28px;height:28px;border-radius:50%;background:${aDotBg};border:2.5px solid ${aDotClr};${aShd};display:flex;align-items:center;justify-content:center">
+        ${aIcon}
       </div>
-      <div style="font-size:9px;font-weight:${inAVTPhase&&!hasAVTDone?'700':'600'};color:${avtLblClr};margin-top:5px;text-align:center;letter-spacing:.2px;text-transform:uppercase;line-height:1.3">AVT Complete</div>
-      <div style="font-size:8px;color:#9ca3af;margin-top:1px;text-align:center;line-height:1.2">${avtSub}</div>
+      <div style="font-size:9px;font-weight:${inAVT&&!hasAVTDone?700:600};color:${aLbl};margin-top:5px;text-align:center;text-transform:uppercase;letter-spacing:.2px;line-height:1.3">AVT Complete</div>
+      <div style="font-size:8px;color:#9ca3af;margin-top:1px;text-align:center;line-height:1.2">${aSub}</div>
     </div>`;
 
-  // ── AVT progress bar section (fills the middle, connects nodes) ────────────
-  // The bar sits on a thick background track — this IS the connector line.
-  // Actual progress fills on top. Expected marker dots over it.
-  const trackColor  = inAVTPhase ? (hasAVTDone ? '#c6e8d9' : '#e2e8f0') : MUTED;
-  const pctFill     = hasAVTDone ? 100 : (hasRehabData ? pctActual : 0);
-  const showMarker  = hasRehabData && !hasAVTDone && pctExpect > 0 && pctExpect < 100;
-
-  // Status text inside or below the bar
-  let barStatusText = '', barStatusColor = '#6b7280';
-  if (hasAVTDone) {
-    barStatusText = '\u2713 Complete'; barStatusColor = G;
-  } else if (!hasRehabData) {
-    barStatusText = 'AVT not yet started'; barStatusColor = '#9ca3af';
-  } else if (isBehind) {
-    barStatusText = Math.abs(sessDiff)+' sessions behind'; barStatusColor = R;
-  } else if (isAhead) {
-    barStatusText = sessDiff+' sessions ahead'; barStatusColor = G;
-  } else {
-    barStatusText = 'On track'; barStatusColor = G;
-  }
+  // ── Progress bar — IS the connector between Switch-on and AVT Complete ─────
+  // The bar fills the full flex space. It sits at node-centre height (14px from
+  // top of the row). The bar itself IS the line — no separate connector drawn.
+  let statusTxt = '', statusClr = '#9ca3af';
+  if (hasAVTDone)         { statusTxt = '\u2713 Complete';                         statusClr = G;     }
+  else if (!hasRehabData) { statusTxt = 'AVT not yet started';                     statusClr = '#9ca3af'; }
+  else if (isBehind)      { statusTxt = Math.abs(sessDiff)+' sessions behind';     statusClr = R;     }
+  else if (isAhead)       { statusTxt = sessDiff+' sessions ahead';                statusClr = G;     }
+  else                    { statusTxt = 'On track';                                statusClr = G;     }
 
   const avtBarHTML = `
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;margin:0 1px;position:relative;z-index:1">
-      <!-- Month labels -->
-      <div style="display:flex;justify-content:space-between;height:12px;align-items:center">
-        ${hasSwitchOn ? `<span style="font-size:7.5px;color:#9ca3af">Mo ${monthsElapsed}/24</span>` : '<span></span>'}
-        ${hasRehabData && !hasAVTDone ? `<span style="font-size:7.5px;color:#9ca3af">${sessNum}/156</span>` : '<span></span>'}
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-start;min-width:0;z-index:1">
+      <!-- top labels -->
+      <div style="display:flex;justify-content:space-between;padding:0 2px;height:13px">
+        ${hasSwitchOn ? `<span style="font-size:7.5px;color:#9ca3af;line-height:13px">Mo ${monthsElapsed}/24</span>` : '<span></span>'}
+        ${hasRehabData&&!hasAVTDone ? `<span style="font-size:7.5px;color:#9ca3af;line-height:13px">${sessNum} done</span>` : '<span></span>'}
       </div>
 
-      <!-- Track + bar: 4px thick, full width, this IS the connector line -->
-      <div style="position:relative;height:8px;margin-top:4px">
-        <!-- Background track (connector line) -->
-        <div style="position:absolute;inset:0;border-radius:4px;background:${trackColor}"></div>
-        <!-- Actual progress fill -->
-        ${pctFill > 0 ? `<div style="position:absolute;left:0;top:0;bottom:0;width:${pctFill}%;background:${barColor};border-radius:4px;transition:width .5s ease"></div>` : ''}
-        <!-- Expected marker -->
-        ${showMarker ? `<div style="position:absolute;top:-3px;bottom:-3px;left:${pctExpect}%;width:2.5px;background:${mrkColor};border-radius:2px;z-index:3">
+      <!-- THE BAR — connects Switch-on to AVT Complete, no separate line -->
+      <div style="position:relative;height:8px;margin-top:5px;border-radius:4px;background:${MUTED};overflow:visible">
+        <!-- green fill: session progress from rehab data -->
+        ${pctFill > 0 ? `<div style="position:absolute;left:0;top:0;bottom:0;width:${pctFill}%;background:${barFill};border-radius:4px;transition:width .5s ease"></div>` : ''}
+        <!-- expected marker from switch-on date calculation -->
+        ${showMarker ? `<div style="position:absolute;top:-3px;bottom:-3px;left:${pctExpect}%;width:2.5px;background:${mrkColor};border-radius:1.5px;z-index:3">
           <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:${mrkColor};border:1.5px solid #fff"></div>
         </div>` : ''}
       </div>
 
-      <!-- Status text -->
-      <div style="font-size:8px;font-weight:600;color:${barStatusColor};text-align:center;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-        ${barStatusText}
-      </div>
-      <!-- Legend when rehab data exists -->
-      ${hasRehabData && !hasAVTDone ? `<div style="display:flex;justify-content:center;gap:6px;margin-top:1px">
-        <span style="font-size:7px;color:#6b7280;white-space:nowrap;display:flex;align-items:center;gap:2px"><span style="display:inline-block;width:6px;height:6px;border-radius:1px;background:${barColor}"></span>${sessNum} done</span>
-        ${showMarker ? `<span style="font-size:7px;color:#6b7280;white-space:nowrap;display:flex;align-items:center;gap:2px"><span style="display:inline-block;width:2px;height:6px;background:${mrkColor};border-radius:1px"></span>exp ${sessExpected}</span>` : ''}
+      <!-- status text -->
+      <div style="font-size:8px;font-weight:600;color:${statusClr};text-align:center;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${statusTxt}</div>
+
+      <!-- mini legend when rehab data exists -->
+      ${hasRehabData&&!hasAVTDone ? `<div style="display:flex;justify-content:center;gap:8px;margin-top:1px">
+        <span style="font-size:7px;color:#6b7280;display:flex;align-items:center;gap:2px">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:1px;background:${barFill}"></span>${sessNum}/156
+        </span>
+        ${showMarker?`<span style="font-size:7px;color:#6b7280;display:flex;align-items:center;gap:2px">
+          <span style="display:inline-block;width:2px;height:6px;background:${mrkColor};border-radius:1px"></span>exp ${sessExpected}
+        </span>`:''}
       </div>` : ''}
     </div>`;
 
-  // ── Pre-AVT connector line (behind first 3 nodes) ─────────────────────────
-  // Green fills up to last done node; grey beyond
-  const preGreen = hasSwitchOn ? 100 : hasSurg ? 50 : 0;
+  // ── Pre-AVT connector (3px line behind first 3 nodes only) ────────────────
+  // Uses absolute positioning behind the pre-node section (3×54px = 162px wide)
+  // Green fills up to last completed node.
 
-  // ── Status line below ──────────────────────────────────────────────────────
-  let statusMsg = '', statusColor = G;
-  if (hasAVTDone) {
-    statusMsg = '\ud83c\udf89 AVT complete \u2014 programme finished';
-  } else if (isRisk) {
-    statusMsg = '\u26a0 At risk \u2014 needs follow-up'; statusColor = R;
-  } else if (!hasSurg) {
-    statusMsg = '\u2192 Enrolled \u2014 awaiting surgery';
-  } else if (!hasSwitchOn) {
-    statusMsg = '\u2192 Surgery done \u2014 awaiting switch-on';
-  }
-  // In AVT phase: bar handles the messaging — no redundant status line needed
+  // ── Status line ───────────────────────────────────────────────────────────
+  let botMsg = '', botClr = G;
+  if      (hasAVTDone)      { botMsg = '\ud83c\udf89 AVT complete \u2014 programme finished'; }
+  else if (isRisk)          { botMsg = '\u26a0 At risk \u2014 needs follow-up'; botClr = R; }
+  else if (!hasSurg)        { botMsg = '\u2192 Enrolled \u2014 awaiting surgery'; }
+  else if (!hasSwitchOn)    { botMsg = '\u2192 Surgery done \u2014 awaiting switch-on'; }
+  // In AVT phase the bar communicates — no redundant text needed
 
-  return `<div style="padding:2px 0 6px">
+  return `<div style="padding:2px 0 4px">
     <div style="display:flex;align-items:flex-start;padding:10px 8px 0;position:relative">
 
-      <!-- Connector line behind first 3 nodes — sits at node centre height (14px from top) -->
-      <div style="position:absolute;top:23px;left:calc(8px + 28px);right:calc(8px + 28px + 56px + 1px);height:3px;background:${MUTED};border-radius:1.5px;z-index:0"></div>
-      <div style="position:absolute;top:23px;left:calc(8px + 28px);width:calc((100% - 16px - 112px - 56px) * ${preGreen/100});height:3px;background:${G};border-radius:1.5px;z-index:1;transition:width .4s"></div>
+      <!-- 3px connector line behind the 3 pre-AVT nodes only -->
+      <!-- spans from centre of node[0] to centre of node[2]: roughly 8px+14px to 8px+108px+14px -->
+      <div style="position:absolute;top:23px;left:calc(8px + 27px);width:calc(108px - 0px);height:3px;background:${MUTED};border-radius:1.5px;z-index:0"></div>
+      <div style="position:absolute;top:23px;left:calc(8px + 27px);width:calc((108px) * ${preGreenPct/100});height:3px;background:${G};border-radius:1.5px;z-index:1;transition:width .4s"></div>
 
-      ${milestonesHTML}
+      ${preNodesHTML}
       ${avtBarHTML}
       ${avtNodeHTML}
     </div>
-    ${statusMsg ? `<div style="font-size:11px;font-weight:600;color:${statusColor};padding:4px 8px 0;display:flex;align-items:center;gap:5px">${statusMsg}</div>` : ''}
+    ${botMsg ? `<div style="font-size:11px;font-weight:600;color:${botClr};padding:4px 8px 0;display:flex;align-items:center;gap:5px">${botMsg}</div>` : ''}
   </div>`;
 }
+
 
 
 

@@ -1302,29 +1302,23 @@ let _stateHospFilter = null;
 function buildJourneyInfographic(cas) {
   if (!cas) return '';
 
-  const hasSurg = !!(cas.surgAdmit || cas.surgStatus);
-  const hasAVT  = !!(cas.switchOn  || cas.switchOnDate);
-  const isRisk  = cas.risk;
+  // ── What we know from SAST / hospital data ────────────────────────────────
+  const hasSurg    = !!(cas.surgAdmit || cas.surgStatus);
+  const hasSwitchOn = !!(cas.switchOn || cas.switchOnDate);  // hospital fact only
 
-  // ── STRICT: AVT Complete only from rehab-app data ────────────────────────
-  // _avtCompleteFromRehab is written ONLY by submitRehabSession / submitQEForm
-  // cas.status === 'paid' reflects SAST claim payment — NOT clinical completion
-  // We never use cas.status or cas.avtComplete alone to mark the journey done
-  const hasAVTDone = !!(cas._avtCompleteFromRehab);
+  // ── What we know ONLY from rehab-app submissions ──────────────────────────
+  // _rehabSessionsLogged  → written only by submitRehabSession()
+  // _avtCompleteFromRehab → written only by submitRehabSession() / submitQEForm()
+  // These are NEVER set by SAST import or cases.js seed data.
+  const hasRehabStarted = (cas._rehabSessionsLogged !== undefined && cas._rehabSessionsLogged !== null);
+  const hasAVTDone      = !!(cas._avtCompleteFromRehab);
+  const isDone          = hasAVTDone;
+  const isRisk          = cas.risk;
 
-  // Programme complete = AVT done AND payment settled (both must be true)
-  // But the journey infographic shows CLINICAL progress only
-  // so isDone here means AVT done from rehab app perspective
-  const isDone = hasAVTDone;
-
-  // ── Sessions: rehab-app data only ────────────────────────────────────────
-  const sessActual = (cas._rehabSessionsLogged !== undefined && cas._rehabSessionsLogged !== null)
-                     ? (cas._rehabSessionsLogged || 0)
-                     : null;
-
-  const soStr = cas.switchOn || cas.switchOnDate || '';
-  let sessExpected = 0;
-  let monthsElapsed = 0;
+  // ── Session progress (rehab app only) ─────────────────────────────────────
+  const sessActual = hasRehabStarted ? (cas._rehabSessionsLogged || 0) : null;
+  const soStr      = cas.switchOn || cas.switchOnDate || '';
+  let sessExpected = 0, monthsElapsed = 0;
   if (soStr && !isNaN(new Date(soStr))) {
     monthsElapsed = Math.max(0,
       (new Date().getFullYear() - new Date(soStr).getFullYear()) * 12 +
@@ -1335,7 +1329,6 @@ function buildJourneyInfographic(cas) {
       ? Math.min(Math.round(monthsElapsed * 8.67), 104)
       : Math.min(104 + Math.round((monthsElapsed - 12) * 4.33), 156);
   }
-
   const sessActualNum = sessActual !== null ? sessActual : 0;
   const sessDiff      = sessActualNum - sessExpected;
   const isBehind      = sessDiff < -5;
@@ -1344,17 +1337,19 @@ function buildJourneyInfographic(cas) {
   const pctExpected   = Math.min(Math.round(sessExpected  / 156 * 100), 100);
 
   // ── Stage definitions ─────────────────────────────────────────────────────
+  // CRITICAL: "AVT Ongoing" is only marked done when rehab has started
+  //           "AVT Complete" is only marked done when _avtCompleteFromRehab is set
+  // Switch-on date from hospital is shown as info but does NOT tick any stage
   const stages = [
-    { label: 'Enrolled',     sub: cas.fy ? cas.fy.replace('-20','\u201320') : '',  done: true        },
-    { label: 'Surgery',      sub: hasSurg    ? fmtDate(cas.surgAdmit)       : '',  done: hasSurg     },
-    { label: 'Switch-on',    sub: hasAVT     ? fmtDate(soStr)               : '',  done: hasAVT      },
-    { label: 'AVT Ongoing',  sub: (hasAVT && !hasAVTDone) ? monthsElapsed + '/24 mo' : '', done: hasAVT },
-    { label: 'AVT Complete', sub: hasAVTDone  ? '\u2713 Done'               : '',  done: hasAVTDone  },
+    { label: 'Enrolled',     sub: cas.fy ? cas.fy.replace('-20','\u201320') : '',                           done: true            },
+    { label: 'Surgery',      sub: hasSurg     ? fmtDate(cas.surgAdmit)           : '',                     done: hasSurg         },
+    { label: 'Switch-on',    sub: hasSwitchOn ? fmtDate(soStr)                   : '',                     done: hasSwitchOn     },
+    { label: 'AVT Ongoing',  sub: hasRehabStarted ? (hasAVTDone ? '\u2713' : monthsElapsed+'/24 mo') : (hasSwitchOn ? 'Not started' : ''), done: hasRehabStarted },
+    { label: 'AVT Complete', sub: hasAVTDone  ? '\u2713 Done' : (hasRehabStarted && monthsElapsed <= 24 ? (24-monthsElapsed)+'mo left' : ''), done: hasAVTDone },
   ];
 
-  // activeIdx = first stage not yet done
   const activeIdx   = isDone ? 4 : stages.findIndex((s, i) => i > 0 && !s.done);
-  const activeIsAVT = activeIdx === 3;
+  const activeIsAVT = activeIdx === 3;  // AVT Ongoing is the active stage
 
   const G     = '#1a8a5a';
   const AMBER = '#d97706';
@@ -1383,38 +1378,33 @@ function buildJourneyInfographic(cas) {
     </div>
   `).join('');
 
-  // Track fill based on clinical stages done (not payment status)
-  const stagesDone = [hasSurg, hasAVT, hasAVTDone, isDone].filter(Boolean).length;
+  const stagesDone = [hasSurg, hasSwitchOn, hasRehabStarted, hasAVTDone].filter(Boolean).length;
   const fillPct    = Math.round(stagesDone / 4 * 100);
 
   // ── AVT progress panel ─────────────────────────────────────────────────────
   let avtPanel = '';
-  if (activeIsAVT && hasAVT) {
-    if (sessActual === null) {
+  if (activeIsAVT && hasSwitchOn) {
+    if (!hasRehabStarted) {
+      // Switch-on done, rehab not yet started through app
       avtPanel = `<div style="margin:8px 10px 4px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 12px">
         <div style="font-size:11px;font-weight:700;color:#92400e;">\u23f3 Awaiting first rehab session log</div>
         <div style="font-size:10px;color:#78350f;margin-top:3px;">Session progress will appear here once the rehab centre submits their first monthly log through the app.</div>
-        <div style="font-size:10px;color:#92400e;margin-top:4px;">Month ${monthsElapsed} of 24 \u00b7 Switch-on: ${fmtDate(soStr)}</div>
+        <div style="font-size:10px;color:#92400e;margin-top:4px;">Switch-on: <strong>${fmtDate(soStr)}</strong> \u00b7 Month ${monthsElapsed} of 24</div>
       </div>`;
     } else {
       const barColor      = isBehind ? R : G;
       const expectedColor = isBehind ? AMBER : '#94a3b8';
-
       let statusLine, statusIcon, statusColor2;
       if (isBehind) {
-        statusLine   = Math.abs(sessDiff) + ' sessions behind expected \u2014 consider intervention';
-        statusIcon   = '\u26a0\ufe0f';
-        statusColor2 = R;
+        statusLine = Math.abs(sessDiff) + ' sessions behind expected \u2014 consider intervention';
+        statusIcon = '\u26a0\ufe0f'; statusColor2 = R;
       } else if (isAheadPlus) {
-        statusLine   = sessDiff + ' sessions ahead \u2014 excellent progress';
-        statusIcon   = '\u2b06\ufe0f';
-        statusColor2 = G;
+        statusLine = sessDiff + ' sessions ahead \u2014 excellent progress';
+        statusIcon = '\u2b06\ufe0f'; statusColor2 = G;
       } else {
-        statusLine   = 'On track \u2014 progressing as expected';
-        statusIcon   = '\u2714\ufe0f';
-        statusColor2 = G;
+        statusLine = 'On track \u2014 progressing as expected';
+        statusIcon = '\u2714\ufe0f'; statusColor2 = G;
       }
-
       avtPanel = `<div style="margin:8px 10px 4px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-size:10px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">AVT Progress \u2014 Rehab App Data</span>
@@ -1431,12 +1421,10 @@ function buildJourneyInfographic(cas) {
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#374151">
-              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${barColor}"></span>
-              Done: <strong>${sessActualNum}</strong>
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${barColor}"></span>Done: <strong>${sessActualNum}</strong>
             </span>
             <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#374151">
-              <span style="display:inline-block;width:2.5px;height:10px;background:${expectedColor};border-radius:1px"></span>
-              Expected: <strong style="color:${expectedColor}">${sessExpected}</strong>
+              <span style="display:inline-block;width:2.5px;height:10px;background:${expectedColor};border-radius:1px"></span>Expected: <strong style="color:${expectedColor}">${sessExpected}</strong>
             </span>
             <span style="font-size:10px;color:#9ca3af">/ 156 total</span>
           </div>
@@ -1449,11 +1437,17 @@ function buildJourneyInfographic(cas) {
     }
   }
 
-  // Status line (only when not in AVT Ongoing — panel handles that case)
-  const statusMsg   = isDone   ? '\u2713 AVT complete \u2014 programme finished'
-                    : isRisk   ? '\u26a0 At risk \u2014 needs follow-up'
-                    : activeIsAVT ? ''
-                    : `Currently at: ${stages[activeIdx] ? stages[activeIdx].label : ''}`;
+  // ── Status line ────────────────────────────────────────────────────────────
+  const statusMsgMap = {
+    'Surgery':      'Awaiting surgery',
+    'Switch-on':    'Surgery done \u2014 awaiting switch-on',
+    'AVT Complete': 'AVT in progress \u2014 rehab sessions ongoing',
+  };
+  var _activeLabel = stages[activeIdx] ? stages[activeIdx].label : '';
+  const statusMsg = isDone     ? '\u2713 AVT complete \u2014 programme finished'
+                  : isRisk     ? '\u26a0 At risk \u2014 needs follow-up'
+                  : activeIsAVT ? ''
+                  : (statusMsgMap[_activeLabel] || ('Stage: ' + _activeLabel));
   const statusColor = isDone ? '#065f46' : isRisk ? R : G;
 
   return `<div style="padding:2px 0 6px">
@@ -1468,6 +1462,7 @@ function buildJourneyInfographic(cas) {
     </div>` : ''}
   </div>`;
 }
+
 
 
 

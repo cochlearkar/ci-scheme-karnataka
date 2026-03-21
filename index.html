@@ -2010,6 +2010,24 @@ function openDistrictAVTCallList() {
 // ══════════════════════════════════════════════════════════════════════════════
 // REHAB — AVT LOG SCREEN (overlaid fullscreen, shows backlog vs current split)
 // ══════════════════════════════════════════════════════════════════════════════
+
+// Returns session count from rehab app submissions only.
+// Returns null if no rehab app data has ever been submitted for this case.
+// This ensures SAST-seeded 'sessions' field never pollutes AVT progress display.
+function _rehabSess(c) {
+  if (!c) return null;
+  if (c._rehabSessionsLogged !== undefined && c._rehabSessionsLogged !== null) {
+    return c._rehabSessionsLogged;
+  }
+  return null; // no rehab app data yet
+}
+
+// Returns session count for display — rehab app first, SAST as fallback label only
+function _displaySess(c) {
+  var r = _rehabSess(c);
+  return r !== null ? r : (c.sessions || 0);
+}
+
 function _avtExpectedSessions(cas) {
   var soStr = cas.switchOn || cas.switchOnDate || '';
   if (!soStr || isNaN(new Date(soStr))) return 0;
@@ -2020,7 +2038,8 @@ function _avtExpectedSessions(cas) {
 
 function _avtIsBacklog(c) {
   var exp = _avtExpectedSessions(c);
-  return exp > 10 && (c.sessions||0) < exp * 0.6;
+  var actual = _rehabSess(c);  // null = no app data = behind
+  return exp > 10 && (actual === null ? true : actual < exp * 0.6);
 }
 
 function _avtDaysPending(c) {
@@ -2053,7 +2072,7 @@ function openAVTLog() {
     var vill   = isDemo() ? '***' : (c.village  || '');
     var days   = _avtDaysPending(c);
     var exp    = _avtExpectedSessions(c);
-    var actual = c.sessions || 0;
+    var actual = _rehabSess(c) !== null ? _rehabSess(c) : 0;  // rehab app only
     var pct    = exp > 0 ? Math.round(actual / exp * 100) : 0;
     var isBack = _avtIsBacklog(c);
 
@@ -2483,7 +2502,7 @@ function openAVTEvalList() {
       +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">District:</span> '+(isDemo()?'***':(c.district||'\u2014'))+'</div>'
       +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Switch-on:</span> '+(soStr||'\u2014')+'</div>'
       +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Due:</span> '+dueDate+'</div>'
-      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Sessions:</span> '+(c.sessions||0)+'</div>'
+      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Sessions (app):</span> '+(_rehabSess(c)!==null?String(_rehabSess(c)):"\u2014")+'</div>'
       +'</div>'
       +'</div>'
       +'<div style="font-size:20px;color:#d1d5db">\u203a</div>'
@@ -3095,7 +3114,7 @@ function buildHome() {
       var expectedSessions = moElapsed <= 12
         ? Math.min(moElapsed * 8.67, 104)   // ~8.67 sessions/month in Y1
         : Math.min(104 + (moElapsed-12)*4.33, 156); // ~4.33/month in Y2
-      var actual = c.sessions || 0;
+      var actual = _rehabSess(c) !== null ? _rehabSess(c) : 0;  // rehab app only
       // Backlog = logged less than 60% of expected (significantly behind)
       return expectedSessions > 10 && actual < expectedSessions * 0.6;
     });
@@ -3542,7 +3561,8 @@ function buildStateUpdateSummary(cases) {
     const r = c.rehabCentre;
     if (!rehabMap[r]) rehabMap[r] = { total:0, sessions:0, cases:[] };
     rehabMap[r].total++;
-    rehabMap[r].sessions += (c.sessions || 0);
+    // Use rehab-app data only — SAST seed must not inflate counts
+    rehabMap[r].sessions += (_rehabSess(c) !== null ? _rehabSess(c) : 0);
     rehabMap[r].cases.push(c);
   });
 
@@ -3553,7 +3573,7 @@ function buildStateUpdateSummary(cases) {
     Object.entries(rehabMap)
       .sort((a,b) => b[1].total - a[1].total)
       .forEach(([centre, data]) => {
-        const active = data.cases.filter(c => c.sessions > 0).length;
+        const active = data.cases.filter(c => _rehabSess(c) !== null && _rehabSess(c) > 0).length;
         const notStarted = data.total - active;
         html += `<div style="padding:10px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px">
           <div style="flex:1;min-width:0">
@@ -4062,7 +4082,7 @@ function buildRehabForm(cas) {
   const warnHTML = cas && cas.risk ? `<div class="warn-banner"><span>⚠</span> This case is flagged at-risk. Last contact: ${cas.lastContact||'not recorded'}.</div>` : '';
 
   // Determine current quarter (1-4) from sessions done
-  const sessionsDone = cas ? (cas.sessions || 0) : 0;
+  const sessionsDone = cas ? (_rehabSess(cas) !== null ? _rehabSess(cas) : 0) : 0;  // rehab app only
   const qtr = sessionsDone < 26 ? 'I' : sessionsDone < 52 ? 'II' : sessionsDone < 78 ? 'III' : 'IV';
   const qtrNum = sessionsDone < 26 ? 1 : sessionsDone < 52 ? 2 : sessionsDone < 78 ? 3 : 4;
   const monthLabels = ['','Month 1–3','Month 4–6','Month 7–9','Month 10–12'];
@@ -5331,9 +5351,11 @@ function buildSummaryHTML(c) {
     +((c.r2RefNo||c.r2Admit||c.r2Status)?'<div class="form-section">'+sec('AVT Complete','&#127911;')
     +row('Ref No.',c.r2RefNo)+row('Preauth Date',fmtDate(c.r2Admit))+row('Claim Status',c.r2Status)
     +(c.r2Net?row('Net Paid','&#8377;'+Number(c.r2Net).toLocaleString('en-IN'),true):'')+'</div>':'')
-    +(c.sessions>0?'<div class="form-section">'+sec('Rehab Sessions','&#128202;')
-    +row('Sessions Completed',c.sessions+' / '+(c.totalSessions||54))
-    +row('Last Contact',c.lastContact)+'</div>':'')
+    +(_rehabSess(c)!==null?'<div class="form-section">'+sec('Rehab Sessions (App Data)','&#128202;')
+    +row('Sessions logged via app',_rehabSess(c)+' / 156')
+    +row('Expected by now',_avtExpectedSessions(c)+' / 156')
+    +row('Last rehab session',fmtDate(c._lastRehabDate))
+    +'</div>':'')
     +'<div style="height:24px"></div></div>';
 }
 
@@ -5343,7 +5365,9 @@ function openRehabSession(cas) {
   selectedCase = cas;
   if (isDemo()) { demoBanner(); return; }
 
-  var sessionsDone = cas.sessions || 0;
+  // Use rehab-app session count only — SAST seed data must not influence quarter
+  var sessFromApp = _rehabSess(cas);
+  var sessionsDone = sessFromApp !== null ? sessFromApp : 0;
 
   // 156 sessions over 2 years: Year 1 = 104 (2/week), Year 2 = 52 (1/week)
   // 8 quarters total: Y1-Q1..Q4 (26 each), Y2-Q1..Q4 (13 each)
@@ -6574,8 +6598,9 @@ function drRender(cases) {
       const r = c.rehabCentre||'Not assigned';
       if(!rMap[r]) rMap[r]={total:0,sessions:0,active:0};
       rMap[r].total++;
-      rMap[r].sessions += (c.sessions||0);
-      if((c.sessions||0)>0) rMap[r].active++;
+      var rSess = _rehabSess(c);
+      rMap[r].sessions += (rSess !== null ? rSess : 0);
+      if(rSess !== null && rSess > 0) rMap[r].active++;
     });
     const entries = Object.entries(rMap).sort((a,b)=>b[1].total-a[1].total);
     html += sectionHead('Rehab centre distribution', entries.length);

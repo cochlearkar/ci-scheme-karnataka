@@ -3119,7 +3119,7 @@ function buildHome() {
     const pending = allMyCases.filter(c => !isHospitalUpdated(c)).length;
     const updated = allMyCases.filter(c =>  isHospitalUpdated(c)).length;
     if (pending > 0) {
-      html += `<div class="action-card primary" onclick="buildCaseList('hosp-pending');showScreen('cases')" style="background:var(--red);border-color:var(--red)"><div class="action-icon">🔴</div><div><div class="action-title">${pending} case${pending!==1?'s':''} need your update</div><div class="action-desc">Surgery &amp; device details not yet submitted</div></div><div class="action-arrow">→</div></div>`;
+      html += `<div class="action-card primary" onclick="openHospCasesOverlay('pending')" style="background:var(--red);border-color:var(--red)"><div class="action-icon">🔴</div><div><div class="action-title">${pending} case${pending!==1?'s':''} need your update</div><div class="action-desc">Surgery &amp; device details not yet submitted</div></div><div class="action-arrow">→</div></div>`;
     }
 
     if (avtRed.length > 0) {
@@ -3234,7 +3234,6 @@ function buildHome() {
         <div class="action-arrow" style="color:#fff">→</div>
       </div>`;
     }
-    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse all cases</div><div class="action-desc">All assigned cases</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'district') {
@@ -3870,6 +3869,20 @@ function openHospCasesOverlay(mode) {
 
   // ── Header config per mode ────────────────────────────────────────────────
   var cfg = {
+    pending: {
+      color:    roleColour,
+      icon:     '🔴',
+      title:    roleLabel + ' — Cases Needing Update',
+      sub:      allCases.filter(function(c){return !isHospitalUpdated(c);}).length + ' pending · ' + allCases.filter(function(c){return isHospitalUpdated(c);}).length + ' updated',
+      stats: [
+        { n: allCases.filter(function(c){return !isHospitalUpdated(c);}).length, label: 'Pending Update', bg:'#fee2e2', clr:'#dc2626', bdr:'#fca5a5' },
+        { n: allCases.filter(function(c){return  isHospitalUpdated(c);}).length, label: 'Updated ✓',      bg:'#dcfce7', clr:'#16a34a', bdr:'#86efac' },
+      ],
+      note: '🔴 Surgery & device details not yet submitted to the programme',
+      noteClr: '#dc2626', noteBg: '#fff5f5', noteBdr: '#fca5a5',
+      cases: allCases.filter(function(c){return !isHospitalUpdated(c);}),
+      grouped: false
+    },
     all: {
       color:    roleColour,
       icon:     roleIcon,
@@ -5719,8 +5732,111 @@ function buildSummaryHTML(c) {
     
     +'</div>'
     +'</div>';
+}
 
-  // ── Build table rows dynamically for selected quarter ────────
+// ══════════════════════════════════════════════════════════════
+// REHAB SESSION FORM
+// ══════════════════════════════════════════════════════════════
+function openRehabSession(cas) {
+  if (!cas) return;
+  selectedCase = cas;
+
+  // ── Set up the screen header ──────────────────────────────────
+  var rsTitle = document.getElementById('rs-title');
+  if (rsTitle) rsTitle.textContent = (isDemo() ? maskName(cas.name) : cas.name) || 'Session Log';
+  var rsSub = document.getElementById('rs-sub');
+  if (rsSub) rsSub.textContent = 'Card: ' + cas.id + (cas.fy ? ' · FY ' + cas.fy : '');
+
+  // ── Quarter definitions ───────────────────────────────────────
+  var QTRS = [
+    {id:1, label:'Q1 (Month 1\u20133)',   spw:2, rows:26, start:1},
+    {id:2, label:'Q2 (Month 4\u20136)',   spw:2, rows:26, start:27},
+    {id:3, label:'Q3 (Month 7\u20139)',   spw:2, rows:26, start:53},
+    {id:4, label:'Q4 (Month 10\u201312)', spw:2, rows:26, start:79},
+  ];
+
+  // ── Auto-detect current quarter ───────────────────────────────
+  var sessFromApp  = _rehabSess(cas);
+  var sessionsDone = sessFromApp !== null ? sessFromApp : 0;
+  var qtrNum = sessionsDone < 26 ? 1 : sessionsDone < 52 ? 2 : sessionsDone < 78 ? 3 : 4;
+  var soStr  = (cas.switchOn || cas.switchOnDate || '').substring(0,10);
+  var qtrBasis = '';
+  if (soStr && !isNaN(new Date(soStr))) {
+    var mo = Math.round((Date.now()-new Date(soStr))/(30.44*24*3600*1000));
+    qtrNum = mo < 3 ? 1 : mo < 6 ? 2 : mo < 9 ? 3 : 4;
+    qtrBasis = '\ud83d\udcc5 Auto-selected from Switch-on date ' + soStr + ' (' + mo + ' months ago)';
+  } else if (sessFromApp !== null) {
+    qtrBasis = '\ud83d\udcca Auto-selected from session count (' + sessionsDone + ' sessions done)';
+  }
+
+  var curQtr     = QTRS[qtrNum - 1];
+  var sessYear   = qtrNum <= 4 ? 1 : 2;
+  var sessPerWeek = curQtr.spw;
+
+  // ── Alert HTML (attendance flag) ──────────────────────────────
+  var alertHTML = '';
+  if (cas._attendanceFlag === 'red') {
+    var consecAbs  = cas._consecAbsent || 0;
+    var missedMo   = cas._missedThisMonth || 0;
+    var daysSinceLast = cas._lastRehabDate ? Math.floor((Date.now()-new Date(cas._lastRehabDate))/86400000) : null;
+    var alertReason = consecAbs>=4 ? consecAbs+' consecutive absences'
+      : missedMo>=4 ? '4+ sessions missed this month'
+      : daysSinceLast>14 ? 'No session in '+daysSinceLast+' days' : 'Low attendance';
+    alertHTML = '<div style="margin:10px 16px 0;background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--red);display:flex;align-items:center;gap:6px">&#128308; AVT Attendance Alert</div>'
+      +'<div style="font-size:11px;color:var(--red);margin-top:3px">'+alertReason+'</div></div>';
+  }
+
+  // ── Info strip ────────────────────────────────────────────────
+  var infoHTML = '<div style="margin:10px 16px 0;background:var(--green-light);border:0.5px solid var(--green-border);border-radius:10px;padding:10px 14px">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Patient</span><div style="color:#0a3d2e;font-weight:600">'+( isDemo()?maskName(cas.name):cas.name)+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Card No.</span><div style="color:#0a3d2e">'+cas.id+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Switch-on</span><div style="color:#0a3d2e">'+fmtDate(soStr)+'</div></div>'
+    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Sessions logged</span><div style="color:#0a3d2e">'+(sessFromApp!==null?sessFromApp:'None yet')+' / 104</div></div>'
+    +(qtrBasis ? +'<div style="grid-column:span 2;font-size:10px;color:#065f46;margin-top:4px">'+qtrBasis+'</div>' : '')
+    +'</div></div>';
+
+  // ── Quarter selector pills ────────────────────────────────────
+  var qtrHTML = '<div style="margin:10px 16px 0">'
+    +'<div style="font-size:11px;font-weight:600;color:var(--text-light);margin-bottom:6px">Select Quarter</div>'
+    +'<div style="display:flex;gap:6px">'
+    +QTRS.map(function(q){
+      var active = q.id === curQtr.id;
+      return '<div onclick="rsSelectQtr('+q.id+',this)" style="flex:1;padding:8px 4px;border-radius:8px;text-align:center;cursor:pointer;font-size:11px;font-weight:'+(active?'700':'500')+';'
+        +'background:'+(active?'var(--blue)':'var(--gray)')+';color:'+(active?'#fff':'var(--text-light)')+';border:1.5px solid '+(active?'var(--blue)':'transparent')+'">'
+        +q.label+'</div>';
+    }).join('')
+    +'</div></div>';
+
+  // ── Mapping HTML ──────────────────────────────────────────────
+  var mappingHTML = '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+    +'<div class="field-label" style="margin-bottom:6px">Mapping / Programming</div>'
+    +'<div class="radio-group" id="rs-mapping" style="flex-direction:row;gap:6px">'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-mapping\')"><div class="radio-dot"></div>Done this month</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,\'rs-mapping\')"><div class="radio-dot"></div>Due next month</div>'
+    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-mapping\')"><div class="radio-dot"></div>Not applicable</div>'
+    +'</div></div>';
+
+  // ── Submit HTML ───────────────────────────────────────────────
+  var submitHTML =
+    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+    +'<div class="field"><div class="field-label">Session notes</div>'
+    +'<textarea class="field-input" id="rs-notes" rows="2" placeholder="Progress, parent feedback..."></textarea></div>'
+    +'<div class="field"><div class="field-label">Issues to flag</div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-device"> Device issue</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-health"> Child health issue</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-suture"> Status of Sutures</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-skin"> Status of skin under the coil</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-other"> Others</label>'
+    +'<input class="field-input" id="rs-issues" placeholder="Details / notes on flagged issues" style="margin-top:2px">'
+    +'</div>'
+    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
+    +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-submit-btn">Save Monthly Log \u2192</button>'
+    +'</div>';
+
+  // ── Common HTML (therapist + stage) ──────────────────────────
+  // Build table rows dynamically for selected quarter ────────
   // All 4 quarters: 26 rows each (2/week x 13 weeks), 104 sessions total over 12 months
   function buildRsRows(qtr) {
     var rows = [];
@@ -5794,7 +5910,7 @@ function buildSummaryHTML(c) {
     +'<th style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Parent<br>guidance</th>'
     +'</tr>'
     +'</thead>'
-    +'<tbody>'+tableRows+'</tbody>'
+    +'<tbody id="rs-table-body">'+tableRows+'</tbody>'
     +'<tfoot>'
     +'<tr style="background:var(--gray)">'
     +'<td colspan="5" style="padding:7px 8px;font-size:11px;font-weight:600;color:var(--text-mid)">Total number of therapy sessions attended =</td>'
@@ -5859,6 +5975,59 @@ function buildSummaryHTML(c) {
     alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + mappingHTML + submitHTML;
 
   showScreen('rehabsession');
+}
+
+function rsSelectQtr(qtrId, el) {
+  // Update pill active state
+  if (el && el.parentNode) {
+    Array.from(el.parentNode.children).forEach(function(c) {
+      c.style.background = 'var(--gray)';
+      c.style.color = 'var(--text-light)';
+      c.style.fontWeight = '500';
+      c.style.borderColor = 'transparent';
+    });
+    el.style.background = 'var(--blue)';
+    el.style.color = '#fff';
+    el.style.fontWeight = '700';
+    el.style.borderColor = 'var(--blue)';
+  }
+  // Rebuild table for new quarter
+  if (window._rs_qtrs) {
+    var newQtr = window._rs_qtrs.find(function(q){ return q.id === qtrId; });
+    if (newQtr) {
+      window._rs_curQtrId    = qtrId;
+      window._rs_sessStart   = newQtr.start;
+      window._rs_slotCount   = newQtr.rows;
+      window._rs_sessPerWeek = newQtr.spw;
+      // Rebuild just the table body — keep other form fields
+      var tableBody = document.getElementById('rs-table-body');
+      if (tableBody) {
+        var rows = [];
+        for (var w = 1; w <= 13; w++) {
+          for (var s = 0; s < newQtr.spw; s++) {
+            rows.push('Week-' + w);
+            if (rows.length >= newQtr.rows) break;
+          }
+          if (rows.length >= newQtr.rows) break;
+        }
+        tableBody.innerHTML = rows.map(function(w, i) {
+          return '<tr id="rs-row-'+i+'">'
+            +'<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">'+(i+1)+'</td>'
+            +'<td style="padding:5px 3px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">'+w+'</td>'
+            +'<td style="padding:3px;border-bottom:1px solid var(--border)"><input type="date" id="rs-date-'+i+'" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
+            +'<td style="padding:3px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-pa-'+i+'" onclick="rsTogglePA('+i+')" style="display:inline-block;min-width:28px;padding:4px 5px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;background:var(--gray);color:var(--text-light);">\u2014</span></td>'
+            +'<td style="padding:5px 3px;font-size:12px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;color:var(--text)" id="rs-snum-'+i+'"></td>'
+            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-aud-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-spe-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-lan-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-cog-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-par-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+            +'</tr>';
+        }).join('');
+        rsUpdateTotal();
+      }
+    }
+  }
 }
 
 // ── New table-form helpers ─────────────────────────────────────────────

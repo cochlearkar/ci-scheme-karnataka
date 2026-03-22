@@ -755,11 +755,11 @@ body {
         <div class="home-stat-num" id="stat1">—</div>
         <div class="home-stat-label" id="stat1-label">Cases</div>
       </div>
-      <div class="home-stat" id="stat2-card" onclick="buildCaseList('ontrack');showScreen('cases')" style="cursor:pointer">
+      <div class="home-stat" id="stat2-card" onclick="buildCaseList('prog-ontrack');showScreen('cases')" style="cursor:pointer">
         <div class="home-stat-num" id="stat2">—</div>
         <div class="home-stat-label" id="stat2-label">On track</div>
       </div>
-      <div class="home-stat" id="stat3-card" onclick="buildCaseList('risk');showScreen('cases')" style="cursor:pointer">
+      <div class="home-stat" id="stat3-card" onclick="buildCaseList('alerts');showScreen('cases')" style="cursor:pointer">
         <div class="home-stat-num" id="stat3" style="color:#FAC775">—</div>
         <div class="home-stat-label" id="stat3-label">Alerts</div>
       </div>
@@ -3082,11 +3082,22 @@ function buildHome() {
   }
 
   const allMyCases = filterCasesByUser(SAMPLE_CASES);
-  const risks      = allMyCases.filter(c => c.risk);
-  const ontrack    = allMyCases.filter(c => !c.risk);
+
+  // ── Programme-view stat definitions ─────────────────────────────────────
+  // On Track: surgery done + switch-on recorded + no red AVT flag + no admin risk
+  // Alerts  : red AVT attendance flag OR admin risk (claim stuck)
+  const clinicalAlert  = c => c._attendanceFlag === 'red';
+  const adminRisk      = c => !!(c.risk);
+  const isAlert        = c => clinicalAlert(c) || adminRisk(c);
+  const isOnTrack      = c => !!(c.switchOn || c.switchOnDate) && !clinicalAlert(c) && !adminRisk(c);
+
+  const risks   = allMyCases.filter(c => adminRisk(c));
+  const ontrack = allMyCases.filter(c => isOnTrack(c));
+  const alerts  = allMyCases.filter(c => isAlert(c));
+
   document.getElementById('stat1').textContent       = allMyCases.length;
   document.getElementById('stat2').textContent       = ontrack.length;
-  document.getElementById('stat3').textContent       = risks.length;
+  document.getElementById('stat3').textContent       = alerts.length;
   document.getElementById('stat1-label').textContent = currentRole === 'district' ? 'In district' : 'Total cases';
 
   // ── AVT attendance data (used by all roles) ────────────────────────────────
@@ -3369,17 +3380,53 @@ function buildHome() {
     }
   }
 
-  // ── AT-RISK alert cards ────────────────────────────────────────────────────
-  if (risks.length) {
-    html += `<div class="section-label" style="margin-top:20px">At-risk cases</div>`;
-    risks.forEach(c => {
-      html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
-        <div class="alert-dot"></div>
-        <div style="flex:1"><div class="alert-name">${c.name}</div>
-        <div class="alert-detail">${c.village||c.taluk} · ${c.phase} · Last contact: ${c.lastContact}</div></div>
-        <span class="alert-tag">At risk</span>
-      </div>`;
-    });
+  // ── AT-RISK alert cards — split into Clinical and Administrative ──────────
+  const clinicalCases = allMyCases.filter(c => c._attendanceFlag === 'red');
+  const adminCases    = allMyCases.filter(c => adminRisk(c));
+
+  if (clinicalCases.length || adminCases.length) {
+    html += `<div class="section-label" style="margin-top:20px">Cases needing attention</div>`;
+
+    // ── Clinical: AVT attendance concerns ──────────────────────────────────
+    if (clinicalCases.length) {
+      html += `<div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;
+                          letter-spacing:.5px;margin:10px 0 6px;display:flex;align-items:center;gap:5px">
+                 🎧 Clinical — AVT Attendance Concerns (${clinicalCases.length})</div>`;
+      clinicalCases.forEach(c => {
+        const daysSince = c._lastRehabDate
+          ? Math.floor((Date.now()-new Date(c._lastRehabDate))/86400000) : null;
+        const lastInfo = daysSince !== null
+          ? `Last session ${daysSince}d ago`
+          : (c.switchOn || c.switchOnDate) ? 'AVT not yet started' : 'Switch-on not recorded';
+        html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
+          <div class="alert-dot" style="background:#dc2626"></div>
+          <div style="flex:1">
+            <div class="alert-name">${c.name}</div>
+            <div class="alert-detail">${c.village||c.taluk} · ${lastInfo}</div>
+          </div>
+          <span class="alert-tag" style="background:#fee2e2;color:#dc2626">AVT concern</span>
+        </div>`;
+      });
+    }
+
+    // ── Administrative: claim / TPA issues ────────────────────────────────
+    if (adminCases.length) {
+      html += `<div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;
+                          letter-spacing:.5px;margin:12px 0 6px;display:flex;align-items:center;gap:5px">
+                 📋 Administrative — Claim / TPA Issues (${adminCases.length})</div>`;
+      adminCases.forEach(c => {
+        const claimStatus = c.surgStatus && c.surgStatus !== 'CLAIMS PAID'
+          ? c.surgStatus : (c.r1Status && c.r1Status !== 'CLAIMS PAID' ? c.r1Status : 'Claim flagged');
+        html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
+          <div class="alert-dot" style="background:#d97706"></div>
+          <div style="flex:1">
+            <div class="alert-name">${c.name}</div>
+            <div class="alert-detail">${c.village||c.taluk} · ${claimStatus}</div>
+          </div>
+          <span class="alert-tag" style="background:#fef3c7;color:#92400e">Claim issue</span>
+        </div>`;
+      });
+    }
   }
 
   // ── State summary by hospital / rehab ─────────────────────────────────────
@@ -3624,7 +3671,9 @@ function buildCaseList(filter = 'all') {
   if      (filter === 'hosp-pending') activeStatusFilter = 'Needs update';
   else if (filter === 'hosp-updated') activeStatusFilter = 'Updated';
   else if (filter === 'ontrack')       activeStatusFilter = 'On track';
-  else if (filter === 'risk')         activeStatusFilter = 'At risk';
+  else if (filter === 'prog-ontrack')  activeStatusFilter = 'Prog on track';
+  else if (filter === 'alerts')        activeStatusFilter = 'Alerts';
+  else if (filter === 'risk')          activeStatusFilter = 'At risk';
   else if (filter === 'confirm')      activeStatusFilter = 'Confirm';
   else if (filter === 'avt-red')      activeStatusFilter = 'AVT Red';
   else if (filter === 'avt-yellow')   activeStatusFilter = 'AVT Alert';
@@ -3714,6 +3763,10 @@ function applyAllFilters() {
     cases = cases.filter(c =>  isHospitalUpdated(c));
   } else if (activeStatusFilter === 'On track') {
     cases = cases.filter(c => !c.risk);
+  } else if (activeStatusFilter === 'Prog on track') {
+    cases = cases.filter(c => !!(c.switchOn||c.switchOnDate) && c._attendanceFlag !== 'red' && !c.risk);
+  } else if (activeStatusFilter === 'Alerts') {
+    cases = cases.filter(c => c._attendanceFlag === 'red' || c.risk);
   } else if (activeStatusFilter === 'Confirm') {
     cases = cases.filter(c => c.risk || !c.surgAdmit || c.status === 'pending');
   } else if (activeStatusFilter === 'On track') {

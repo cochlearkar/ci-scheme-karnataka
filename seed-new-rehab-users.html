@@ -50,7 +50,7 @@
     <span>Username: r_kaher_belagavi &nbsp;·&nbsp; Password: CIScheme@2025 &nbsp;·&nbsp; Role: rehab</span>
   </div>
 
-  <button id="seed-btn" onclick="seedUsers()">Create Users in Firebase</button>
+  <button id="seed-btn">Create Users in Firebase</button>
   <div id="log"></div>
 </div>
 
@@ -101,7 +101,7 @@ const NEW_USERS = [
     zone:      'Bengaluru',
     status:    'active',
     mustChangePassword: false
-,
+  },
   {
     username:  'r_kaher_belagavi',
     password:  'CIScheme@2025',
@@ -114,7 +114,7 @@ const NEW_USERS = [
   }
 ];
 
-window.seedUsers = async function() {
+async function seedUsers() {
   const btn = document.getElementById('seed-btn');
   const log = document.getElementById('log');
   btn.disabled = true;
@@ -185,6 +185,7 @@ window.seedUsers = async function() {
   print('Share credentials with the respective centres.');
   btn.textContent = '✓ Done';
 };
+document.getElementById('seed-btn').addEventListener('click', seedUsers);
 </script>
 </body>
 </html>

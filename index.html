@@ -3133,6 +3133,47 @@ function buildHome() {
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
+    // Close action grid then show attention section
+    html += `</div>`;
+
+    // ── Cases needing attention — Clinical + Administrative ────────────────
+    const clinicalCases = allMyCases.filter(c => c._attendanceFlag === 'red');
+    const adminCases    = allMyCases.filter(c => adminRisk(c));
+
+    if (clinicalCases.length || adminCases.length) {
+      html += `<div class="section-label" style="margin-top:16px">Cases needing attention</div>`;
+
+      if (clinicalCases.length) {
+        html += `<div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 6px;display:flex;align-items:center;gap:5px">🎧 Clinical — AVT Attendance Concerns (${clinicalCases.length})</div>`;
+        clinicalCases.forEach(c => {
+          const daysSince = c._lastRehabDate ? Math.floor((Date.now()-new Date(c._lastRehabDate))/86400000) : null;
+          const lastInfo  = daysSince !== null ? `Last session ${daysSince}d ago`
+                          : (c.switchOn||c.switchOnDate) ? 'AVT not yet started' : 'Switch-on not recorded';
+          html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
+            <div class="alert-dot" style="background:#dc2626"></div>
+            <div style="flex:1"><div class="alert-name">${c.name}</div>
+            <div class="alert-detail">${c.village||c.taluk} · ${lastInfo}</div></div>
+            <span class="alert-tag" style="background:#fee2e2;color:#dc2626">AVT concern</span>
+          </div>`;
+        });
+      }
+
+      if (adminCases.length) {
+        html += `<div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px;margin:${clinicalCases.length?'14px':'8px'} 0 6px;display:flex;align-items:center;gap:5px">📋 Administrative — Claim / TPA Issues (${adminCases.length})</div>`;
+        adminCases.forEach(c => {
+          const claimStatus = c.surgStatus && c.surgStatus !== 'CLAIMS PAID' ? c.surgStatus
+                            : (c.r1Status  && c.r1Status  !== 'CLAIMS PAID' ? c.r1Status : 'Claim flagged');
+          html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
+            <div class="alert-dot" style="background:#d97706"></div>
+            <div style="flex:1"><div class="alert-name">${c.name}</div>
+            <div class="alert-detail">${c.village||c.taluk} · ${claimStatus}</div></div>
+            <span class="alert-tag" style="background:#fef3c7;color:#92400e">Claim issue</span>
+          </div>`;
+        });
+      }
+    }
+
+
   } else if (currentRole === 'rehab') {
     // ── Backlog: cases where sessions logged < 80% of expected given months elapsed ──
     const rehabBacklog = allMyCases.filter(function(c) {
@@ -3225,8 +3266,6 @@ function buildHome() {
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#128C7E,#25D366);border:none;cursor:pointer" onclick="shareWhatsApp()"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">📤</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Share Daily Update on WhatsApp</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Tap to open WhatsApp with today's hospital summary pre-filled</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">All guidelines · Rates · Checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
   }
-  html += `</div>`;
-
   // ── AVT ATTENDANCE PANEL (all roles except state see their filtered view) ──
   if (currentRole !== 'state' && avtTotal.length > 0) {
     const totalWithSessions = avtTotal.length;
@@ -3380,54 +3419,7 @@ function buildHome() {
     }
   }
 
-  // ── AT-RISK alert cards — split into Clinical and Administrative ──────────
-  const clinicalCases = allMyCases.filter(c => c._attendanceFlag === 'red');
-  const adminCases    = allMyCases.filter(c => adminRisk(c));
 
-  if (clinicalCases.length || adminCases.length) {
-    html += `<div class="section-label" style="margin-top:20px">Cases needing attention</div>`;
-
-    // ── Clinical: AVT attendance concerns ──────────────────────────────────
-    if (clinicalCases.length) {
-      html += `<div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;
-                          letter-spacing:.5px;margin:10px 0 6px;display:flex;align-items:center;gap:5px">
-                 🎧 Clinical — AVT Attendance Concerns (${clinicalCases.length})</div>`;
-      clinicalCases.forEach(c => {
-        const daysSince = c._lastRehabDate
-          ? Math.floor((Date.now()-new Date(c._lastRehabDate))/86400000) : null;
-        const lastInfo = daysSince !== null
-          ? `Last session ${daysSince}d ago`
-          : (c.switchOn || c.switchOnDate) ? 'AVT not yet started' : 'Switch-on not recorded';
-        html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
-          <div class="alert-dot" style="background:#dc2626"></div>
-          <div style="flex:1">
-            <div class="alert-name">${c.name}</div>
-            <div class="alert-detail">${c.village||c.taluk} · ${lastInfo}</div>
-          </div>
-          <span class="alert-tag" style="background:#fee2e2;color:#dc2626">AVT concern</span>
-        </div>`;
-      });
-    }
-
-    // ── Administrative: claim / TPA issues ────────────────────────────────
-    if (adminCases.length) {
-      html += `<div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;
-                          letter-spacing:.5px;margin:12px 0 6px;display:flex;align-items:center;gap:5px">
-                 📋 Administrative — Claim / TPA Issues (${adminCases.length})</div>`;
-      adminCases.forEach(c => {
-        const claimStatus = c.surgStatus && c.surgStatus !== 'CLAIMS PAID'
-          ? c.surgStatus : (c.r1Status && c.r1Status !== 'CLAIMS PAID' ? c.r1Status : 'Claim flagged');
-        html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
-          <div class="alert-dot" style="background:#d97706"></div>
-          <div style="flex:1">
-            <div class="alert-name">${c.name}</div>
-            <div class="alert-detail">${c.village||c.taluk} · ${claimStatus}</div>
-          </div>
-          <span class="alert-tag" style="background:#fef3c7;color:#92400e">Claim issue</span>
-        </div>`;
-      });
-    }
-  }
 
   // ── State summary by hospital / rehab ─────────────────────────────────────
   if (currentRole === 'state') {

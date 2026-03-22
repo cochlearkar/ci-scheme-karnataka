@@ -1985,7 +1985,10 @@ function filterCasesByUser(cases) {
   }
   if (currentUser.role === 'district') {
     const d = (currentUser.district||currentUser.unit||'').toUpperCase();
-    return cases.filter(c => (c.district||'').toUpperCase() === d);
+    return cases.filter(c =>
+      (c.district||'').toUpperCase() === d ||
+      (c._distTransferredTo||'').toUpperCase() === d  // transferred-in cases
+    );
   }
   return cases;
 }
@@ -3244,17 +3247,33 @@ function buildHome() {
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'district') {
+    // Cases to confirm = not yet confirmed by this district + transferred-in
+    const myDistrict = (currentUser&&(currentUser.district||currentUser.unit)||'').toUpperCase();
+    const toConfirm  = allMyCases.filter(c => !c._distConfirmed &&
+      ((c.district||'').toUpperCase()===myDistrict ||
+       (c._distTransferredTo||'').toUpperCase()===myDistrict));
+    const confirmed  = allMyCases.filter(c => c._distConfirmed &&
+      (c._distConfirmedDistrict||'').toUpperCase()===myDistrict);
+    const transferred = allMyCases.filter(c => c._distTransferredTo &&
+      (c._distTransferredTo||'').toUpperCase()!==myDistrict);
+
+    // Primary: Confirm Cases
+    html += `<div class="action-card primary" onclick="openDistrictConfirmList()" style="background:#8a5a0a;border-color:#8a5a0a">`
+      +`<div class="action-icon">✅</div>`
+      +`<div><div class="action-title">${toConfirm.length} case${toConfirm.length!==1?'s':''} to confirm</div>`
+      +`<div class="action-desc">Verify, call family, record PHC · Includes transferred-in cases</div></div>`
+      +`<div class="action-arrow" style="color:#fff">→</div></div>`;
+
+    // Secondary: Follow-up & Evaluation
+    html += `<div class="action-card primary" onclick="openDistrictFollowupList()" style="background:#1a4a7a;border-color:#1a4a7a">`
+      +`<div class="action-icon">📞</div>`
+      +`<div><div class="action-title">${confirmed.length} case${confirmed.length!==1?'s':''} — Follow-up &amp; Evaluation</div>`
+      +`<div class="action-desc">Confirmed own-district cases · Telephonic follow-up · Assessment</div></div>`
+      +`<div class="action-arrow" style="color:#fff">→</div></div>`;
+
     if (avtRed.length > 0) {
       html += `<div class="action-card primary" onclick="openDistrictAVTCallList()" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">📞</div><div><div class="action-title">${avtRed.length} child${avtRed.length!==1?'ren':''} missing AVT 🔴</div><div class="action-desc">Tap to call families — get child back to rehab</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     }
-    if (avtYellow.length > 0) {
-      html += `<div class="action-card" style="border-color:#d97706;background:#fffbeb" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:#92400e">${avtYellow.length} attendance concern — 2 consecutive absences</div><div class="action-desc" style="color:#92400e">Follow up with family this week</div></div>`;
-    }
-    if (risks.length > 0) {
-      html += `<div class="action-card primary" onclick="buildCaseList('risk');showScreen('cases')"><div class="action-icon">⚠️</div><div><div class="action-title">Review ${risks.length} at-risk</div><div class="action-desc">Missed sessions or stalled cases</div></div><div class="action-arrow">→</div></div>`;
-    }
-    html += `<div class="action-card primary" onclick="buildCaseList('confirm');showScreen('cases')"><div class="action-icon">✅</div><div><div class="action-title">Confirm Cases</div><div class="action-desc">Verify pending information</div></div><div class="action-arrow">→</div></div>`;
-    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">By district</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#7a4f1a,#b87333);border:none" onclick="openDistrictReport()"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">District Report</div><div class="action-desc" style="color:rgba(255,255,255,.75)">Status · Follow-up · Outcomes · At-risk</div></div>`;
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📈</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · District checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
@@ -7663,6 +7682,715 @@ function drShowTabStyle(tab) {
 // DISTRICT UNIFIED SCREEN — Case view + Follow-up + Assessment
 // ══════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════════
+// DISTRICT CONFIRM LIST OVERLAY
+// ══════════════════════════════════════════════════════════════════════
+function openDistrictConfirmList() {
+  var existing = document.getElementById('dist-confirm-overlay');
+  if (existing) existing.remove();
+
+  var myDistrict = (currentUser&&(currentUser.district||currentUser.unit)||'').toUpperCase();
+  var allCases   = filterCasesByUser(SAMPLE_CASES);
+  var toConfirm  = allCases.filter(function(c) {
+    return !c._distConfirmed &&
+      ((c.district||'').toUpperCase() === myDistrict ||
+       (c._distTransferredTo||'').toUpperCase() === myDistrict);
+  });
+
+  var ov = document.createElement('div');
+  ov.id = 'dist-confirm-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+  ov.innerHTML =
+    '<div style="background:#8a5a0a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    + '<div onclick="document.getElementById(\'dist-confirm-overlay\').remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">✅ Cases to Confirm</div>'
+    + '<div style="color:rgba(255,255,255,.75);font-size:11px">'
+    + toConfirm.length + ' unconfirmed · ' + myDistrict + '</div></div></div>'
+    + '<div style="flex:1;overflow-y:auto">'
+    + (toConfirm.length === 0
+        ? '<div style="text-align:center;padding:40px;color:#9ca3af;font-size:13px">✅ All cases confirmed</div>'
+        : toConfirm.map(function(c) {
+            var nm   = isDemo() ? maskName(c.name) : c.name;
+            var isTransferred = (c._distTransferredTo||'').toUpperCase() === myDistrict;
+            return '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;'
+              + 'border-bottom:0.5px solid #f1f5f9;cursor:pointer;background:#fff"'
+              + ' onclick="openDistrictCaseConfirm(\'' + c.id + '\')">'
+              + '<div style="width:36px;height:36px;border-radius:50%;background:#fef3c7;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">👶</div>'
+              + '<div style="flex:1;min-width:0">'
+              + '<div style="font-size:13px;font-weight:600;color:#111">' + nm + '</div>'
+              + '<div style="font-size:11px;color:#64748b;margin-top:1px">'
+              + (c.village||c.taluk||'') + ' · ' + (c.district||'') + ' · FY ' + (c.fy||'')
+              + (isTransferred ? ' <span style="background:#ede9fe;color:#4a2a7a;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:600">Transferred in</span>' : '')
+              + '</div></div>'
+              + '<div style="color:#d1d5db;font-size:18px">›</div>'
+              + '</div>';
+          }).join(''))
+    + '</div>';
+  document.body.appendChild(ov);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// DISTRICT CASE CONFIRM SCREEN
+// ══════════════════════════════════════════════════════════════════════
+function openDistrictCaseConfirm(caseId) {
+  var cas = SAMPLE_CASES.find(function(c){ return String(c.id) === String(caseId); });
+  if (!cas) return;
+  selectedCase = cas;
+
+  var existing = document.getElementById('dist-case-confirm-overlay');
+  if (existing) existing.remove();
+
+  var myDistrict = (currentUser&&(currentUser.district||currentUser.unit)||'').toUpperCase();
+  var nm   = isDemo() ? maskName(cas.name) : cas.name;
+  var mob1 = cleanMob(cas.mobile||'');
+  var today = new Date().toISOString().split('T')[0];
+  var addr  = [cas.village, cas.taluk, cas.district].filter(Boolean).join(', ');
+
+  // District options for transfer
+  var KA_DISTRICTS = ["BAGALKOTE","BALLARI","BANGALORE - RURAL","BANGALORE EAST","BANGALORE NORTH",
+    "BANGALORE SOUTH","BANGALORE WEST","BELAGAVI","BENGALURU","BENGALURU RURAL","BIDAR",
+    "CHAMARAJANAGARA","CHIKKABALLAPURA","CHIKKAMAGALURU","CHITRADURGA","DAKSHINA KANNADA",
+    "DAVANAGERE","DHARWAR","GADAG","HASSAN","HAVERI","KALABURAGI","KODAGU","KOLAR","KOPPAL",
+    "MANDYA","MYSORE","MYSURU","RAICHUR","RAMANAGARA","SHIVAMOGGA","TUMAKURU","UDUPI",
+    "UTTARA KANNADA","VIJAYANAGAR","VIJAYAPURA","YADGIR"];
+  var distOpts = KA_DISTRICTS.map(function(d){
+    return '<option value="'+d+'"'+(d===myDistrict?' selected':'')+'>'+d+'</option>';
+  }).join('');
+
+  var ov = document.createElement('div');
+  ov.id = 'dist-case-confirm-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:10000;display:flex;flex-direction:column;overflow:hidden';
+  ov.innerHTML =
+    '<div style="background:#8a5a0a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    + '<div onclick="document.getElementById(\'dist-case-confirm-overlay\').remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">' + nm + '</div>'
+    + '<div style="color:rgba(255,255,255,.75);font-size:11px">Card: ' + cas.id + ' · Confirm case</div>'
+    + '</div></div>'
+    + '<div style="flex:1;overflow-y:auto;padding:16px">'
+
+    // Patient info card
+    + '<div style="background:#FFF8EE;border:1px solid #FAC775;border-radius:12px;padding:14px;margin-bottom:14px">'
+    + '<div style="font-size:10px;font-weight:700;color:#7a4f1a;text-transform:uppercase;margin-bottom:8px">👶 Patient Information</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">'
+    + distInfoRow('Name', nm)
+    + distInfoRow('FY', cas.fy||'—')
+    + distInfoRow('Gender', cas.gender||'—')
+    + distInfoRow('DOB', fmtDate(cas.dob))
+    + distInfoRow('Current Age', currentAge(cas.dob)||cas.age||'—')
+    + distInfoRow('Age at Surgery', ageAtSurgery(cas.dob,cas.surgAdmit)||cas.age||'—')
+    + distInfoRow('Surgery Date', fmtDate(cas.surgAdmit))
+    + distInfoRow('Hospital', cas.hospital||'—')
+    + distInfoRow('Switch-on', fmtDate(cas.switchOn||cas.switchOnDate))
+    + distInfoRow('Rehab Centre', cas.rehabCentre||'—')
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;font-size:12px">'
+    + distInfoRow('Address', addr||'—')
+    + distInfoRow('District', cas.district||'—')
+    + '</div>'
+    // Device
+    + ((cas.implantCompany||cas.implantModel||cas.implantNumber||cas.speechProcessor)
+      ? '<div style="border-top:0.5px solid #FAC775;margin-top:8px;padding-top:8px">'
+        + '<div style="font-size:10px;font-weight:700;color:#7a4f1a;margin-bottom:4px">🎧 Device</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px">'
+        + distInfoRow('Manufacturer', cas.implantCompany)
+        + distInfoRow('Model', cas.implantModel)
+        + distInfoRow('Serial', cas.implantNumber)
+        + distInfoRow('Processor', cas.speechProcessor)
+        + '</div></div>' : '')
+    // Mobile
+    + '<div style="border-top:0.5px solid #FAC775;margin-top:8px;padding-top:8px">'
+    + '<div style="font-size:10px;font-weight:700;color:#7a4f1a;margin-bottom:4px">📞 Contact</div>'
+    + (mob1 ? '<a href="tel:'+mob1+'" style="font-size:13px;font-weight:600;color:#7a4f1a;text-decoration:none">📞 '+mob1+'</a><br>' : '<span style="color:#9ca3af;font-size:12px">No mobile recorded</span><br>')
+    + '<div style="margin-top:6px;display:flex;gap:8px">'
+    + '<input class="field-input" id="dcc-extra-phone" type="tel" placeholder="Add extra phone number" style="flex:1;font-size:12px">'
+    + '<button onclick="dccAddPhone()" style="padding:6px 12px;background:#8a5a0a;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer">+ Add</button>'
+    + '</div>'
+    + '<div id="dcc-phone-list" style="margin-top:6px;font-size:11px;color:#374151">'
+    + ((cas._extraPhones||[]).map(function(p,i){ return '<div>'+p+' <span onclick="dccRemovePhone('+i+')" style="color:#dc2626;cursor:pointer;font-size:10px">✕</span></div>'; }).join(''))
+    + '</div>'
+    + '</div></div>'
+
+    // Journey infographic
+    + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:14px">'
+    + buildJourneyInfographic(cas)
+    + '</div>'
+
+    // PHC
+    + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:10px">🏥 Public Health Institution for Follow-up</div>'
+    + '<div class="field"><div class="field-label">PHC / Government institution name <span class="req">*</span></div>'
+    + '<input class="field-input" id="dcc-phc" placeholder="Name of Primary Health Centre or institution" value="'+(cas._phcName||'')+'"></div>'
+    + '<div class="field"><div class="field-label">PHC address / notes</div>'
+    + '<input class="field-input" id="dcc-phc-addr" placeholder="Address or contact" value="'+(cas._phcAddr||'')+'"></div>'
+    + '</div>'
+
+    // 1st telephonic follow-up
+    + '<div style="background:#EBF3FC;border:1px solid #B5D4F4;border-radius:12px;padding:14px;margin-bottom:14px">'
+    + '<div style="font-size:11px;font-weight:700;color:#1a4a7a;margin-bottom:10px">📞 1st Telephonic Follow-up (record now)</div>'
+    + '<div class="field-row"><div class="field"><div class="field-label">Date of call <span class="req">*</span></div><input type="date" class="field-input" id="dcc-call-date" value="'+today+'"></div>'
+    + '<div class="field"><div class="field-label">Family reachable?</div>'
+    + '<select class="field-input" id="dcc-reachable">'
+    + '<option>Yes</option><option>Not reachable</option><option>Wrong number</option>'
+    + '</select></div></div>'
+    + '<div class="field"><div class="field-label">Spoke with</div>'
+    + '<select class="field-input" id="dcc-spoke"><option value="">Select</option>'
+    + '<option>Mother</option><option>Father</option><option>Both</option><option>Grandparent</option><option>Other guardian</option>'
+    + '</select></div>'
+    + '<div class="field"><div class="field-label">Notes from call</div>'
+    + '<textarea class="field-input" id="dcc-call-notes" rows="2" placeholder="Observations, any issues noted..."></textarea></div>'
+    + '</div>'
+
+    // Confirm OR Transfer
+    + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:16px">'
+    + '<div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:10px">📍 Action</div>'
+    + '<div class="field"><div class="field-label">This case belongs to</div>'
+    + '<div class="radio-group" id="dcc-action">'
+    + '<div class="radio-item checked" onclick="selectRadio(this,\'dcc-action\');document.getElementById(\'dcc-transfer-row\').style.display=\'none\'"><div class="radio-dot"></div>✅ My district — confirm &amp; retain</div>'
+    + '<div class="radio-item" onclick="selectRadio(this,\'dcc-action\');document.getElementById(\'dcc-transfer-row\').style.display=\'block\'"><div class="radio-dot"></div>🔀 Another district — transfer</div>'
+    + '<div class="radio-item" onclick="selectRadio(this,\'dcc-action\');document.getElementById(\'dcc-transfer-row\').style.display=\'none\'"><div class="radio-dot"></div>✝️ Child deceased — close case</div>'
+    + '</div></div>'
+    + '<div id="dcc-transfer-row" style="display:none">'
+    + '<div class="field"><div class="field-label">Transfer to district <span class="req">*</span></div>'
+    + '<select class="field-input" id="dcc-transfer-dist"><option value="">Select district...</option>' + distOpts + '</select></div>'
+    + '</div>'
+    + '</div>'
+
+    + '<div id="dcc-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>'
+    + '<button onclick="submitDistrictConfirm(\'' + cas.id + '\')" '
+    + 'style="width:100%;padding:14px;background:#8a5a0a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">'
+    + '✅ Confirm &amp; Save &#8594;</button>'
+    + '</div>';
+
+  document.body.appendChild(ov);
+}
+
+function distInfoRow(label, val) {
+  if (!val) return '';
+  return '<div><span style="color:#7a4f1a;font-size:10px;font-weight:600;text-transform:uppercase">'+label+'</span>'
+        +'<div style="color:#374141;font-size:12px">'+val+'</div></div>';
+}
+
+// Extra phones helpers
+function dccAddPhone() {
+  var inp = document.getElementById('dcc-extra-phone');
+  if (!inp || !inp.value.trim()) return;
+  var ph = inp.value.trim();
+  if (!selectedCase._extraPhones) selectedCase._extraPhones = [];
+  selectedCase._extraPhones.push(ph);
+  inp.value = '';
+  var list = document.getElementById('dcc-phone-list');
+  if (list) {
+    list.innerHTML = selectedCase._extraPhones.map(function(p,i){
+      return '<div style="padding:3px 0">'+p+' <span onclick="dccRemovePhone('+i+')" style="color:#dc2626;cursor:pointer;font-size:10px">✕ remove</span></div>';
+    }).join('');
+  }
+}
+function dccRemovePhone(idx) {
+  if (selectedCase._extraPhones) {
+    selectedCase._extraPhones.splice(idx, 1);
+    dccAddPhone(); // re-render (hack: call with empty)
+    var inp = document.getElementById('dcc-extra-phone');
+    if (inp) inp.value = '';
+    var list = document.getElementById('dcc-phone-list');
+    if (list) list.innerHTML = selectedCase._extraPhones.map(function(p,i){
+      return '<div style="padding:3px 0">'+p+' <span onclick="dccRemovePhone('+i+')" style="color:#dc2626;cursor:pointer;font-size:10px">✕ remove</span></div>';
+    }).join('');
+  }
+}
+
+// Submit confirm
+async function submitDistrictConfirm(caseId) {
+  var errEl = document.getElementById('dcc-error');
+  errEl.style.display = 'none';
+
+  var phcName   = (document.getElementById('dcc-phc')||{}).value||'';
+  var phcAddr   = (document.getElementById('dcc-phc-addr')||{}).value||'';
+  var callDate  = (document.getElementById('dcc-call-date')||{}).value||'';
+  var reachable = (document.getElementById('dcc-reachable')||{}).value||'';
+  var spoke     = (document.getElementById('dcc-spoke')||{}).value||'';
+  var callNotes = (document.getElementById('dcc-call-notes')||{}).value||'';
+  var actionEl  = document.querySelector('#dcc-action .radio-item.checked');
+  var action    = actionEl ? actionEl.textContent.trim() : '';
+  var transferTo = (document.getElementById('dcc-transfer-dist')||{}).value||'';
+
+  if (!phcName) { errEl.textContent='PHC / institution name is required.'; errEl.style.display='block'; return; }
+  if (!callDate) { errEl.textContent='Call date is required.'; errEl.style.display='block'; return; }
+  if (action.indexOf('Another district') > -1 && !transferTo) {
+    errEl.textContent='Please select the district to transfer to.'; errEl.style.display='block'; return;
+  }
+
+  var now = new Date().toISOString();
+  var myDistrict = (currentUser&&(currentUser.district||currentUser.unit)||'');
+  var isTransfer = action.indexOf('Another district') > -1;
+  var isDeceased = action.indexOf('deceased') > -1;
+
+  var caseUpdates = {
+    _distConfirmed:         !isTransfer && !isDeceased,
+    _distConfirmedBy:       currentUser ? currentUser.username : 'unknown',
+    _distConfirmedAt:       now,
+    _distConfirmedDistrict: isTransfer ? '' : myDistrict,
+    _distTransferredTo:     isTransfer ? transferTo : '',
+    _distDeceased:          isDeceased,
+    _phcName:               phcName,
+    _phcAddr:               phcAddr,
+    _extraPhones:           selectedCase._extraPhones||[],
+    _lastDistFollowup:      callDate,
+    _lastModified:          now
+  };
+
+  // Save first follow-up
+  var followupRecord = {
+    type:       'district_followup',
+    caseId:     String(caseId),
+    caseName:   selectedCase.name||'',
+    callDate:   callDate,
+    reachable:  reachable,
+    spoke:      spoke,
+    notes:      callNotes,
+    isFirst:    true,
+    action:     isTransfer ? 'transferred_to_'+transferTo : isDeceased ? 'deceased' : 'confirmed',
+    phcName:    phcName,
+    district:   myDistrict,
+    submittedBy: currentUser ? currentUser.username : 'unknown',
+    timestamp:  now
+  };
+
+  try {
+    var _add = window._fbFns.addDoc;
+    var _col = window._fbFns.collection;
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+
+    await _add(_col(window._fbDb, 'submissions_district'), followupRecord);
+    await _upd(_doc(window._fbDb, 'cases', String(caseId)), caseUpdates);
+
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
+
+    document.getElementById('dist-case-confirm-overlay').remove();
+    openDistrictConfirmList(); // refresh list
+
+    var msg = isTransfer
+      ? '✅ Case transferred to '+transferTo+'. They will see it in their Confirm Cases queue.'
+      : isDeceased
+      ? '✅ Case marked as deceased and closed.'
+      : '✅ Case confirmed for '+myDistrict+'. First follow-up recorded. Case moved to Follow-up & Evaluation tab.';
+    alert(msg);
+  } catch(e) {
+    errEl.textContent = 'Error: '+e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// DISTRICT FOLLOW-UP LIST OVERLAY (confirmed own-district cases)
+// ══════════════════════════════════════════════════════════════════════
+function openDistrictFollowupList() {
+  var existing = document.getElementById('dist-followup-list-overlay');
+  if (existing) existing.remove();
+
+  var myDistrict = (currentUser&&(currentUser.district||currentUser.unit)||'').toUpperCase();
+  var allCases   = filterCasesByUser(SAMPLE_CASES);
+  var confirmed  = allCases.filter(function(c) {
+    return c._distConfirmed &&
+      (c._distConfirmedDistrict||'').toUpperCase() === myDistrict;
+  });
+
+  var ov = document.createElement('div');
+  ov.id = 'dist-followup-list-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+  ov.innerHTML =
+    '<div style="background:#1a4a7a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    + '<div onclick="document.getElementById(\'dist-followup-list-overlay\').remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">📞 Follow-up &amp; Evaluation</div>'
+    + '<div style="color:rgba(255,255,255,.75);font-size:11px">'
+    + confirmed.length + ' confirmed cases · ' + myDistrict + '</div></div></div>'
+    + '<div style="flex:1;overflow-y:auto">'
+    // FY-grouped list
+    + (confirmed.length === 0
+        ? '<div style="text-align:center;padding:40px;color:#9ca3af;font-size:13px">No confirmed cases yet</div>'
+        : (function() {
+            var byFY = {};
+            confirmed.forEach(function(c) {
+              var fy = c.fy||'Unknown FY';
+              if (!byFY[fy]) byFY[fy] = [];
+              byFY[fy].push(c);
+            });
+            return Object.keys(byFY).sort().reverse().map(function(fy) {
+              return '<div style="background:#f1f5f9;padding:5px 14px;border-bottom:0.5px solid #e2e8f0">'
+                + '<span style="font-size:10px;font-weight:700;color:#64748b">FY '+fy+' · '+byFY[fy].length+' cases</span></div>'
+                + byFY[fy].map(function(c) {
+                    var nm = isDemo()?maskName(c.name):c.name;
+                    var lastFU = c._lastDistFollowup||'';
+                    var flagBadge = c._distFlags && c._distFlags.length
+                      ? ' <span style="background:#fee2e2;color:#dc2626;font-size:9px;padding:1px 5px;border-radius:3px">⚠ '+c._distFlags.length+' flag'+(c._distFlags.length>1?'s':'')+'</span>' : '';
+                    return '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:0.5px solid #f1f5f9;cursor:pointer;background:#fff"'
+                      + ' onclick="document.getElementById(\'dist-followup-list-overlay\').remove();openDistrictUnified(SAMPLE_CASES.find(function(x){return String(x.id)===\''+c.id+'\'}))">'
+                      + '<div style="width:36px;height:36px;border-radius:50%;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">👶</div>'
+                      + '<div style="flex:1;min-width:0">'
+                      + '<div style="font-size:13px;font-weight:600;color:#111">'+nm+flagBadge+'</div>'
+                      + '<div style="font-size:11px;color:#64748b;margin-top:1px">'+(c.village||c.taluk||'')+' · '+(c.district||'')+(lastFU?' · Last FU: '+fmtDate(lastFU):' · No follow-up yet')+'</div>'
+                      + '</div><div style="color:#d1d5db;font-size:18px">›</div></div>';
+                  }).join('');
+            }).join('');
+          })())
+    + '</div>';
+  document.body.appendChild(ov);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// FLAGS — checkbox helpers
+// ══════════════════════════════════════════════════════════════════════
+function dfFlagNone(el) {
+  // If "No concerns" is checked, uncheck all others
+  if (el.checked) {
+    ['device','progress','family','claim','absent','deceased','other'].forEach(function(f){
+      var cb = document.getElementById('df-flag-'+f);
+      if (cb) cb.checked = false;
+    });
+  }
+}
+function dfFlagCheck() {
+  // If any concern is checked, uncheck "No concerns"
+  var noneEl = document.getElementById('df-flag-none');
+  if (noneEl) noneEl.checked = false;
+}
+
+// Helper to collect checked flags
+function dfGetFlags() {
+  var flags = [];
+  ['none','device','progress','family','claim','absent','deceased','other'].forEach(function(f){
+    var cb = document.getElementById('df-flag-'+f);
+    if (cb && cb.checked) flags.push(f);
+  });
+  return flags;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// DISTRICT LOGIN — CONFIRM CASES & FOLLOW-UP SYSTEM
+// ══════════════════════════════════════════════════════════════════════
+
+function _districtOf() {
+  return (currentUser && (currentUser.district||currentUser.unit)||'').toUpperCase();
+}
+
+// ── Confirm Cases List Overlay ────────────────────────────────────────
+function openDistrictConfirmList() {
+  var myDistrict = _districtOf();
+  var all = filterCasesByUser(SAMPLE_CASES);
+  var cases = all.filter(function(c) {
+    return !c._distConfirmed && (
+      (c.district||'').toUpperCase() === myDistrict ||
+      (c._distTransferredTo||'').toUpperCase() === myDistrict
+    );
+  });
+  cases.sort(function(a,b){ return (a.name||'') < (b.name||'') ? -1 : 1; });
+
+  var ov = document.createElement('div');
+  ov.id = 'dist-confirm-list-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  var listHTML = cases.length === 0
+    ? '<div style="text-align:center;padding:48px;color:#9ca3af;font-size:13px">✓ No cases pending confirmation</div>'
+    : cases.map(function(c) {
+        var isTransfer = (c._distTransferredTo||'').toUpperCase() === myDistrict;
+        var mob = cleanMob(c.mobile||'');
+        return '<div style="background:#fff;border-bottom:1px solid #f1f5f9;padding:13px 16px;cursor:pointer;display:flex;align-items:center;gap:12px"'
+          +' onclick="document.getElementById(\'dist-confirm-list-ov\').remove();openDistrictConfirmCase(SAMPLE_CASES.find(function(x){return String(x.id)===\''+c.id+'\'}))">'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:13px;font-weight:600;color:#111">'+(isDemo()?maskName(c.name):c.name)+'</div>'
+          +'<div style="font-size:11px;color:#64748b;margin-top:2px">'+(c.district||'')+(c.fy?' · FY '+c.fy:'')+(mob?' · 📞 '+mob:'')+'</div>'
+          +(isTransfer ? '<div style="font-size:10px;color:#d97706;font-weight:600;margin-top:2px">⟶ Transferred from '+(c.district||'')+'</div>' : '')
+          +'</div>'
+          +'<span style="font-size:10px;padding:2px 8px;border-radius:6px;font-weight:600;white-space:nowrap;'
+          +(isTransfer ? 'background:#fef3c7;color:#92400e' : 'background:#e0f2fe;color:#0369a1')
+          +'">'+(isTransfer?'Transferred in':'Own district')+'</span>'
+          +'</div>';
+      }).join('');
+
+  ov.innerHTML =
+    '<div style="background:#8a5a0a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    +'<div onclick="document.getElementById(\'dist-confirm-list-ov\').remove()" '
+    +'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    +'<div><div style="color:#fff;font-weight:700;font-size:15px">✅ Confirm Cases</div>'
+    +'<div style="color:rgba(255,255,255,.75);font-size:11px">'+cases.length+' cases pending · tap to open</div></div></div>'
+    +'<div style="flex:1;overflow-y:auto">'+listHTML+'</div>';
+
+  var ex = document.getElementById('dist-confirm-list-ov');
+  if (ex) ex.remove();
+  document.body.appendChild(ov);
+}
+
+// ── Follow-up List Overlay ─────────────────────────────────────────────
+function openDistrictFollowupList() {
+  var myDistrict = _districtOf();
+  var all = filterCasesByUser(SAMPLE_CASES);
+  var cases = all.filter(function(c) {
+    return c._distConfirmed && (c._distConfirmedDistrict||c.district||'').toUpperCase() === myDistrict;
+  });
+  cases.sort(function(a,b){ return (a._lastDistFollowup||'') < (b._lastDistFollowup||'') ? -1 : 1; });
+
+  var ov = document.createElement('div');
+  ov.id = 'dist-followup-list-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  var listHTML = cases.length === 0
+    ? '<div style="text-align:center;padding:48px;color:#9ca3af;font-size:13px">No confirmed cases yet</div>'
+    : cases.map(function(c) {
+        var lastFU = c._lastDistFollowup || '';
+        var mob = cleanMob(c.mobile||'');
+        var overdue = lastFU && Math.floor((Date.now()-new Date(lastFU))/86400000) > 60;
+        return '<div style="background:#fff;border-bottom:1px solid #f1f5f9;padding:13px 16px;cursor:pointer;display:flex;align-items:center;gap:12px"'
+          +' onclick="document.getElementById(\'dist-followup-list-ov\').remove();openDistrictUnified(SAMPLE_CASES.find(function(x){return String(x.id)===\''+c.id+'\'}))">'
+          +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:13px;font-weight:600;color:#111">'+(isDemo()?maskName(c.name):c.name)+'</div>'
+          +'<div style="font-size:11px;color:#64748b;margin-top:2px">'+(c.district||'')+(mob?' · 📞 '+mob:'')+'</div>'
+          +(lastFU ? '<div style="font-size:10px;margin-top:2px;color:'+(overdue?'#dc2626':'#16a34a')+'">Last follow-up: '+lastFU+(overdue?' ⚠ Overdue':'')+'</div>'
+                   : '<div style="font-size:10px;margin-top:2px;color:#d97706">No follow-up recorded yet</div>')
+          +'</div>'
+          +'<span style="font-size:18px;color:#d1d5db">›</span>'
+          +'</div>';
+      }).join('');
+
+  ov.innerHTML =
+    '<div style="background:#1a4a7a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    +'<div onclick="document.getElementById(\'dist-followup-list-ov\').remove()" '
+    +'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    +'<div><div style="color:#fff;font-weight:700;font-size:15px">📞 Follow-up &amp; Evaluation</div>'
+    +'<div style="color:rgba(255,255,255,.75);font-size:11px">'+cases.length+' confirmed cases · tap to open</div></div></div>'
+    +'<div style="flex:1;overflow-y:auto">'+listHTML+'</div>';
+
+  var ex = document.getElementById('dist-followup-list-ov');
+  if (ex) ex.remove();
+  document.body.appendChild(ov);
+}
+
+// ── Confirm Case Screen ────────────────────────────────────────────────
+function openDistrictConfirmCase(cas) {
+  if (!cas) return;
+  selectedCase = cas;
+
+  var ov = document.createElement('div');
+  ov.id = 'dist-confirm-case-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  var mob = cleanMob(cas.mobile||'');
+  var myDistrict = _districtOf();
+  var isTransfer = (cas._distTransferredTo||'').toUpperCase() === myDistrict;
+  var distOptions = ROLE_META.district.orgOptions.map(function(d) {
+    return '<option value="'+d+'"'+(d.toUpperCase()===myDistrict?' selected':'')+'>'+d+'</option>';
+  }).join('');
+
+  // Full profile card
+  function pRow(label, val) {
+    if (!val) return '';
+    return '<div><div style="font-size:10px;font-weight:600;color:#8a5a0a;text-transform:uppercase">'+label+'</div>'
+          +'<div style="font-size:12px;color:#3d2200;font-weight:500;margin-top:1px">'+val+'</div></div>';
+  }
+
+  var profileHTML =
+    '<div style="background:#FFF8EE;border:1px solid #FAC775;border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+    +'<div style="background:#8a5a0a;border-radius:8px;padding:8px 12px;margin:-2px -2px 10px;display:flex;justify-content:space-between;align-items:center">'
+    +'<span style="color:#fff;font-weight:700;font-size:13px">'+(isDemo()?maskName(cas.name):cas.name)+'</span>'
+    +'<span style="color:rgba(255,255,255,.75);font-size:11px">Card: '+cas.id+'</span>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    +pRow('Date of Birth', fmtDate(cas.dob))
+    +pRow('Gender', cas.gender)
+    +pRow('Current Age', currentAge(cas.dob)||cas.age)
+    +pRow('Age at Surgery', ageAtSurgery(cas.dob,cas.surgAdmit)||cas.age)
+    +pRow('Address', [cas.village,cas.taluk,cas.district].filter(Boolean).join(', '))
+    +pRow('FY', cas.fy)
+    +pRow('Hospital', cas.hospital)
+    +pRow('Surgery Date', fmtDate(cas.surgAdmit))
+    +pRow('Switch-on Date', fmtDate(cas.switchOn||cas.switchOnDate))
+    +pRow('Rehab Centre', cas.rehabCentre)
+    +pRow('Implant', [cas.implantCompany,cas.implantModel].filter(Boolean).join(' '))
+    +pRow('Serial No.', cas.implantNumber)
+    +'</div>'
+    // Primary mobile
+    +(mob ? '<div style="margin-top:10px;padding-top:8px;border-top:0.5px solid #FAC775;display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-size:10px;font-weight:600;color:#8a5a0a;text-transform:uppercase">Mobile</span>'
+      +'<a href="tel:'+mob+'" style="font-size:13px;font-weight:700;color:#8a5a0a;text-decoration:none">📞 '+mob+'</a>'
+      +'</div>' : '')
+    // Add alternate mobile
+    +'<div style="margin-top:8px;padding-top:8px;border-top:0.5px solid #FAC775">'
+    +'<div style="font-size:10px;font-weight:600;color:#8a5a0a;text-transform:uppercase;margin-bottom:4px">Add Alternate Phone Numbers</div>'
+    +'<div id="dc-alt-phones">'
+    +(cas._altMobiles && cas._altMobiles.length ? cas._altMobiles.map(function(m,i){
+      return '<div style="display:flex;gap:6px;margin-bottom:4px">'
+        +'<input class="field-input" value="'+m+'" id="dc-alt-'+i+'" placeholder="Alternate mobile" type="tel" style="flex:1">'
+        +'</div>';
+    }).join('') : '')
+    +'</div>'
+    +'<button onclick="dcAddAltPhone()" style="margin-top:4px;background:transparent;border:1px solid #FAC775;border-radius:6px;padding:5px 12px;font-size:12px;color:#8a5a0a;cursor:pointer">+ Add phone</button>'
+    +'</div>'
+    +'</div>';
+
+  // Confirm / Transfer form
+  var formHTML =
+    '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+    +'<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:12px">📋 Case Confirmation</div>'
+    +(isTransfer ? '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:#92400e">⟶ This case was transferred from <strong>'+(cas.district||'')+'</strong></div>' : '')
+    +'<div class="field"><div class="field-label">Does this case belong to your district? <span class="req">*</span></div>'
+    +'<div class="radio-group" id="dc-belongs" style="flex-direction:row;gap:6px">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,\'dc-belongs\');dcToggleTransfer(false)" style="flex:1"><div class="radio-dot"></div>Yes — belongs here</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,\'dc-belongs\');dcToggleTransfer(true)" style="flex:1"><div class="radio-dot"></div>No — transfer to correct district</div>'
+    +'</div></div>'
+    // Transfer district selector (hidden by default)
+    +'<div id="dc-transfer-row" style="display:none" class="field"><div class="field-label">Transfer to district <span class="req">*</span></div>'
+    +'<select class="field-input" id="dc-transfer-dist"><option value="">Select district...</option>'+distOptions+'</select>'
+    +'</div>'
+    // PHC / Health institution (shown when own district)
+    +'<div id="dc-phc-row" class="field"><div class="field-label">PHC / Public Health Institution responsible for follow-up</div>'
+    +'<input class="field-input" id="dc-phc" placeholder="Name of PHC or health institution"></div>'
+    +'</div>'
+
+    // First telephonic follow-up
+    +'<div style="background:#EBF3FC;border:1px solid #B5D4F4;border-radius:12px;padding:14px 16px;margin-bottom:12px">'
+    +'<div style="font-size:12px;font-weight:700;color:#1a4a7a;margin-bottom:12px">📞 First Telephonic Follow-up</div>'
+    +'<div class="field-row">'
+    +'<div class="field"><div class="field-label">Date of call <span class="req">*</span></div>'
+    +'<input type="date" class="field-input has-value" id="dc-date" value="'+new Date().toISOString().split('T')[0]+'"></div>'
+    +'<div class="field"><div class="field-label">Spoke with</div>'
+    +'<select class="field-input" id="dc-spoke"><option>Mother</option><option>Father</option><option>Both parents</option><option>Grandparent</option><option>Other guardian</option></select>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Family reachable?</div>'
+    +'<div class="radio-group" id="dc-reachable" style="flex-direction:row;gap:6px">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,\'dc-reachable\')" style="flex:1"><div class="radio-dot"></div>Yes</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,\'dc-reachable\')" style="flex:1"><div class="radio-dot"></div>No — not reachable</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,\'dc-reachable\')" style="flex:1"><div class="radio-dot"></div>Wrong number</div>'
+    +'</div></div>'
+    +'<div class="field"><div class="field-label">Notes from call</div>'
+    +'<textarea class="field-input" id="dc-notes" rows="2" placeholder="Child status, family feedback, any concerns..."></textarea></div>'
+    +'</div>'
+
+    +'<div id="dc-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#dc2626;margin-bottom:10px"></div>'
+    +'<button onclick="submitDistrictConfirm(\''+cas.id+'\')" style="width:100%;padding:14px;background:#8a5a0a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">Confirm &amp; Save Follow-up →</button>';
+
+  ov.innerHTML =
+    '<div style="background:#8a5a0a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    +'<div onclick="document.getElementById(\'dist-confirm-case-ov\').remove()" '
+    +'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    +'<div><div style="color:#fff;font-weight:700;font-size:15px">✅ Confirm Case</div>'
+    +'<div style="color:rgba(255,255,255,.75);font-size:11px">'+(isDemo()?maskName(cas.name):cas.name)+' · Card '+cas.id+'</div></div></div>'
+    +'<div style="flex:1;overflow-y:auto;padding:14px">'
+    +profileHTML
+    +formHTML
+    +'</div>';
+
+  var ex = document.getElementById('dist-confirm-case-ov');
+  if (ex) ex.remove();
+  document.body.appendChild(ov);
+}
+
+function dcAddAltPhone() {
+  var container = document.getElementById('dc-alt-phones');
+  if (!container) return;
+  var idx = container.children.length;
+  var div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:6px;margin-bottom:4px';
+  div.innerHTML = '<input class="field-input" id="dc-alt-'+idx+'" placeholder="Alternate mobile" type="tel" style="flex:1">'
+    +'<button onclick="this.parentElement.remove()" style="background:#fee2e2;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;color:#dc2626;font-size:14px">✕</button>';
+  container.appendChild(div);
+}
+
+function dcToggleTransfer(show) {
+  var tr = document.getElementById('dc-transfer-row');
+  var ph = document.getElementById('dc-phc-row');
+  if (tr) tr.style.display = show ? 'block' : 'none';
+  if (ph) ph.style.display = show ? 'none' : 'block';
+}
+
+async function submitDistrictConfirm(caseId) {
+  var belongs   = document.querySelector('#dc-belongs .radio-item.checked');
+  var isTransfer = belongs && belongs.textContent.includes('transfer');
+  var date      = document.getElementById('dc-date').value;
+  var reachable = document.querySelector('#dc-reachable .radio-item.checked');
+  var errEl     = document.getElementById('dc-error');
+  errEl.style.display = 'none';
+
+  if (!date) { errEl.textContent='Date of call is required.'; errEl.style.display='block'; return; }
+  if (isTransfer) {
+    var tDist = document.getElementById('dc-transfer-dist').value;
+    if (!tDist) { errEl.textContent='Please select the correct district.'; errEl.style.display='block'; return; }
+  }
+
+  // Collect alternate phones
+  var altMobiles = [];
+  var container = document.getElementById('dc-alt-phones');
+  if (container) {
+    Array.from(container.querySelectorAll('input')).forEach(function(inp) {
+      var v = cleanMob(inp.value.trim());
+      if (v) altMobiles.push(v);
+    });
+  }
+
+  var cas = SAMPLE_CASES.find(function(c){ return String(c.id) === String(caseId); });
+  var now = new Date().toISOString();
+
+  try {
+    var _add = window._fbFns.addDoc;
+    var _col = window._fbFns.collection;
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+    var myDistrict = _districtOf();
+
+    var followupRecord = {
+      type:        'district_confirm_followup',
+      caseId:      String(caseId),
+      date:        date,
+      reachable:   reachable ? reachable.textContent.trim() : '',
+      spoke:       (document.getElementById('dc-spoke')||{}).value || '',
+      notes:       (document.getElementById('dc-notes')||{}).value || '',
+      phc:         (document.getElementById('dc-phc')||{}).value || '',
+      isTransfer:  isTransfer,
+      transferTo:  isTransfer ? document.getElementById('dc-transfer-dist').value : '',
+      confirmedBy: currentUser ? currentUser.username : '',
+      district:    myDistrict,
+      timestamp:   now
+    };
+
+    await _add(_col(window._fbDb, 'submissions_district'), followupRecord);
+
+    var caseUpdates = {
+      _altMobiles:          altMobiles.length ? altMobiles : (cas._altMobiles||[]),
+      _lastDistFollowup:    date,
+      _lastModified:        now
+    };
+
+    if (isTransfer) {
+      caseUpdates._distTransferredTo = document.getElementById('dc-transfer-dist').value;
+      caseUpdates._distTransferredBy = currentUser ? currentUser.username : '';
+      caseUpdates._distTransferredAt = now;
+    } else {
+      caseUpdates._distConfirmed         = true;
+      caseUpdates._distConfirmedBy       = currentUser ? currentUser.username : '';
+      caseUpdates._distConfirmedDistrict = myDistrict;
+      caseUpdates._distConfirmedAt       = now;
+      if ((document.getElementById('dc-phc')||{}).value)
+        caseUpdates._distPHC = document.getElementById('dc-phc').value;
+    }
+
+    await _upd(_doc(window._fbDb, 'cases', String(caseId)), caseUpdates);
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
+
+    document.getElementById('dist-confirm-case-ov').remove();
+    alert(isTransfer
+      ? '✅ Case transferred. It will appear in the Confirm Cases list of the selected district.'
+      : '✅ Case confirmed and first follow-up recorded.');
+
+    buildHomeScreen();
+  } catch(e) {
+    errEl.textContent = 'Error: '+e.message;
+    errEl.style.display = 'block';
+  }
+}
+
 function openDistrictUnified(cas) {
   selectedCase = cas;
   document.getElementById('dist-title').textContent = (isDemo()?maskName(cas.name):cas.name) || 'Child Assessment';
@@ -7818,23 +8546,7 @@ function buildFollowupForm(today, cas) {
     +'<div class="field"><div class="field-label">Device notes · ಸಾಧನ ಟಿಪ್ಪಣಿ</div>'
     +'<input class="field-input" id="df-device-note" placeholder="Details about the issue... / ಸಮಸ್ಯೆ ವಿವರ..."></div></div>'
 
-    +'<div style="background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
-    +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🗣️ Speech Progress · ಮಾತಿನ ಪ್ರಗತಿ</div>'
-    +'<div class="field"><div class="field-label">Current milestone · ಈಗಿನ ಹಂತ</div>'
-    +'<select class="field-input" id="df-milestone"><option value="">Select</option>'
-    +'<option>1 — Detection / ಶಬ್ದ ಗ್ರಹಣ</option>'
-    +'<option>2 — Discrimination / ಶಬ್ದ ವಿವೇಚನೆ</option>'
-    +'<option>3 — Identification / ಪದ ಗುರುತಿಸುವಿಕೆ</option>'
-    +'<option>4 — Comprehension / ಭಾಷಾ ಗ್ರಹಣ</option>'
-    +'<option>5 — Expression / ಮಾತಿನ ಅಭಿವ್ಯಕ್ತಿ</option>'
-    +'<option>6 — Age-appropriate / ವಯಸ್ಸಿಗೆ ತಕ್ಕ</option>'
-    +'</select></div>'
-    +'<div class="field"><div class="field-label">Progress since last call · ಕೊನೆಯ ಬಾರಿಗಿಂತ ಪ್ರಗತಿ</div>'
-    +'<div class="radio-group" id="df-progress">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Better / ಉತ್ತಮ</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Same / ಅದೇ</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Regressed / ಹಿನ್ನಡೆ</div>'
-    +'</div></div></div>'
+
 
     +'<div style="background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
     +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🏫 School &amp; Rehab · ಶಾಲೆ ಮತ್ತು ಪುನರ್ವಸತಿ</div>'
@@ -7861,14 +8573,34 @@ function buildFollowupForm(today, cas) {
 
     +'<div style="background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:12px">'
     +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">⚠️ Flags · ಗಮನಿಸಬೇಕಾದ ಅಂಶ</div>'
-    +'<div class="field"><div class="field-label">Any concern? · ಯಾವುದಾದರೂ ಸಮಸ್ಯೆ?</div>'
-    +'<div class="radio-group" id="df-flag">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>No concerns / ಸಮಸ್ಯೆ ಇಲ್ಲ</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Device issue / ಸಾಧನ ಸಮಸ್ಯೆ</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Not progressing / ಪ್ರಗತಿ ಇಲ್ಲ</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Family needs support / ಕುಟುಂಬ ಬೆಂಬಲ ಬೇಕು</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Claim issue / ಕ್ಲೇಮ್ ಸಮಸ್ಯೆ</div>'
+    +'<div class="field"><div class="field-label">Select all that apply · ಅನ್ವಯವಾಗುವ ಎಲ್ಲವನ್ನೂ ಆಯ್ಕೆ ಮಾಡಿ</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><input type="checkbox" id="df-flag-none" onchange="dfFlagNone(this)" style="width:16px;height:16px;cursor:pointer"> No concerns / ಸಮಸ್ಯೆ ಇಲ್ಲ</label>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;background:#fff5f5;border-radius:8px;border:1px solid #fca5a5"><input type="checkbox" id="df-flag-device" onchange="dfFlagCheck()" style="width:16px;height:16px;cursor:pointer"> 🔧 Device issue / ಸಾಧನ ಸಮಸ್ಯೆ</label>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;background:#fff5f5;border-radius:8px;border:1px solid #fca5a5"><input type="checkbox" id="df-flag-progress" onchange="dfFlagCheck()" style="width:16px;height:16px;cursor:pointer"> 📉 Not progressing / ಪ್ರಗತಿ ಇಲ್ಲ</label>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;background:#fff5f5;border-radius:8px;border:1px solid #fca5a5"><input type="checkbox" id="df-flag-family" onchange="dfFlagCheck()" style="width:16px;height:16px;cursor:pointer"> 👨‍👩‍👧 Family needs support / ಕುಟುಂಬ ಬೆಂಬಲ ಬೇಕು</label>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;background:#fefce8;border-radius:8px;border:1px solid #fde68a"><input type="checkbox" id="df-flag-claim" onchange="dfFlagCheck()" style="width:16px;height:16px;cursor:pointer"> 📋 Claim issue / ಕ್ಲೇಮ್ ಸಮಸ್ಯೆ</label>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;background:#fff5f5;border-radius:8px;border:1px solid #fca5a5"><input type="checkbox" id="df-flag-absent" onchange="dfFlagCheck()" style="width:16px;height:16px;cursor:pointer"> ❌ Absent from rehab / ಪುನರ್ವಸತಿಗೆ ಗೈರು</label>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;background:#fff5f5;border-radius:8px;border:1px solid #fca5a5"><input type="checkbox" id="df-flag-deceased" onchange="dfFlagCheck()" style="width:16px;height:16px;cursor:pointer"> ✝️ Child deceased / ಮಗು ನಿಧನ</label>'
+    +'<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0"><input type="checkbox" id="df-flag-other" onchange="dfFlagCheck()" style="width:16px;height:16px;cursor:pointer"> 📝 Other / ಇತರ</label>'
     +'</div></div>'
+    +'<div style="background:#fff;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🗣️ Speech Progress · ಮಾತಿನ ಪ್ರಗತಿ</div>'
+    +'<div class="field"><div class="field-label">Current milestone · ಈಗಿನ ಹಂತ</div>'
+    +'<select class="field-input" id="df-milestone"><option value="">Select</option>'
+    +'<option>1 — Detection / ಶಬ್ದ ಗ್ರಹಣ</option>'
+    +'<option>2 — Discrimination / ಶಬ್ದ ವಿವೇಚನೆ</option>'
+    +'<option>3 — Identification / ಪದ ಗುರುತಿಸುವಿಕೆ</option>'
+    +'<option>4 — Comprehension / ಭಾಷಾ ಗ್ರಹಣ</option>'
+    +'<option>5 — Expression / ಮಾತಿನ ಅಭಿವ್ಯಕ್ತಿ</option>'
+    +'<option>6 — Age-appropriate / ವಯಸ್ಸಿಗೆ ತಕ್ಕ</option>'
+    +'</select></div>'
+    +'<div class="field"><div class="field-label">Progress since last call · ಕೊನೆಯ ಬಾರಿಗಿಂತ ಪ್ರಗತಿ</div>'
+    +'<div class="radio-group" id="df-progress">'
+    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Better / ಉತ್ತಮ</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Same / ಅದೇ</div>'
+    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Regressed / ಹಿನ್ನಡೆ</div>'
+    +'</div></div></div>'
     +'<div class="field"><div class="field-label">Notes · ಟಿಪ್ಪಣಿ</div>'
     +'<textarea class="field-input" id="df-notes" rows="2" placeholder="Observations from the call... / ಕರೆಯಿಂದ ಟಿಪ್ಪಣಿ..."></textarea></div></div>'
 
@@ -8051,18 +8783,8 @@ function openDistrictFollowup(cas) {
     +'<input class="field-input" id="df-device-issue" placeholder="Battery, coil, processor issues etc. (leave blank if none)"></div>'
     +'</div>'
 
-    // Section 3: Speech & Language
+    // Section 3: Speech & Language (progress only — milestone moved before flags)
     +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128483;&#65039; Speech &amp; Language</div>'
-    +'<div class="field"><div class="field-label">Current milestone <span class="req">*</span></div>'
-    +'<select class="field-input" id="df-milestone"><option value="">Select milestone...</option>'
-    +'<option>1 — Detection: responds to sounds</option>'
-    +'<option>2 — Discrimination: distinguishes sounds</option>'
-    +'<option>3 — Identification: recognises familiar words</option>'
-    +'<option>4 — Comprehension: understands spoken language</option>'
-    +'<option>5 — Verbal expression: producing speech</option>'
-    +'<option>6 — Age-appropriate communication</option>'
-    +'<option>Not assessed / unknown</option>'
-    +'</select></div>'
     +'<div class="field"><div class="field-label">Progress since last call</div>'
     +'<div class="radio-group" id="df-progress">'
     +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-progress&quot;)"><div class="radio-dot"></div>Better — improved</div>'
@@ -8104,15 +8826,31 @@ function openDistrictFollowup(cas) {
     +'</select></div>'
     +'</div>'
 
-    // Section 6: At-risk & flags
+    // Speech milestone — just before flags
+    +'<div class="form-section" style="margin:0 16px">'
+    +'<div class="form-section-title">&#127925; Current Speech Milestone</div>'
+    +'<div class="field"><div class="field-label">Milestone achieved <span class="req">*</span></div>'
+    +'<select class="field-input" id="df-milestone"><option value="">Select milestone...</option>'
+    +'<option>1 — Detection: responds to sounds</option>'
+    +'<option>2 — Discrimination: distinguishes sounds</option>'
+    +'<option>3 — Identification: recognises familiar words</option>'
+    +'<option>4 — Comprehension: understands spoken language</option>'
+    +'<option>5 — Verbal expression: producing speech</option>'
+    +'<option>6 — Age-appropriate communication</option>'
+    +'<option>Not assessed / unknown</option>'
+    +'</select></div></div>'
+
+    // Section 6: At-risk & flags — checkboxes (multiple issues allowed)
     +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#9888;&#65039; Flags &amp; Escalation</div>'
-    +'<div class="field"><div class="field-label">Any concern to escalate?</div>'
-    +'<div class="radio-group" id="df-flag">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>No concerns</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Device issue — needs attention</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Child not progressing — needs review</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Family needs support / counselling</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,&quot;df-flag&quot;)"><div class="radio-dot"></div>Claim issue — needs follow-up</div>'
+    +'<div class="field"><div class="field-label">Concerns to escalate (tick all that apply)</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="df-flag-none" onchange="dfFlagNone(this)"> No concerns</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="df-flag-device"> Device issue — needs attention</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="df-flag-progress"> Child not progressing — needs review</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="df-flag-family"> Family needs support / counselling</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="df-flag-claim"> Claim issue — needs follow-up</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="df-flag-rehab"> Not attending rehab regularly</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="df-flag-deceased"> Child deceased</label>'
     +'</div></div>'
     +'<div class="field"><div class="field-label">Notes / observations</div>'
     +'<textarea class="field-input" id="df-notes" rows="3" placeholder="Any additional observations from the call..."></textarea></div>'
@@ -8175,7 +8913,7 @@ async function submitDistrictFollowup() {
     school:      getRadio('df-school'),
     rehabAttend: getRadio('df-rehab-attend'),
     missReason:  document.getElementById('df-miss-reason').value,
-    flag:        getRadio('df-flag'),
+    flags:       dfGetFlags(),
     notes:       document.getElementById('df-notes').value.trim(),
     timestamp:   new Date().toISOString(),
     entryId:     'DF-' + Date.now()

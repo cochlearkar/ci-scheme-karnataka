@@ -2882,9 +2882,10 @@ function openQEScreen(cas, quarterNum) {
     +'</div>'
     +'<div class="form-section" style="padding:0 16px">'
     + sec('\u270f Signatures')
-    + editRow('Supervisor',  inp('supervisor',  pv(saved.supervisor),  'Full name'))
-    + editRow('Audiologist', inp('audiologist', pv(saved.audiologist), 'Full name'))
-    + editRow('Date',        inp('sig-date',    pv(saved.evalDate||today), '', 'date'))
+    + editRow('AVT Therapist',        inp('therapist',     pv(saved.therapist),     'Full name'))
+    + editRow('Mapping Audiologist',   inp('audiologist',   pv(saved.audiologist),   'Full name (if mapping done this quarter)'))
+    + editRow('Supervisor',            inp('supervisor',    pv(saved.supervisor),    'Full name'))
+    + editRow('Date',                  inp('sig-date',      pv(saved.evalDate||today), '', 'date'))
     +'</div>'
     +'</div>'; // end formA
 
@@ -2970,7 +2971,8 @@ async function submitQEForm(quarterNum, isDraft) {
     dailyAttendance: r('daily-att'),
     monthlyReports: r('monthly-rep'),
     supervisor: g('supervisor'),
-    audiologist: g('audiologist'),
+    therapist:         g('therapist'),
+    audiologist:       g('audiologist'),
     // Form B — mapping
     mapDates: g('map-dates'),
     soundField: r('sft'),
@@ -6034,7 +6036,10 @@ function openRehabSession(cas) {
     +'</div>';
 
   var commonHTML =
-    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'    +'<div class="field" style="margin:0"><div class="field-label">Therapist name</div>'    +'<input class="field-input" id="rs-therapist" placeholder="Full name"></div>'    +'<div class="field" style="margin:0"><div class="field-label">Rehab stage</div>'    +'<div class="radio-group" id="rs-stage" style="flex-direction:row;gap:4px">'    +'<div class="radio-item checked" onclick="selectRadio(this,\'rs-stage\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>AVT Ongoing</div>'    +'<div class="radio-item" onclick="selectRadio(this,\'rs-stage\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>AVT Complete</div>'    +'</div></div>'    +'</div></div>';
+    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
+    +'<div class="field" style="margin:0"><div class="field-label">Therapist name</div>'
+    +'<input class="field-input" id="rs-therapist" placeholder="Full name of therapist conducting this session"></div>'
+    +'</div>';
 
   window._rs_sessStart   = sessStart;
   window._rs_slotCount   = rowCount;
@@ -6330,9 +6335,7 @@ async function submitRehabSession() {
 
   // ── Validate ────────────────────────────────────────────────
   var therapist = document.getElementById('rs-therapist').value.trim();
-  var stage     = document.querySelector('#rs-stage .radio-item.checked');
   if (!therapist) { errEl.textContent='Therapist name is required.'; errEl.style.display='block'; return; }
-  if (!stage)     { errEl.textContent='Rehab stage is required.';    errEl.style.display='block'; return; }
 
   // ── Collect rows from new table form ────────────────────────
   var slotCount    = window._rs_slotCount    || 14;
@@ -6420,7 +6423,6 @@ async function submitRehabSession() {
     rehabCentre:    currentUser ? currentUser.unit : '',
     submittedBy:    currentUser ? currentUser.username : '',
     therapist:      therapist,
-    stage:          stage.textContent.trim(),
     month:          monthStr,
     dateFrom:       firstDate,
     dateTo:         lastDate,
@@ -6435,6 +6437,7 @@ async function submitRehabSession() {
     ecap:           ecapEl ? ecapEl.textContent.trim()  : '',
     magnetOk:       magEl  ? magEl.textContent.trim()   : '',
     entReferral:    entEl  ? entEl.textContent.trim()   : '',
+    mapAudiologist: (document.getElementById('rs-map-audiologist')||{}).value    || '',
     deviceStatus:   (document.getElementById('rs-devicestatus') ||{}).value     || '',
     notes:          (document.getElementById('rs-notes')        ||{}).value     || '',
     issueNone:      !!(document.getElementById('rs-issue-none')  ||{}).checked,
@@ -6498,13 +6501,7 @@ async function submitRehabSession() {
     _monthAttendPct:   weekEntry.attendancePct
   };
 
-  // Update claim/stage status from stage field
-  var stageText = stage.textContent.trim();
-  if (stageText.indexOf('AVT Complete') > -1) {
-    caseUpdates.avtComplete = true; caseUpdates.status = 'paid';
-  } else {
-    // No auto-complete — hospital confirms payment
-  }
+  // Stage removed — AVT completion is declared separately via the AVT Complete button
 
   try {
     var _col = window._fbFns.collection;

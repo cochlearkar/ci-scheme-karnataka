@@ -751,15 +751,15 @@ body {
   </div>
   <div class="home-hero" style="padding-top:0">
     <div class="home-stats">
-      <div class="home-stat">
+      <div class="home-stat" id="stat1-card" onclick="buildCaseList();showScreen('cases')" style="cursor:pointer">
         <div class="home-stat-num" id="stat1">—</div>
         <div class="home-stat-label" id="stat1-label">Cases</div>
       </div>
-      <div class="home-stat">
+      <div class="home-stat" id="stat2-card" onclick="buildCaseList('ontrack');showScreen('cases')" style="cursor:pointer">
         <div class="home-stat-num" id="stat2">—</div>
         <div class="home-stat-label" id="stat2-label">On track</div>
       </div>
-      <div class="home-stat">
+      <div class="home-stat" id="stat3-card" onclick="buildCaseList('risk');showScreen('cases')" style="cursor:pointer">
         <div class="home-stat-num" id="stat3" style="color:#FAC775">—</div>
         <div class="home-stat-label" id="stat3-label">Alerts</div>
       </div>
@@ -1397,6 +1397,7 @@ function buildJourneyInfographic(cas) {
   const aSub  = hasAVTDone ? '\u2713 Done' : (avtActive && monthsElapsed > 0 ? (12-monthsElapsed)+'mo left' : '\u00b7');
 
   const avtNodeHTML = `<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:${nodeColW}px;padding-top:${ROW_PT}px;position:relative;z-index:3">
+    ${inAVT && !hasAVTDone && monthsElapsed > 0 ? `<div style="position:absolute;top:0px;left:0;right:0;text-align:center;font-size:7.5px;color:#9ca3af;font-weight:600;white-space:nowrap;line-height:1">Month ${monthsElapsed}/12</div>` : ""}
     <div style="width:${DOT}px;height:${DOT}px;border-radius:50%;background:${aBg};border:2.5px solid ${aClr};${aShd};display:flex;align-items:center;justify-content:center">${aIco}</div>
     <div style="font-size:9px;font-weight:${avtActive?700:600};color:${aLClr};margin-top:5px;text-align:center;text-transform:uppercase;letter-spacing:.2px;line-height:1.3">AVT Complete</div>
     <div style="font-size:8px;color:#9ca3af;margin-top:1px;text-align:center">${aSub}</div>
@@ -1429,7 +1430,7 @@ function buildJourneyInfographic(cas) {
       <div style="display:flex;align-items:center;gap:3px;margin-top:2px">
         ${stIcon ? `<span style="font-size:10px;line-height:1">${stIcon}</span>` : ''}
         <span style="font-size:9px;font-weight:600;color:${stClr}">${stTxt}</span>
-        <span style="font-size:8px;color:#9ca3af;margin-left:auto">Mo&thinsp;${monthsElapsed}/12</span>
+
       </div>
     </div>` : '';
 
@@ -3111,16 +3112,13 @@ function buildHome() {
     if (pending > 0) {
       html += `<div class="action-card primary" onclick="buildCaseList('hosp-pending');showScreen('cases')" style="background:var(--red);border-color:var(--red)"><div class="action-icon">🔴</div><div><div class="action-title">${pending} case${pending!==1?'s':''} need your update</div><div class="action-desc">Surgery &amp; device details not yet submitted</div></div><div class="action-arrow">→</div></div>`;
     }
-    if (updated > 0) {
-      html += `<div class="action-card" onclick="buildCaseList('hosp-updated');showScreen('cases')"><div class="action-icon">✅</div><div class="action-title">${updated} updated</div><div class="action-desc">Surgery details submitted</div></div>`;
-    }
+
     if (avtRed.length > 0) {
       html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtRed.length} child${avtRed.length!==1?'ren':''} missing AVT 🔴</div><div class="action-desc">Not attending regularly — follow up</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     }
     if (avtYellow.length > 0) {
       html += `<div class="action-card" style="border-color:#d97706;background:#fffbeb" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:#92400e">${avtYellow.length} attendance concern ⚠️</div><div class="action-desc">2 consecutive sessions missed</div></div>`;
     }
-    html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All cases</div></div>`;
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
@@ -3625,6 +3623,7 @@ function buildCaseList(filter = 'all') {
 
   if      (filter === 'hosp-pending') activeStatusFilter = 'Needs update';
   else if (filter === 'hosp-updated') activeStatusFilter = 'Updated';
+  else if (filter === 'ontrack')       activeStatusFilter = 'On track';
   else if (filter === 'risk')         activeStatusFilter = 'At risk';
   else if (filter === 'confirm')      activeStatusFilter = 'Confirm';
   else if (filter === 'avt-red')      activeStatusFilter = 'AVT Red';
@@ -3713,6 +3712,8 @@ function applyAllFilters() {
     cases = cases.filter(c => !isHospitalUpdated(c));
   } else if (activeStatusFilter === 'Updated') {
     cases = cases.filter(c =>  isHospitalUpdated(c));
+  } else if (activeStatusFilter === 'On track') {
+    cases = cases.filter(c => !c.risk);
   } else if (activeStatusFilter === 'Confirm') {
     cases = cases.filter(c => c.risk || !c.surgAdmit || c.status === 'pending');
   } else if (activeStatusFilter === 'On track') {

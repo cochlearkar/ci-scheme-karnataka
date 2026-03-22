@@ -1575,7 +1575,7 @@ function buildPatientCard(cas, role) {
         <span class="patient-info-icon">👶</span>
         <div style="flex:1;min-width:0">
           <div class="patient-info-name">${cas.name}</div>
-          <div class="patient-info-sub">${[cas.gender, cas.age, cas.caste].filter(Boolean).join(' · ')}</div>
+          <div class="patient-info-sub">${[cas.gender, (currentAge(cas.dob)||cas.age), cas.caste].filter(Boolean).join(' \u00b7 ')}</div>
         </div>
         <span class="status-pill ${statusClass}" style="flex-shrink:0">${statusLabel}</span>
       </div>
@@ -1614,7 +1614,7 @@ function buildPatientCard(cas, role) {
       <span class="patient-info-icon">👶</span>
       <div style="flex:1;min-width:0">
         <div class="patient-info-name">${cas.name}</div>
-        <div class="patient-info-sub">${[cas.gender, cas.age, cas.caste].filter(Boolean).join(' · ')}</div>
+        <div class="patient-info-sub">${[cas.gender, (currentAge(cas.dob)||cas.age), cas.caste].filter(Boolean).join(' \u00b7 ')}</div>
       </div>
       <span class="status-pill ${statusClass}" style="flex-shrink:0">${statusLabel}</span>
     </div>
@@ -2721,7 +2721,7 @@ function openQEScreen(cas, quarterNum) {
     +'<span style="color:rgba(255,255,255,.7);font-size:11px">ID: '+cas.id+'</span>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--border)">'
-    + infoCell('Age / Gender', [cas.age,cas.gender].filter(Boolean).join(' / '))
+    + infoCell('Age / Gender', [(currentAge(cas.dob)||cas.age),cas.gender].filter(Boolean).join(' / '))
     + infoCell('Hearing Age', cas.hearingAge)
     + mobCell
     + infoCell2('Guardian', isDemo()?'***':cas.guardian)
@@ -3836,7 +3836,7 @@ function caseCardHTML(c) {
     attendanceBadge(c)+
     '</div>'+
     '<div class="case-meta">'+
-    '<span>'+(c.gender||'')+(c.age?', '+c.age:'')+' · '+(c.district||'')+'</span>'+
+    '<span>'+(c.gender||'')+((currentAge(c.dob)||c.age)?', '+(currentAge(c.dob)||c.age):'')+' · '+(c.district||'')+'</span>'+
     '<span>'+dateLabel+'</span>'+
     '<span style="color:var(--text-light);font-size:11px">'+(c.fy||'')+'</span>'+
     '</div></div>';
@@ -4874,6 +4874,25 @@ function buildDistrictForm(cas) {
     </div>`;
 }
 
+
+// ── Age calculation helpers ──────────────────────────────────────────────
+function calcAgeYrMo(dobStr, refDateStr) {
+  if (!dobStr || !refDateStr) return '';
+  var d1 = new Date(dobStr), d2 = new Date(refDateStr);
+  if (isNaN(d1) || isNaN(d2) || d2 < d1) return '';
+  var years = d2.getFullYear() - d1.getFullYear();
+  var months = d2.getMonth() - d1.getMonth();
+  if (d2.getDate() < d1.getDate()) months--;
+  if (months < 0) { years--; months += 12; }
+  return years > 0 ? years + ' yr ' + months + ' mo' : months + ' mo';
+}
+function currentAge(dobStr) {
+  return dobStr ? calcAgeYrMo(dobStr, new Date().toISOString().substring(0,10)) : '';
+}
+function ageAtSurgery(dobStr, surgDateStr) {
+  return calcAgeYrMo(dobStr, surgDateStr ? surgDateStr.substring(0,10) : '');
+}
+
 function calcAgeAtSurgery() {
   const dob = document.getElementById('f-dob');
   const surgDate = document.getElementById('f-surgdate');
@@ -4888,7 +4907,7 @@ function calcAgeAtSurgery() {
   if (months < 0) { years--; months += 12; }
   if (d2.getDate() < d1.getDate()) months--;
   if (months < 0) { years--; months += 12; }
-  ageField.value = years > 0 ? `${years} yr ${months} mo` : `${months} months`;
+  ageField.value = years > 0 ? years + ' yr ' + months + ' mo' : months + ' mo';
   ageField.classList.add('has-value');
 }
 
@@ -5713,7 +5732,7 @@ function buildSummaryHTML(c) {
     +'<div style="margin-bottom:16px">'+journey+'</div>'
     +hospBadge
     +'<div class="form-section">'+sec('Patient Information','&#128118;')
-    +row('TPA ID',c.tpa)+row('Gender',c.gender)+row('Age at Surgery',c.age)
+    +row('TPA ID',c.tpa)+row('Gender',c.gender)+row('Age at Surgery', ageAtSurgery(c.dob, c.surgAdmit) || c.age)
     +row('Date of Birth',fmtDate(c.dob))+row('Caste / Category',c.caste)
     +'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border)">'
     +'<span style="font-size:11px;color:var(--text-light);flex-shrink:0;width:45%">Mobile</span>'
@@ -5793,6 +5812,9 @@ function openRehabSession(cas) {
     return '<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">'+label+'</span>'
           +'<div style="color:#0a3d2e;font-weight:500;font-size:12px">'+val+'</div></div>';
   }
+  var _mobClean = cleanMob(cas.mobile);
+  var _implant  = [cas.implantCompany, cas.implantModel].filter(Boolean).join(' ');
+  var _addr     = [cas.village, cas.taluk, cas.district].filter(Boolean).join(', ');
   var infoHTML =
     '<div style="margin:10px 16px 0;background:var(--green-light);border:0.5px solid var(--green-border);border-radius:10px;overflow:hidden">'
     +'<div style="background:#0a3d2e;padding:8px 14px;display:flex;justify-content:space-between;align-items:center">'
@@ -5802,17 +5824,32 @@ function openRehabSession(cas) {
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 14px">'
     +rsInfoRow('Date of Birth',    fmtDate(cas.dob))
     +rsInfoRow('Gender',           cas.gender)
-    +rsInfoRow('Age at Surgery',   cas.age)
+    +rsInfoRow('Current Age',      currentAge(cas.dob) || cas.age)
+    +rsInfoRow('Age at Surgery',   ageAtSurgery(cas.dob, cas.surgAdmit) || cas.age)
+    +rsInfoRow('Address',          _addr)
+    +(_mobClean ? '<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Mobile</span>'
+      +'<div><a href="tel:'+_mobClean+'" style="color:#0a3d2e;font-weight:600;font-size:12px;text-decoration:none">'+_mobClean+'</a></div></div>' : '')
     +rsInfoRow('District',         cas.district)
     +rsInfoRow('Referred Hospital',cas.hospital)
     +rsInfoRow('Surgery Date',     fmtDate(cas.surgAdmit))
+    +rsInfoRow('CI Surgeon',       cas.ciSurgeon || cas.mentorSurgeon || '')
     +rsInfoRow('Switch-on Date',   fmtDate(soStr))
     +rsInfoRow('Rehab Centre',     currentUser&&currentUser.unit ? currentUser.unit : (cas.rehabCentre||''))
-    +'<div style="grid-column:span 2">'
-    +rsInfoRow('Sessions logged (app)', (sessFromApp!==null?sessFromApp:'None yet')+' / 104')
     +'</div>'
-    +(qtrBasis ? '<div style="grid-column:span 2;font-size:10px;color:#065f46;padding-top:2px">'+qtrBasis+'</div>' : '')
-    +'</div></div>';
+    +((_implant||cas.implantNumber||cas.speechProcessor) ?
+      '<div style="border-top:0.5px solid var(--green-border);padding:8px 14px">'
+      +'<div style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;margin-bottom:6px">&#127911; Device Details</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">'
+      +rsInfoRow('Manufacturer', cas.implantCompany)
+      +rsInfoRow('Model',        cas.implantModel)
+      +rsInfoRow('Serial No.',   cas.implantNumber)
+      +rsInfoRow('Processor',    cas.speechProcessor)
+      +'</div></div>' : '')
+    +'<div style="border-top:0.5px solid var(--green-border);padding:8px 14px">'
+    +rsInfoRow('Sessions (app)', (sessFromApp!==null?sessFromApp:'None yet')+' / 104')
+    +(qtrBasis ? '<div style="font-size:10px;color:#065f46;margin-top:4px">'+qtrBasis+'</div>' : '')
+    +'</div>'
+    +'</div>';
 
   // ── Quarter selector — prominent, mandatory ──────────────────
   var qtrHTML =
@@ -5973,6 +6010,8 @@ function openRehabSession(cas) {
         +'</div></div>';
     }).join('')
     +'</div>'
+    +'<div class="field"><div class="field-label">Mapping Audiologist</div>'
+    +'<input class="field-input" id="rs-map-audiologist" placeholder="Full name of audiologist"></div>'
     +'<div class="field"><div class="field-label">Issues / device status</div>'
     +'<input class="field-input" id="rs-devicestatus" placeholder="None, or describe..."></div>'
     +'</div>';

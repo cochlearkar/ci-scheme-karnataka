@@ -3123,10 +3123,7 @@ function buildHome() {
     }
 
     if (avtRed.length > 0) {
-      html += `<div class="action-card primary" onclick="buildCaseList('avt-red');showScreen('cases')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtRed.length} child${avtRed.length!==1?'ren':''} missing AVT 🔴</div><div class="action-desc">Not attending regularly — follow up</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
-    }
-    if (avtYellow.length > 0) {
-      html += `<div class="action-card" style="border-color:#d97706;background:#fffbeb" onclick="buildCaseList('avt-yellow');showScreen('cases')"><div class="action-icon">⚠️</div><div class="action-title" style="color:#92400e">${avtYellow.length} attendance concern ⚠️</div><div class="action-desc">2 consecutive sessions missed</div></div>`;
+      html += `<div class="action-card primary" onclick="openHospCasesOverlay('alerts')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtRed.length} child${avtRed.length!==1?'ren':''} missing AVT 🔴</div><div class="action-desc">Not attending regularly — tap to review</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     }
     html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Package rates · Claim checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;

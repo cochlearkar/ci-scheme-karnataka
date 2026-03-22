@@ -3786,7 +3786,11 @@ function applyAllFilters() {
   filteredCases = cases;
   const searchEl = document.getElementById('case-search');
   if (searchEl) searchEl.value = '';
-  renderCaseList();
+  if (activeStatusFilter === 'Alerts') {
+    renderAlertsList();
+  } else {
+    renderCaseList();
+  }
 }
 
 function applyFilter(f, el) {
@@ -3845,6 +3849,14 @@ function caseCardHTML(c) {
 }
 
 
+// Helper: single stat box for the cases banner
+function _bStat(n, label, textClr, bgClr, borderClr) {
+  return '<div style="background:'+bgClr+';border:0.5px solid '+borderClr+';border-radius:10px;padding:10px;text-align:center">' +
+         '<div style="font-size:22px;font-weight:700;color:'+textClr+'">'+n+'</div>' +
+         '<div style="font-size:10px;color:'+textClr+';margin-top:2px;font-weight:600">'+label+'</div>' +
+         '</div>';
+}
+
 function renderCaseList() {
   document.getElementById('case-count').textContent = `Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''}`;
 
@@ -3854,18 +3866,56 @@ function renderCaseList() {
   if (banner) {
     if (currentRole === 'hospital') {
       banner.style.display = 'block';
-      // Always use locked totals — never recalculate on tab switch
-      banner.innerHTML =
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
-        '<div style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px;text-align:center">' +
-        '<div style="font-size:22px;font-weight:700;color:var(--red)">' + _hospTotalPending + '</div>' +
-        '<div style="font-size:10px;color:var(--red);margin-top:2px;font-weight:600">PENDING UPDATE</div>' +
-        '<div style="font-size:9px;color:var(--red);opacity:0.7">of ' + _hospTotalAll + ' total</div></div>' +
-        '<div style="background:var(--green-light);border:0.5px solid var(--green-border);border-radius:10px;padding:10px;text-align:center">' +
-        '<div style="font-size:22px;font-weight:700;color:var(--green)">' + _hospTotalUpdated + '</div>' +
-        '<div style="font-size:10px;color:var(--green);margin-top:2px;font-weight:600">UPDATED ✓</div>' +
-        '<div style="font-size:9px;color:var(--green);opacity:0.7">of ' + _hospTotalAll + ' total</div></div>' +
-        '</div>';
+      const _all     = filterCasesByUser(SAMPLE_CASES);
+      const _total   = _all.length;
+      const _pending = _all.filter(c => !isHospitalUpdated(c)).length;
+      const _updated = _all.filter(c =>  isHospitalUpdated(c)).length;
+      const _clinical= _all.filter(c => c._attendanceFlag === 'red').length;
+      const _admin   = _all.filter(c => c.risk).length;
+      const _ontrack = _all.filter(c => !!(c.switchOn||c.switchOnDate) && c._attendanceFlag !== 'red' && !c.risk).length;
+      const _alerts  = _all.filter(c => c._attendanceFlag === 'red' || c.risk).length;
+
+      // Banner content depends on which filter is active
+      let bannerHTML = '';
+      if (activeStatusFilter === 'All') {
+        bannerHTML =
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">' +
+          _bStat(_total,  'Total Cases',      '#374151', '#f8fafc', '#e2e8f0') +
+          _bStat(_ontrack,'On Track',          'var(--green)', 'var(--green-light)', 'var(--green-border)') +
+          _bStat(_alerts, 'Need Attention',    'var(--red)',   'var(--red-light)',   '#f5c6c2') +
+          '</div>';
+      } else if (activeStatusFilter === 'Prog on track') {
+        bannerHTML =
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+          _bStat(_ontrack,'On Track', 'var(--green)', 'var(--green-light)', 'var(--green-border)') +
+          _bStat(_total - _ontrack, 'Not Yet On Track', '#64748b', '#f1f5f9', '#e2e8f0') +
+          '</div>' +
+          '<div style="font-size:11px;color:#64748b;margin-bottom:10px;padding:8px 10px;background:#f8fafc;border-radius:8px;border:0.5px solid #e2e8f0">' +
+          '✅ On track = switch-on recorded + no AVT attendance concern + no claim issue' +
+          '</div>';
+      } else if (activeStatusFilter === 'Alerts') {
+        bannerHTML =
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+          _bStat(_clinical, 'AVT Concern',  '#dc2626', '#fee2e2', '#fca5a5') +
+          _bStat(_admin,    'Claim Issue',   '#d97706', '#fef3c7', '#fcd34d') +
+          '</div>' +
+          '<div style="font-size:11px;color:#64748b;margin-bottom:10px;padding:8px 10px;background:#fef9f0;border-radius:8px;border:0.5px solid #fcd34d">' +
+          '🎧 AVT Concern = child not attending sessions regularly · 📋 Claim Issue = TPA has flagged this case' +
+          '</div>';
+      } else if (activeStatusFilter === 'Needs update') {
+        bannerHTML =
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2') +
+          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)') +
+          '</div>';
+      } else {
+        bannerHTML =
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2') +
+          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)') +
+          '</div>';
+      }
+      banner.innerHTML = bannerHTML;
     } else {
       banner.style.display = 'none';
     }
@@ -3899,6 +3949,90 @@ function renderCaseList() {
       </div>
     </div>`;
   });
+  list.innerHTML = html;
+}
+
+// Renders the Alerts case list — Clinical and Admin sections, each FY-grouped
+function renderAlertsList() {
+  document.getElementById('case-count').textContent =
+    `Showing ${filteredCases.length} case${filteredCases.length!==1?'s':''} needing attention`;
+
+  const list = document.getElementById('case-list');
+  if (!filteredCases.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-light);padding:32px;font-size:13px">No cases needing attention</div>';
+    return;
+  }
+
+  const clinical = filteredCases.filter(c => c._attendanceFlag === 'red');
+  const admin    = filteredCases.filter(c => c.risk);
+
+  function fyGroupedCards(cases, tagLabel, tagBg, tagClr, dotClr) {
+    if (!cases.length) return '';
+    const byFY = {};
+    cases.forEach(c => {
+      const fy = c.fy || 'Unknown FY';
+      if (!byFY[fy]) byFY[fy] = [];
+      byFY[fy].push(c);
+    });
+    let html = '';
+    Object.keys(byFY).sort().reverse().forEach(fy => {
+      const fyId = 'al-fy-' + fy.replace(/[^a-z0-9]/gi,'') + '-' + dotClr.replace('#','');
+      html += `<div style="margin-bottom:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center;
+                    padding:6px 10px;background:#f8fafc;border-radius:8px 8px 0 0;
+                    border:0.5px solid #e2e8f0;cursor:pointer"
+             onclick="toggleFYSection('${fyId}')">
+          <span style="font-size:11px;font-weight:700;color:#374151">FY ${fy}</span>
+          <span style="font-size:10px;color:#64748b">${byFY[fy].length} case${byFY[fy].length!==1?'s':''}</span>
+          <span id="${fyId}-icon" style="font-size:10px;color:#64748b">▼</span>
+        </div>
+        <div id="${fyId}" style="border:0.5px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;overflow:hidden">`;
+      byFY[fy].forEach(c => {
+        const daysSince = c._lastRehabDate
+          ? Math.floor((Date.now()-new Date(c._lastRehabDate))/86400000) : null;
+        const detail = tagLabel === 'AVT Concern'
+          ? (daysSince !== null ? `Last session ${daysSince}d ago`
+             : (c.switchOn||c.switchOnDate) ? 'AVT not yet started' : 'Switch-on not recorded')
+          : (c.surgStatus && c.surgStatus !== 'CLAIMS PAID' ? c.surgStatus
+             : c.r1Status && c.r1Status !== 'CLAIMS PAID' ? c.r1Status : 'Claim flagged');
+        html += `<div class="alert-card" style="border-radius:0;border-bottom:0.5px solid #f1f5f9"
+                      onclick="openCaseFromList('${c.id}')">
+          <div class="alert-dot" style="background:${dotClr}"></div>
+          <div style="flex:1">
+            <div class="alert-name">${c.name}</div>
+            <div class="alert-detail">${c.village||c.taluk||''} · ${detail}</div>
+          </div>
+          <span class="alert-tag" style="background:${tagBg};color:${tagClr}">${tagLabel}</span>
+        </div>`;
+      });
+      html += `</div></div>`;
+    });
+    return html;
+  }
+
+  let html = '';
+
+  if (clinical.length) {
+    html += `<div style="font-size:11px;font-weight:700;color:#dc2626;text-transform:uppercase;
+                         letter-spacing:.5px;margin:4px 0 8px;display:flex;align-items:center;gap:6px">
+               🎧 Clinical — AVT Attendance Concerns
+               <span style="font-size:11px;background:#fee2e2;color:#dc2626;padding:1px 8px;
+                            border-radius:10px;font-weight:700">${clinical.length}</span>
+             </div>`;
+    html += fyGroupedCards(clinical, 'AVT Concern', '#fee2e2', '#dc2626', '#dc2626');
+  }
+
+  if (admin.length) {
+    html += `<div style="font-size:11px;font-weight:700;color:#d97706;text-transform:uppercase;
+                         letter-spacing:.5px;margin:${clinical.length?'18px':'4px'} 0 8px;
+                         display:flex;align-items:center;gap:6px">
+               📋 Administrative — Claim / TPA Issues
+               <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:1px 8px;
+                            border-radius:10px;font-weight:700">${admin.length}</span>
+             </div>`;
+    html += fyGroupedCards(admin, 'Claim Issue', '#fef3c7', '#92400e', '#d97706');
+  }
+
   list.innerHTML = html;
 }
 

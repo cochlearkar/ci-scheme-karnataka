@@ -751,15 +751,15 @@ body {
   </div>
   <div class="home-hero" style="padding-top:0">
     <div class="home-stats">
-      <div class="home-stat" id="stat1-card" onclick="buildCaseList();showScreen('cases')" style="cursor:pointer">
+      <div class="home-stat" id="stat1-card" onclick="openHospCasesOverlay('all')" style="cursor:pointer">
         <div class="home-stat-num" id="stat1">—</div>
         <div class="home-stat-label" id="stat1-label">Cases</div>
       </div>
-      <div class="home-stat" id="stat2-card" onclick="buildCaseList('prog-ontrack');showScreen('cases')" style="cursor:pointer">
+      <div class="home-stat" id="stat2-card" onclick="openHospCasesOverlay('ontrack')" style="cursor:pointer">
         <div class="home-stat-num" id="stat2">—</div>
         <div class="home-stat-label" id="stat2-label">On track</div>
       </div>
-      <div class="home-stat" id="stat3-card" onclick="buildCaseList('alerts');showScreen('cases')" style="cursor:pointer">
+      <div class="home-stat" id="stat3-card" onclick="openHospCasesOverlay('alerts')" style="cursor:pointer">
         <div class="home-stat-num" id="stat3" style="color:#FAC775">—</div>
         <div class="home-stat-label" id="stat3-label">Alerts</div>
       </div>
@@ -3855,6 +3855,196 @@ function _bStat(n, label, textClr, bgClr, borderClr) {
          '<div style="font-size:22px;font-weight:700;color:'+textClr+'">'+n+'</div>' +
          '<div style="font-size:10px;color:'+textClr+';margin-top:2px;font-weight:600">'+label+'</div>' +
          '</div>';
+}
+
+function openHospCasesOverlay(mode) {
+  var existing = document.getElementById('hosp-cases-overlay');
+  if (existing) existing.remove();
+
+  // Role-aware header colour and label
+  var roleMeta   = ROLE_META[currentRole] || ROLE_META.hospital;
+  var roleColour = roleMeta.color;
+  var roleIcon   = roleMeta.icon;
+  var roleLabel  = roleMeta.label;
+
+  var allCases  = filterCasesByUser(SAMPLE_CASES);
+  var clinical  = allCases.filter(function(c){ return c._attendanceFlag === 'red'; });
+  var adminR    = allCases.filter(function(c){ return !!(c.risk); });
+  var ontrack   = allCases.filter(function(c){ return !!(c.switchOn||c.switchOnDate) && c._attendanceFlag !== 'red' && !c.risk; });
+  var alerts    = allCases.filter(function(c){ return c._attendanceFlag === 'red' || c.risk; });
+
+  // ── Header config per mode ────────────────────────────────────────────────
+  var cfg = {
+    all: {
+      color:    roleColour,
+      icon:     roleIcon,
+      title:    roleLabel + ' — All Cases',
+      sub:      allCases.length + ' cases · ' + ontrack.length + ' on track · ' + alerts.length + ' need attention',
+      stats: [
+        { n: allCases.length,  label: 'Total',          bg: '#e2e8f0', clr: '#374151',      bdr: '#cbd5e1' },
+        { n: ontrack.length,   label: 'On Track',        bg: '#dcfce7', clr: '#16a34a',      bdr: '#86efac' },
+        { n: alerts.length,    label: 'Need Attention',  bg: '#fee2e2', clr: '#dc2626',      bdr: '#fca5a5' },
+      ],
+      cases: allCases,
+      grouped: false
+    },
+    ontrack: {
+      color:    roleColour,
+      icon:     '✅',
+      title:    roleLabel + ' — On Track',
+      sub:      ontrack.length + ' of ' + allCases.length + ' cases · switch-on done + no concerns',
+      stats: [
+        { n: ontrack.length,              label: 'On Track',        bg: '#dcfce7', clr: '#16a34a', bdr: '#86efac' },
+        { n: allCases.length-ontrack.length, label: 'Not Yet On Track', bg: '#f1f5f9', clr: '#64748b', bdr: '#cbd5e1' },
+      ],
+      note: '✅ On track = switch-on recorded + no AVT attendance concern + no claim issue',
+      noteClr: '#14532d',
+      noteBg:  '#f0fdf4',
+      noteBdr: '#86efac',
+      cases: ontrack,
+      grouped: false
+    },
+    alerts: {
+      color:    roleColour,
+      icon:     '⚠️',
+      title:    roleLabel + ' — Cases Needing Attention',
+      sub:      alerts.length + ' cases · ' + clinical.length + ' clinical · ' + adminR.length + ' administrative',
+      stats: [
+        { n: clinical.length, label: 'AVT Concern',  bg: '#fee2e2', clr: '#dc2626', bdr: '#fca5a5' },
+        { n: adminR.length,   label: 'Claim Issue',  bg: '#fef3c7', clr: '#d97706', bdr: '#fcd34d' },
+      ],
+      note: '🎧 AVT Concern = not attending sessions · 📋 Claim Issue = TPA has flagged this case',
+      noteClr: '#92400e',
+      noteBg:  '#fffbeb',
+      noteBdr: '#fcd34d',
+      cases: alerts,
+      grouped: true,
+      clinical: clinical,
+      adminR:   adminR
+    }
+  };
+  var c = cfg[mode] || cfg.all;
+
+  // ── Stat boxes ─────────────────────────────────────────────────────────────
+  function statBox(s) {
+    return '<div style="background:'+s.bg+';border:1px solid '+s.bdr+';border-radius:10px;padding:10px;text-align:center;flex:1">'
+         + '<div style="font-size:22px;font-weight:800;color:'+s.clr+'">'+s.n+'</div>'
+         + '<div style="font-size:10px;font-weight:700;color:'+s.clr+';margin-top:2px">'+s.label+'</div>'
+         + '</div>';
+  }
+  var statsHTML = '<div style="display:flex;gap:8px;margin:12px 0 8px">'
+    + c.stats.map(statBox).join('') + '</div>';
+  if (c.note) {
+    statsHTML += '<div style="font-size:11px;color:'+c.noteClr+';padding:8px 10px;background:'+c.noteBg+';'
+               + 'border:0.5px solid '+c.noteBdr+';border-radius:8px;margin-bottom:10px">'+c.note+'</div>';
+  }
+
+  // ── Case card (simple, tap to open) ───────────────────────────────────────
+  function caseRow(cas, tagLabel, tagBg, tagClr, dotClr) {
+    var nm     = isDemo() ? maskName(cas.name) : cas.name;
+    var detail = tagLabel === 'AVT Concern'
+      ? (cas._lastRehabDate
+          ? 'Last session '+(Math.floor((Date.now()-new Date(cas._lastRehabDate))/86400000))+'d ago'
+          : (cas.switchOn||cas.switchOnDate) ? 'AVT not yet started' : 'Switch-on not recorded')
+      : tagLabel === 'Claim Issue'
+        ? (cas.surgStatus && cas.surgStatus!=='CLAIMS PAID' ? cas.surgStatus
+           : cas.r1Status && cas.r1Status!=='CLAIMS PAID' ? cas.r1Status : 'Claim flagged')
+      : (cas.surgAdmit ? 'Surgery: '+fmtDate(cas.surgAdmit) : cas.fy || '');
+    return '<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;'
+         + 'border-bottom:0.5px solid #f1f5f9;cursor:pointer;background:#fff" '
+         + 'onclick="document.getElementById(\'hosp-cases-overlay\').remove();openCaseFromList(\''+cas.id+'\')">'
+         + '<div style="width:8px;height:8px;border-radius:50%;background:'+dotClr+';flex-shrink:0"></div>'
+         + '<div style="flex:1;min-width:0">'
+         + '<div style="font-size:13px;font-weight:600;color:#111">'+nm+'</div>'
+         + '<div style="font-size:11px;color:#64748b;margin-top:1px">'+(cas.village||cas.taluk||cas.district||'')+(detail?' · '+detail:'')+'</div>'
+         + '</div>'
+         + '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;'
+         + 'background:'+tagBg+';color:'+tagClr+';white-space:nowrap">'+tagLabel+'</span>'
+         + '</div>';
+  }
+
+  // ── FY-grouped section ─────────────────────────────────────────────────────
+  function fyGroup(cases, tagLabel, tagBg, tagClr, dotClr, secHeadLabel, secHeadClr, secHeadBg) {
+    if (!cases.length) return '';
+    var html = '';
+    // Section heading
+    html += '<div style="font-size:11px;font-weight:700;color:'+secHeadClr+';text-transform:uppercase;'
+          + 'letter-spacing:.5px;padding:12px 14px 6px;background:'+secHeadBg+';'
+          + 'display:flex;align-items:center;gap:6px">'
+          + secHeadLabel
+          + ' <span style="background:'+tagBg+';color:'+tagClr+';padding:1px 8px;border-radius:10px;font-size:11px">'+cases.length+'</span></div>';
+    // Group by FY
+    var byFY = {};
+    cases.forEach(function(cas){
+      var fy = cas.fy || 'Unknown FY';
+      if (!byFY[fy]) byFY[fy] = [];
+      byFY[fy].push(cas);
+    });
+    Object.keys(byFY).sort().reverse().forEach(function(fy) {
+      html += '<div style="background:#f8fafc;padding:5px 14px;border-bottom:0.5px solid #e2e8f0">'
+            + '<span style="font-size:10px;font-weight:700;color:#64748b">FY '+fy
+            + ' &nbsp;·&nbsp; '+byFY[fy].length+' case'+(byFY[fy].length!==1?'s':'')+'</span></div>';
+      byFY[fy].forEach(function(cas){
+        html += caseRow(cas, tagLabel, tagBg, tagClr, dotClr);
+      });
+    });
+    return html;
+  }
+
+  // ── Build list HTML ────────────────────────────────────────────────────────
+  var listHTML = '';
+  if (mode === 'alerts') {
+    listHTML += fyGroup(c.clinical, 'AVT Concern', '#fee2e2', '#dc2626', '#dc2626',
+                        '🎧 Clinical — AVT Attendance Concerns', '#dc2626', '#fff5f5');
+    listHTML += fyGroup(c.adminR,   'Claim Issue',  '#fef3c7', '#92400e', '#d97706',
+                        '📋 Administrative — Claim / TPA Issues', '#92400e', '#fffbeb');
+  } else {
+    // flat FY-grouped list
+    var byFY = {};
+    c.cases.forEach(function(cas){
+      var fy = cas.fy || 'Unknown FY';
+      if (!byFY[fy]) byFY[fy] = [];
+      byFY[fy].push(cas);
+    });
+    Object.keys(byFY).sort().reverse().forEach(function(fy) {
+      listHTML += '<div style="background:#f1f5f9;padding:5px 14px;border-bottom:0.5px solid #e2e8f0">'
+               + '<span style="font-size:10px;font-weight:700;color:#64748b">FY '+fy
+               + ' &nbsp;·&nbsp; '+byFY[fy].length+' case'+(byFY[fy].length!==1?'s':'')+'</span></div>';
+      byFY[fy].forEach(function(cas){
+        var tag = cas._attendanceFlag==='red' ? 'AVT Concern' : cas.risk ? 'Claim Issue' : '✓ On track';
+        var tagBg  = cas._attendanceFlag==='red' ? '#fee2e2' : cas.risk ? '#fef3c7' : '#dcfce7';
+        var tagClr = cas._attendanceFlag==='red' ? '#dc2626' : cas.risk ? '#92400e' : '#16a34a';
+        var dotClr = cas._attendanceFlag==='red' ? '#dc2626' : cas.risk ? '#d97706' : '#16a34a';
+        listHTML += caseRow(cas, tag, tagBg, tagClr, dotClr);
+      });
+    });
+  }
+
+  // ── Assemble overlay ───────────────────────────────────────────────────────
+  var ov = document.createElement('div');
+  ov.id = 'hosp-cases-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  ov.innerHTML =
+    // Header
+    '<div style="background:'+c.color+';padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    + '<div onclick="document.getElementById(\'hosp-cases-overlay\').remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;'
+    + 'display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px;flex-shrink:0">&#8592;</div>'
+    + '<div>'
+    + '<div style="color:#fff;font-weight:700;font-size:15px">'+c.icon+' '+c.title+'</div>'
+    + '<div style="color:rgba(255,255,255,.75);font-size:11px;margin-top:2px">'+c.sub+'</div>'
+    + '</div></div>'
+    // Stats + note
+    + '<div style="background:#fff;padding:0 14px;border-bottom:1px solid #e5e7eb;flex-shrink:0">'
+    + statsHTML
+    + '</div>'
+    // Scrollable list
+    + '<div style="flex:1;overflow-y:auto">'
+    + (listHTML || '<div style="text-align:center;color:#9ca3af;padding:40px;font-size:13px">No cases in this category</div>')
+    + '</div>';
+
+  document.body.appendChild(ov);
 }
 
 function renderCaseList() {

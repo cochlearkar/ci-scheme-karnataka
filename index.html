@@ -836,6 +836,10 @@ body {
   <div class="bottom-bar" id="summary-action-bar" style="display:none">
     <button class="btn-submit" id="summary-action-btn" onclick="summaryAction()">Update →</button>
     <button class="btn-submit" id="summary-eval-btn" onclick="openQuarterlyEval(selectedCase)" style="display:none;margin-top:8px;background:var(--purple)">🎯 Quarterly Evaluation →</button>
+    <button class="btn-submit" id="summary-amend-btn"
+      style="display:none;margin-top:8px;font-size:13px">
+      &#9999; Amend / Correct
+    </button>
     <button class="btn-submit" id="summary-extra-btn" onclick="openOutcomeAssessment(selectedCase)"
       style="display:none;background:#4a2a7a;margin-top:8px;font-size:13px">
       &#127919; Full Outcome Assessment
@@ -3004,6 +3008,7 @@ async function submitQEForm(quarterNum, isDraft) {
     caseUpdates._lastEvalDate = record.evalDate;
     // Cache full record so form reloads with all data
     caseUpdates['_evalQ'+quarterNum] = record;
+    caseUpdates['_evalQ'+quarterNum+'SubmitAt'] = new Date().toISOString();
     caseUpdates._draftQ = isDraft ? quarterNum : null;
     if (record.avtCompleted === 'yes') caseUpdates.avtComplete = true;
 
@@ -3257,6 +3262,7 @@ function buildHome() {
   } else if (currentRole === 'state') {
     html += `<div class="action-card primary" onclick="showScreen('newcase')" style="background:var(--purple);border-color:var(--purple)"><div class="action-icon">➕</div><div><div class="action-title">Add New Case</div><div class="action-desc">Enter new SAST pre-auth data</div></div><div class="action-arrow">→</div></div>`;
     html += `<div class="action-card" onclick="buildCaseList();showScreen('cases')"><div class="action-icon">📋</div><div class="action-title">Browse cases</div><div class="action-desc">All cases</div></div>`;
+    html += `<div class="action-card primary" onclick="openPendingCorrections()" style="background:#4a2a7a;border-color:#4a2a7a"><div class="action-icon">📨</div><div><div class="action-title">Correction Requests</div><div class="action-desc">Tier 2 — Review &amp; approve pending corrections</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none" onclick="window.open('dashboard.html','_blank')"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">Dashboard</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Charts &amp; Trends</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#0a3d2e,#1a6b4a);border:none" onclick="window.open('reports.html','_blank')"><div class="action-icon" style="font-size:22px">📋</div><div class="action-title" style="color:#fff">Reports</div><div class="action-desc" style="color:rgba(255,255,255,.7)">District · Hospital · FY · At-risk</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#128C7E,#25D366);border:none;cursor:pointer" onclick="shareWhatsApp()"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">📤</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Share Daily Update on WhatsApp</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Tap to open WhatsApp with today's hospital summary pre-filled</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
@@ -5444,7 +5450,16 @@ async function submitToSheet(formData) {
         if (formData['f-serial'])         updates.implantNumber  = formData['f-serial'];
         if (formData['f-processor-model'])updates.speechProcessor= formData['f-processor-model'];
         updates.status = 'rehab1';
+        var _wasSubmitted = selectedCase && selectedCase.hospSubmitted;
+        var _inWindow     = _wasSubmitted && withinCorrectionWindow(selectedCase._hospSubmitAt);
         updates.hospSubmitted = true;
+        updates._hospSubmitAt = new Date().toISOString();
+        if (_wasSubmitted && _inWindow) {
+          // Log as Tier 1 self-correction
+          logAmendment({ caseId:String(card), tier:1, status:'applied', role:'hospital',
+            field:'(hospital form re-submission within 24h)',
+            reason:'Self-correction within 24-hour window' });
+        }
       }
       if (role === 'rehab') {
         updates.lastContact = formData['f-sessdate'] || new Date().toISOString().split('T')[0];
@@ -5640,26 +5655,63 @@ function openCaseSummary(cas) {
 
   if (currentRole === 'hospital') {
     if (isHospitalUpdated(cas)) {
-      bar.style.display = 'none';
+      // Show Amend if within 24hr window, else Correction Request
+      var _hw = withinCorrectionWindow(cas._hospSubmitAt);
+      bar.style.display = 'block';
+      btn.textContent   = _hw ? '✏️ Amend Submission (within 24h) →' : '📋 Request Correction →';
+      btn.className     = 'btn-submit hospital';
+      btn.style.background = _hw ? '' : '#d97706';
+      btn.onclick = _hw
+        ? function(){ openHospitalUpdate(selectedCase); }
+        : function(){ openCorrectionRequest(selectedCase, 'hospital'); };
     } else {
       btn.textContent = '✏️ Update Surgery Details →';
       btn.className = 'btn-submit hospital';
+      btn.onclick = function(){ openHospitalUpdate(selectedCase); };
     }
   } else if (currentRole === 'rehab') {
-    btn.textContent = '🎧 Log Rehab Session →';
-    btn.className = 'btn-submit rehab';
+    var _rw = cas._rehabLastSubmit && withinCorrectionWindow(cas._rehabLastSubmit);
+    if (cas._rehabLastSubmit && !_rw) {
+      // Past 24hrs — offer correction request alongside new log
+      btn.textContent = '🎧 Log New Session →';
+      btn.className   = 'btn-submit rehab';
+      // Show amend button separately below
+      var extraAmend = document.getElementById('summary-amend-btn');
+      if (extraAmend) {
+        extraAmend.style.display = 'block';
+        extraAmend.textContent   = '📋 Request Correction to Past Log';
+        extraAmend.onclick       = function(){ openCorrectionRequest(selectedCase, 'rehab'); };
+      }
+    } else if (cas._rehabLastSubmit && _rw) {
+      btn.textContent = '✏️ Amend Last Session (within 24h) →';
+      btn.className   = 'btn-submit rehab';
+      btn.style.background = '#1a4a7a';
+    } else {
+      btn.textContent = '🎧 Log Rehab Session →';
+      btn.className   = 'btn-submit rehab';
+    }
   } else if (currentRole === 'district') {
     btn.textContent = '📍 Log Follow-up →';
     btn.className = 'btn-submit district';
   } else if (currentRole === 'state') {
     btn.textContent = '✏️ Update Claim Details →';
     btn.className = 'btn-submit state';
+    var scBtn = document.getElementById('summary-amend-btn');
+    if (scBtn) {
+      scBtn.style.display = 'block';
+      scBtn.textContent   = '🔑 State Override — Direct Correction';
+      scBtn.style.background = '#4a2a7a';
+      scBtn.style.color   = '#fff';
+      scBtn.onclick       = function(){ openStateCorrection(selectedCase); };
+    }
   }
   // Show outcome assessment button for district role
   const extraBtn = document.getElementById('summary-extra-btn');
   if (extraBtn) extraBtn.style.display = (currentRole === 'district') ? 'block' : 'none';
   const evalBtn2 = document.getElementById('summary-eval-btn');
   if (evalBtn2) evalBtn2.style.display = (currentRole === 'rehab') ? 'block' : 'none';
+  const amendBtn = document.getElementById('summary-amend-btn');
+  if (amendBtn) { amendBtn.style.display = 'none'; amendBtn.style.background = ''; amendBtn.style.color = ''; }
   document.getElementById('summary-action-bar').style.display = 'block';
   showScreen('casesummary');
 }
@@ -8299,6 +8351,368 @@ function attendanceBadge(cas) {
 
 // HOSPITAL UPDATE FUNCTIONS
 // ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════
+// CORRECTION SYSTEM
+// ══════════════════════════════════════════════════════════════════════
+// Tier 1 — Self-correction within 24 hours (same unit, reason required)
+// Tier 2 — Correction request after 24 hours (State reviews + approves)
+// Tier 3 — State override (direct edit any time, always logged)
+//
+// Every correction is logged to 'amendments' collection:
+// { caseId, role, unit, who, field, oldVal, newVal, reason,
+//   tier, timestamp, status: 'applied'|'pending'|'approved'|'rejected' }
+// ══════════════════════════════════════════════════════════════════════
+
+var CORRECTION_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// ── Check if a submission is within the 24-hour self-correction window ──
+function withinCorrectionWindow(timestampStr) {
+  if (!timestampStr) return false;
+  var t = new Date(timestampStr).getTime();
+  if (isNaN(t)) return false;
+  return (Date.now() - t) < CORRECTION_WINDOW_MS;
+}
+
+// ── Log an amendment to Firestore ─────────────────────────────────────
+async function logAmendment(amendRec) {
+  try {
+    var _add = window._fbFns.addDoc;
+    var _col = window._fbFns.collection;
+    await _add(_col(window._fbDb, 'amendments'), {
+      ...amendRec,
+      timestamp: new Date().toISOString(),
+      submittedBy: currentUser ? currentUser.username : 'unknown',
+      unit: currentUser ? currentUser.unit : ''
+    });
+  } catch(e) {
+    console.error('logAmendment error:', e);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CORRECTION REQUEST OVERLAY (Tier 2 — after 24 hours)
+// ══════════════════════════════════════════════════════════════════════
+function openCorrectionRequest(cas, submissionType) {
+  // submissionType: 'hospital' | 'rehab' | 'quarterly_eval'
+  var existing = document.getElementById('correction-req-overlay');
+  if (existing) existing.remove();
+
+  var roleMeta = ROLE_META[currentRole] || ROLE_META.hospital;
+
+  var ov = document.createElement('div');
+  ov.id = 'correction-req-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  var typeLabel = submissionType === 'hospital' ? 'Surgery / Device Details'
+    : submissionType === 'rehab' ? 'AVT Session Log'
+    : 'Quarterly Evaluation';
+
+  ov.innerHTML =
+    '<div style="background:'+roleMeta.color+';padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    + '<div onclick="document.getElementById(\'correction-req-overlay\').remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;'
+    + 'display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#9999; Correction Request</div>'
+    + '<div style="color:rgba(255,255,255,.75);font-size:11px">'+(isDemo()?maskName(cas.name):cas.name)+' · Card: '+cas.id+'</div>'
+    + '</div></div>'
+    + '<div style="flex:1;overflow-y:auto;padding:16px">'
+    // Info box
+    + '<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin-bottom:16px">'
+    + '<div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:4px">&#9888;&#65039; 24-hour self-correction window has passed</div>'
+    + '<div style="font-size:11px;color:#78350f">Your correction request will be reviewed by the State team. The current data remains unchanged until approved.</div>'
+    + '</div>'
+    // Form
+    + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px">'
+    + '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:12px">Correction Details — '+typeLabel+'</div>'
+    + '<div class="field"><div class="field-label">Field to correct <span class="req">*</span></div>'
+    + '<select class="field-input" id="cr-field">'
+    + '<option value="">Select field...</option>'
+    + (submissionType === 'hospital' ? 
+        '<option>Surgery Date</option><option>Switch-on Date</option><option>Implant Manufacturer</option><option>Implant Model</option><option>Serial Number</option><option>Speech Processor</option><option>CI Surgeon</option><option>Patient DOB</option><option>Patient Mobile</option><option>Other</option>'
+      : submissionType === 'rehab' ?
+        '<option>Session Date</option><option>Attendance (P/A)</option><option>Session Count</option><option>Therapist Name</option><option>Mapping Audiologist</option><option>Quarter</option><option>Other</option>'
+      : '<option>MAIS Score</option><option>ISD Domain Score</option><option>Evaluation Date</option><option>Therapist Name</option><option>Audiologist Name</option><option>AVT Completed status</option><option>Other</option>'
+    )
+    + '</select></div>'
+    + '<div class="field"><div class="field-label">Current (wrong) value <span class="req">*</span></div>'
+    + '<input class="field-input" id="cr-old-val" placeholder="What is currently recorded (wrong value)"></div>'
+    + '<div class="field"><div class="field-label">Correct value <span class="req">*</span></div>'
+    + '<input class="field-input" id="cr-new-val" placeholder="What it should be"></div>'
+    + '<div class="field"><div class="field-label">Reason for correction <span class="req">*</span></div>'
+    + '<textarea class="field-input" id="cr-reason" rows="3" placeholder="Explain why this correction is needed (e.g. typing error, wrong date selected, patient details updated...)"></textarea></div>'
+    + '</div>'
+    // Error + Submit
+    + '<div id="cr-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>'
+    + '<button onclick="submitCorrectionRequest(\''+cas.id+'\',\''+submissionType+'\')" '
+    + 'style="width:100%;padding:14px;background:'+roleMeta.color+';color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">'
+    + '&#128231; Submit Correction Request &#8594;</button>'
+    + '</div>';
+
+  document.body.appendChild(ov);
+}
+
+async function submitCorrectionRequest(caseId, submissionType) {
+  var field   = document.getElementById('cr-field').value.trim();
+  var oldVal  = document.getElementById('cr-old-val').value.trim();
+  var newVal  = document.getElementById('cr-new-val').value.trim();
+  var reason  = document.getElementById('cr-reason').value.trim();
+  var errEl   = document.getElementById('cr-error');
+  errEl.style.display = 'none';
+
+  if (!field)  { errEl.textContent='Please select the field to correct.'; errEl.style.display='block'; return; }
+  if (!oldVal) { errEl.textContent='Please enter the current wrong value.'; errEl.style.display='block'; return; }
+  if (!newVal) { errEl.textContent='Please enter the correct value.'; errEl.style.display='block'; return; }
+  if (!reason) { errEl.textContent='Please explain why this correction is needed.'; errEl.style.display='block'; return; }
+
+  try {
+    var _add = window._fbFns.addDoc;
+    var _col = window._fbFns.collection;
+    await _add(_col(window._fbDb, 'amendments'), {
+      caseId:         String(caseId),
+      submissionType: submissionType,
+      field:          field,
+      oldVal:         oldVal,
+      newVal:         newVal,
+      reason:         reason,
+      tier:           2,
+      status:         'pending',
+      role:           currentRole,
+      unit:           currentUser ? currentUser.unit : '',
+      submittedBy:    currentUser ? currentUser.username : 'unknown',
+      timestamp:      new Date().toISOString()
+    });
+
+    document.getElementById('correction-req-overlay').remove();
+    alert('✅ Correction request submitted. The State team will review and apply it. You will see the correction reflected once approved.');
+  } catch(e) {
+    errEl.textContent = 'Error submitting request: ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// STATE OVERRIDE (Tier 3)
+// ══════════════════════════════════════════════════════════════════════
+function openStateCorrection(cas) {
+  var existing = document.getElementById('state-correction-overlay');
+  if (existing) existing.remove();
+
+  var ov = document.createElement('div');
+  ov.id = 'state-correction-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  ov.innerHTML =
+    '<div style="background:#4a2a7a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    + '<div onclick="document.getElementById(\'state-correction-overlay\').remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;'
+    + 'display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#128273; State Override — Direct Correction</div>'
+    + '<div style="color:rgba(255,255,255,.75);font-size:11px">'+(isDemo()?maskName(cas.name):cas.name)+' · Card: '+cas.id+'</div>'
+    + '</div></div>'
+    + '<div style="flex:1;overflow-y:auto;padding:16px">'
+    + '<div style="background:#ede9fe;border:1px solid #c4b5fd;border-radius:10px;padding:12px 14px;margin-bottom:16px">'
+    + '<div style="font-size:12px;font-weight:700;color:#4c1d95;margin-bottom:4px">&#9679; State Team Override</div>'
+    + '<div style="font-size:11px;color:#5b21b6">This correction is applied immediately and permanently logged. Use only for verified errors.</div>'
+    + '</div>'
+    + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px">'
+    + '<div class="field"><div class="field-label">Field to correct <span class="req">*</span></div>'
+    + '<select class="field-input" id="sc-field">'
+    + '<option value="">Select field...</option>'
+    + '<option>Surgery Date (surgAdmit)</option><option>Switch-on Date (switchOn)</option>'
+    + '<option>Date of Birth (dob)</option><option>Patient Name (name)</option>'
+    + '<option>Mobile (mobile)</option><option>District (district)</option>'
+    + '<option>Hospital (hospital)</option><option>Implant Manufacturer (implantCompany)</option>'
+    + '<option>Implant Model (implantModel)</option><option>Serial Number (implantNumber)</option>'
+    + '<option>Speech Processor (speechProcessor)</option><option>Rehab Centre (rehabCentre)</option>'
+    + '<option>CI Surgeon (ciSurgeon)</option><option>Other (notes)</option>'
+    + '</select></div>'
+    + '<div class="field"><div class="field-label">Current value</div>'
+    + '<input class="field-input" id="sc-old-val" placeholder="Current value (for audit record)"></div>'
+    + '<div class="field"><div class="field-label">Correct value <span class="req">*</span></div>'
+    + '<input class="field-input" id="sc-new-val" placeholder="The correct value to apply"></div>'
+    + '<div class="field"><div class="field-label">Reason / authority <span class="req">*</span></div>'
+    + '<textarea class="field-input" id="sc-reason" rows="3" placeholder="e.g. Verified from physical hospital records on DD/MM/YYYY by [name]"></textarea></div>'
+    + '</div>'
+    + '<div id="sc-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>'
+    + '<button onclick="applyStateOverride(\''+cas.id+'\')" '
+    + 'style="width:100%;padding:14px;background:#4a2a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">'
+    + '&#9999; Apply Override &#8594;</button>'
+    + '</div>';
+
+  document.body.appendChild(ov);
+}
+
+async function applyStateOverride(caseId) {
+  var fieldRaw = document.getElementById('sc-field').value.trim();
+  var oldVal   = document.getElementById('sc-old-val').value.trim();
+  var newVal   = document.getElementById('sc-new-val').value.trim();
+  var reason   = document.getElementById('sc-reason').value.trim();
+  var errEl    = document.getElementById('sc-error');
+  errEl.style.display = 'none';
+
+  if (!fieldRaw) { errEl.textContent='Please select a field.'; errEl.style.display='block'; return; }
+  if (!newVal)   { errEl.textContent='Please enter the correct value.'; errEl.style.display='block'; return; }
+  if (!reason)   { errEl.textContent='Reason is required for audit.'; errEl.style.display='block'; return; }
+
+  // Extract Firestore field name from "(fieldName)" pattern, else use raw label
+  var match = fieldRaw.match(/\((\w+)\)$/);
+  var fsField = match ? match[1] : 'notes';
+
+  try {
+    var _add = window._fbFns.addDoc;
+    var _col = window._fbFns.collection;
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+    var now  = new Date().toISOString();
+
+    // 1. Log the amendment first
+    await _add(_col(window._fbDb, 'amendments'), {
+      caseId:      String(caseId),
+      field:       fsField,
+      fieldLabel:  fieldRaw,
+      oldVal:      oldVal,
+      newVal:      newVal,
+      reason:      reason,
+      tier:        3,
+      status:      'applied',
+      role:        'state',
+      submittedBy: currentUser ? currentUser.username : 'unknown',
+      unit:        currentUser ? currentUser.unit : '',
+      timestamp:   now
+    });
+
+    // 2. Apply the correction to the case document
+    var updates = { [fsField]: newVal, _lastStateOverride: now, _lastModified: now };
+    await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+
+    // 3. Update local cache
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(caseId); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
+
+    document.getElementById('state-correction-overlay').remove();
+    alert('✅ Correction applied and logged. The case has been updated.');
+  } catch(e) {
+    errEl.textContent = 'Error applying override: ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// STATE: PENDING CORRECTION REQUESTS VIEW
+// ══════════════════════════════════════════════════════════════════════
+async function openPendingCorrections() {
+  var existing = document.getElementById('pending-corrections-overlay');
+  if (existing) existing.remove();
+
+  var ov = document.createElement('div');
+  ov.id = 'pending-corrections-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+  ov.innerHTML =
+    '<div style="background:#4a2a7a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    + '<div onclick="document.getElementById(\'pending-corrections-overlay\').remove()" '
+    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;'
+    + 'display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#128231; Correction Requests</div>'
+    + '<div style="color:rgba(255,255,255,.75);font-size:11px">Tier 2 — Pending review</div>'
+    + '</div></div>'
+    + '<div id="pcr-body" style="flex:1;overflow-y:auto;padding:16px">'
+    + '<div style="text-align:center;padding:40px;color:#9ca3af">Loading...</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+
+  try {
+    var _col   = window._fbFns.collection;
+    var _query = window._fbFns.query;
+    var _where = window._fbFns.where;
+    var _getDocs = window._fbFns.getDocs;
+
+    var q    = _query(_col(window._fbDb, 'amendments'), _where('status','==','pending'));
+    var snap = await _getDocs(q);
+    var reqs = snap.docs.map(function(d){ return { _id: d.id, ...d.data() }; })
+                  .sort(function(a,b){ return b.timestamp > a.timestamp ? 1 : -1; });
+
+    var body = document.getElementById('pcr-body');
+    if (!reqs.length) {
+      body.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;font-size:13px">&#10003; No pending correction requests</div>';
+      return;
+    }
+
+    body.innerHTML = reqs.map(function(r) {
+      var cas = SAMPLE_CASES.find(function(c){ return String(c.id) === String(r.caseId); });
+      var casName = cas ? (isDemo()?maskName(cas.name):cas.name) : 'Case '+r.caseId;
+      return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:12px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+        + '<div><div style="font-size:13px;font-weight:700;color:#111">'+casName+'</div>'
+        + '<div style="font-size:11px;color:#64748b">Card '+r.caseId+' · '+r.role+' · '+(r.unit||'')+'</div></div>'
+        + '<span style="font-size:10px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:6px;font-weight:600">Pending</span>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+        + '<div><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Field</div><div style="font-size:12px;color:#374151">'+r.field+'</div></div>'
+        + '<div><div style="font-size:10px;color:#64748b;font-weight:600;text-transform:uppercase">Type</div><div style="font-size:12px;color:#374151">'+r.submissionType+'</div></div>'
+        + '<div><div style="font-size:10px;color:#dc2626;font-weight:600;text-transform:uppercase">Wrong value</div><div style="font-size:12px;color:#dc2626">'+r.oldVal+'</div></div>'
+        + '<div><div style="font-size:10px;color:#16a34a;font-weight:600;text-transform:uppercase">Correct value</div><div style="font-size:12px;color:#16a34a;font-weight:700">'+r.newVal+'</div></div>'
+        + '</div>'
+        + '<div style="background:#f8fafc;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:#374151"><strong>Reason:</strong> '+r.reason+'</div>'
+        + '<div style="font-size:10px;color:#9ca3af;margin-bottom:10px">Requested: '+(r.timestamp?r.timestamp.substring(0,16).replace('T',' '):'')
+        + ' by '+r.submittedBy+'</div>'
+        + '<div style="display:flex;gap:8px">'
+        + '<button onclick="approveCorrection(\''+r._id+'\',\''+r.caseId+'\',\''+r.field+'\',\''+encodeURIComponent(r.newVal)+'\')" '
+        + 'style="flex:1;padding:10px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#10003; Approve &amp; Apply</button>'
+        + '<button onclick="rejectCorrection(\''+r._id+'\')" '
+        + 'style="flex:1;padding:10px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#10007; Reject</button>'
+        + '</div></div>';
+    }).join('');
+  } catch(e) {
+    document.getElementById('pcr-body').innerHTML = '<div style="padding:20px;color:#dc2626">Error loading requests: '+e.message+'</div>';
+  }
+}
+
+async function approveCorrection(amendId, caseId, field, newValEncoded) {
+  var newVal = decodeURIComponent(newValEncoded);
+  if (!confirm('Apply this correction to Case '+caseId+'?\n\nField: '+field+'\nNew value: '+newVal)) return;
+  try {
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+    var now  = new Date().toISOString();
+
+    // Apply to case
+    var updates = { [field]: newVal, _lastModified: now };
+    await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+
+    // Mark amendment as approved
+    await _upd(_doc(window._fbDb, 'amendments', String(amendId)), {
+      status: 'approved', approvedBy: currentUser?currentUser.username:'state', approvedAt: now
+    });
+
+    // Update local cache
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(caseId); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
+
+    // Refresh the list
+    openPendingCorrections();
+  } catch(e) {
+    alert('Error: '+e.message);
+  }
+}
+
+async function rejectCorrection(amendId) {
+  var reason = prompt('Reason for rejection (will be logged):');
+  if (!reason) return;
+  try {
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+    await _upd(_doc(window._fbDb, 'amendments', String(amendId)), {
+      status: 'rejected',
+      rejectedBy:  currentUser ? currentUser.username : 'state',
+      rejectedAt:  new Date().toISOString(),
+      rejectReason: reason
+    });
+    openPendingCorrections();
+  } catch(e) {
+    alert('Error: '+e.message);
+  }
+}
+
 function openCaseFromList(caseId) {
   const cas = SAMPLE_CASES.find(x => String(x.id) === String(caseId));
   if (!cas) return;

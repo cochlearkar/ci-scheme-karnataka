@@ -7045,14 +7045,30 @@ async function submitRehabSession() {
 
     // Store the saved entry for frozen display
     window._rs_lastSaved = weekEntry;
-    // Show frozen view in place — do NOT navigate away
-    showRehabLogFrozen(weekEntry, selectedCase, 'just_saved');
 
   } catch(e) {
     errEl.textContent = 'Error saving: ' + e.message;
     errEl.style.display = 'block';
     btn.textContent = 'Save Monthly Log →';
     btn.disabled = false;
+    return; // stop here — don't show frozen view if save failed
+  }
+
+  // Show frozen read-only view OUTSIDE try/catch so errors are visible
+  try {
+    showRehabLogFrozen(window._rs_lastSaved, selectedCase, 'just_saved');
+  } catch(fe) {
+    // Fallback: show simple success message if frozen view crashes
+    document.getElementById('rs-body').innerHTML =
+      '<div style="padding:24px 16px;text-align:center">'
+      + '<div style="font-size:36px;margin-bottom:12px">✅</div>'
+      + '<div style="font-size:16px;font-weight:700;color:#065f46;margin-bottom:6px">Saved successfully!</div>'
+      + '<div style="font-size:12px;color:#6b7280;margin-bottom:4px">Entry ID: ' + (window._rs_lastSaved ? window._rs_lastSaved.entryId : '') + '</div>'
+      + '<div style="font-size:11px;color:#dc2626;margin-top:8px">Display error: ' + fe.message + '</div>'
+      + '<button onclick="goBack()" style="margin-top:20px;padding:11px 24px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Back to Cases</button>'
+      + '</div>';
+    showScreen('rehabsession');
+    console.error('showRehabLogFrozen error:', fe);
   }
 }
 

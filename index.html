@@ -6158,15 +6158,29 @@ function openRehabSession(cas) {
   window._rs_qtrs        = QTRS;
   window._rs_curQtrId    = curQtr.id;
 
-  // Show screen immediately with form
-  document.getElementById('rs-body').innerHTML =
-    alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + saveBtnHTML + mappingHTML + mappingSaveBtnHTML + submitHTML;
+  // FIX: Show a loading spinner first, then check Firestore before rendering the form.
+  // This prevents the race condition where the user could enter data into a blank form
+  // before the async pre-check completes and wipes their inputs by calling showRehabLogFrozen.
+  var rsBody = document.getElementById('rs-body');
+  rsBody.innerHTML =
+    '<div style="padding:40px 16px;text-align:center">'
+    + '<div style="font-size:28px;margin-bottom:12px">⏳</div>'
+    + '<div style="font-size:13px;color:var(--text-light)">Loading session data…</div>'
+    + '</div>';
   showScreen('rehabsession');
 
-  // Async: check Firestore for existing submissions for this case + quarter
+  // Capture the fully-built form HTML so we can render it after the Firestore check
+  var fullFormHTML = alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + saveBtnHTML + mappingHTML + mappingSaveBtnHTML + submitHTML;
+
+  // Async: check Firestore for existing submissions for this case + quarter.
   // If AVT log already saved => show frozen. If mapping saved => pre-fill + freeze.
+  // Only if nothing exists do we render the blank editable form.
   (async function() {
-    if (!window._fbDb || !window._fbFns) return;
+    if (!window._fbDb || !window._fbFns) {
+      // No Firestore — just show the form
+      rsBody.innerHTML = fullFormHTML;
+      return;
+    }
     var _col = window._fbFns.collection;
     var _qfn = window._fbFns.query;
     var _whr = window._fbFns.where;
@@ -6186,9 +6200,13 @@ function openRehabSession(cas) {
         var existingAVT = avtSnap.docs[0].data();
         window._rs_lastSaved = existingAVT;
         showRehabLogFrozen(existingAVT, cas, 'existing');
-        return; // full screen frozen - no need to check mapping separately
+        return; // full screen frozen — no need to check mapping separately
       }
     } catch(e) { console.warn('AVT pre-load failed:', e); }
+
+    // No existing AVT log — render the blank editable form now
+    rsBody.innerHTML = fullFormHTML;
+
     try {
       var mapQ = _qfn(
         _col(window._fbDb, 'submissions_mapping'),
@@ -7241,7 +7259,7 @@ async function submitAVTLog() {
     if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
     window._rs_lastSaved = avtEntry;
     if (btn) { btn.textContent = 'Save AVT Attendance Log →'; btn.disabled = false; }
-    rsFreezeSavedTable(avtEntry);
+    showRehabLogFrozen(avtEntry, selectedCase, 'just_saved');
   } catch(e) {
     if (errEl) { errEl.textContent = 'Error saving AVT log: ' + e.message; errEl.style.display = 'block'; }
     if (btn) { btn.textContent = 'Save AVT Attendance Log →'; btn.disabled = false; }
@@ -7653,8 +7671,8 @@ async function submitRehabSession() {
     return; // stop here — don't show frozen view if save failed
   }
 
-  // Freeze the AVT table in-place: lock rows, show success banner above table
-  rsFreezeSavedTable(window._rs_lastSaved);
+  // Show the confirmed frozen view with the saved entry
+  showRehabLogFrozen(window._rs_lastSaved, selectedCase, 'just_saved');
 }
 
 

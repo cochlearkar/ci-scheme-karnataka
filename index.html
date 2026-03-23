@@ -5864,6 +5864,7 @@ function buildSummaryHTML(c) {
 function openRehabSession(cas) {
   if (!cas) return;
   selectedCase = cas;
+  window._rs_frozen = false; // Reset frozen flag for fresh open
 
   // ── Set up the screen header ──────────────────────────────────
   var rsTitle = document.getElementById('rs-title');
@@ -6204,7 +6205,7 @@ function openRehabSession(cas) {
           if (ts > existingTs) { existing = data; existingTs = ts; }
         }
       });
-      if (existing) {
+      if (existing && !window._rs_frozen) {
         showRehabLogFrozen(existing, _rsCas, 'existing');
       }
     })
@@ -6584,6 +6585,8 @@ function rsIssueNone(el) {
 // REHAB LOG — FROZEN VIEW (read-only after save, with tier edit rules)
 // ══════════════════════════════════════════════════════════════════
 function showRehabLogFrozen(entry, cas, mode) {
+  // Ensure the rehab session screen is visible
+  showScreen('rehabsession');
   var submittedAt  = entry.timestamp || '';
   var submittedBy  = entry.submittedBy || '';
   var ageMs        = submittedAt ? (Date.now() - new Date(submittedAt).getTime()) : Infinity;
@@ -6726,9 +6729,13 @@ function showRehabLogFrozen(entry, cas, mode) {
     + '<button onclick="goBack()" style="width:100%;margin-top:10px;padding:12px;background:transparent;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-mid);cursor:pointer;font-family:inherit">← Back to Cases</button>'
     + '</div>';
 
+  // Mark as frozen so fetch-on-open doesn't overwrite
+  window._rs_frozen = true;
+  showScreen('rehabsession');
   document.getElementById('rs-body').innerHTML = html;
-  // Hide the back button in header (no need to go back — frozen view is the destination)
-  document.getElementById('rs-submit-btn') && (document.getElementById('rs-submit-btn').style.display = 'none');
+  // Scroll to top of rs-body
+  var rsBody = document.getElementById('rs-body');
+  if (rsBody) rsBody.scrollTop = 0;
 }
 
 // ── Un-freeze for Tier 1 / Tier 3 edit ───────────────────────────────────────
@@ -6752,6 +6759,7 @@ function rsUnfreezeForEdit() {
     });
   }
   // Re-open the form fresh
+  window._rs_frozen = false;
   openRehabSession(selectedCase);
 }
 
@@ -6847,6 +6855,50 @@ async function submitRehabSession() {
     slots.push(slot);
   }
 
+  // ── Collect S3 (3rd session) rows ────────────────────────────────────
+  var numWeeks = Math.floor(slotCount / 2);
+  for (var w = 0; w < numWeeks; w++) {
+    var sid    = 's3-' + w;
+    var paEl3  = document.getElementById('rs-pa-' + sid);
+    var dateEl3= document.getElementById('rs-date-' + sid);
+    if (!paEl3) continue;
+    var att3 = paEl3.getAttribute('data-val') || 'NA';
+    // Only collect if explicitly set to P or A (skip default N/A)
+    if (att3 === 'NA') continue;
+    atLeastOne = true;
+    var rowEl3 = document.getElementById('rs-row-' + sid);
+    var weekLbl3 = rowEl3 ? (rowEl3.cells[1] ? rowEl3.cells[1].textContent.trim() : '') : '';
+    var slot3 = {
+      rowIndex:   sid,
+      weekLabel:  weekLbl3,
+      isS3:       true,
+      sessdate:   dateEl3 ? dateEl3.value : '',
+      attendance: att3,
+      isPresent:  att3 === 'P',
+      isAbsent:   att3 === 'A'
+    };
+    if (att3 === 'P') {
+      runningP++;
+      slot3.sessNum     = sessStart + runningP - 1;
+      slot3.audition    = document.getElementById('rs-aud-'+sid) ? document.getElementById('rs-aud-'+sid).classList.contains('tick') : false;
+      slot3.speech      = document.getElementById('rs-spe-'+sid) ? document.getElementById('rs-spe-'+sid).classList.contains('tick') : false;
+      slot3.language    = document.getElementById('rs-lan-'+sid) ? document.getElementById('rs-lan-'+sid).classList.contains('tick') : false;
+      slot3.cognition   = document.getElementById('rs-cog-'+sid) ? document.getElementById('rs-cog-'+sid).classList.contains('tick') : false;
+      slot3.parentGuide = document.getElementById('rs-par-'+sid) ? document.getElementById('rs-par-'+sid).classList.contains('tick') : false;
+      presentCount++;
+    } else {
+      absentCount++;
+    }
+    // Insert after the 2nd slot of this week (maintain chronological order)
+    var insertAfter = 2 * w + 1; // index of 2nd session of this week in slots array
+    var insertPos = slots.findIndex(function(s){ return s.rowIndex === insertAfter; });
+    if (insertPos >= 0) {
+      slots.splice(insertPos + 1, 0, slot3);
+    } else {
+      slots.push(slot3);
+    }
+  }
+
   if (!atLeastOne) {
     errEl.textContent = 'Please mark attendance for at least one row.';
     errEl.style.display = 'block';
@@ -6890,7 +6942,7 @@ async function submitRehabSession() {
     totalRows:      slots.length,
     presentCount:   presentCount,
     absentCount:    absentCount,
-    attendancePct:  slots.length > 0 ? Math.round(presentCount/slots.length*100) : 0,
+    attendancePct:  (presentCount+absentCount) > 0 ? Math.round(presentCount/(presentCount+absentCount)*100) : 0,
     mapDate:        (document.getElementById('rs-mapdate')      ||{}).value     || '',
     mapCount:       (document.getElementById('rs-mapcount')     ||{}).value     || '',
     soundField:     sfEl   ? sfEl.textContent.trim()   : '',

@@ -6006,23 +6006,7 @@ function openRehabSession(cas) {
     +'</div></div>';
 
   // ── Submit HTML ───────────────────────────────────────────────
-  var submitHTML =
-    '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
-    +'<div class="field"><div class="field-label">Session notes</div>'
-    +'<textarea class="field-input" id="rs-notes" rows="2" placeholder="Progress, parent feedback..."></textarea></div>'
-    +'<div class="field"><div class="field-label">Issues to flag</div>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-device"> Device issue</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-health"> Child health issue</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-suture"> Status of Sutures</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" id="rs-issue-skin"> Status of skin under the coil</label>'
-    
-    +'<input class="field-input" id="rs-issues" placeholder="Details / notes on flagged issues" style="margin-top:2px">'
-    +'</div>'
-    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
-    +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-submit-btn">Save Weekly Log \u2192</button>'
-    +'<button onclick="openRehabHistory(selectedCase)" style="width:100%;margin-top:8px;padding:11px;background:transparent;border:1.5px solid var(--blue);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--blue)">\ud83d\udccb View All Saved Logs</button>'
-    +'</div>';
-
+  
   // ── Common HTML (therapist + stage) ──────────────────────────
   // Build table rows dynamically for selected quarter ────────
   // All 4 quarters: 26 rows each (2/week x 13 weeks), 104 sessions total over 12 months
@@ -6131,8 +6115,14 @@ function openRehabSession(cas) {
     +'<input class="field-input" id="rs-devicestatus" placeholder="None, or describe..."></div>'
     +'</div>';
 
+  var saveBtnHTML =
+    '<div style="margin:10px 16px 0">'
+    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
+    +'<button onclick="submitRehabSession()" style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-submit-btn">💾 Save Weekly Attendance Log →</button>'
+    +'</div>';
+
   var submitHTML =
-    '<div style="margin:12px 16px 40px">'
+    '<div style="margin:10px 16px 40px">'
     +'<div class="field"><div class="field-label">Notes / observations</div>'
     +'<textarea class="field-input" id="rs-notes" rows="2" placeholder="Progress, parent feedback..."></textarea></div>'
     +'<div class="field"><div class="field-label">Issues to flag</div>'
@@ -6144,9 +6134,6 @@ function openRehabSession(cas) {
     +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="rs-issue-other"> Others</label>'
     +'<input class="field-input" id="rs-issues" placeholder="Details / notes on flagged issues" style="margin-top:2px">'
     +'</div></div>'
-    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:12px;display:none;"></div>'
-    +'<button onclick="submitRehabSession()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-submit-btn">Save Weekly Log \u2192</button>'
-    +'<button onclick="openRehabHistory(selectedCase)" style="width:100%;margin-top:8px;padding:11px;background:transparent;border:1.5px solid var(--blue);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--blue)">\ud83d\udccb View All Saved Logs</button>'
     +'</div>';
 
   var commonHTML =
@@ -6165,7 +6152,7 @@ function openRehabSession(cas) {
 
   // Show screen immediately with form
   document.getElementById('rs-body').innerHTML =
-    alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + mappingHTML + submitHTML;
+    alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + saveBtnHTML + mappingHTML + submitHTML;
   showScreen('rehabsession');
 
   // Async: check Firestore for an existing submission for this case + quarter
@@ -6981,6 +6968,85 @@ async function openRehabHistory(cas) {
   }
 }
 
+
+// ══════════════════════════════════════════════════════════════════════
+// FREEZE SAVED TABLE — locks AVT rows in-place, keeps mapping editable
+// ══════════════════════════════════════════════════════════════════════
+function rsFreezeSavedTable(entry) {
+  if (!entry) return;
+
+  // ── 1. Success banner — insert above the AVT table div ───────────────
+  var tableDiv = document.querySelector('#rs-avt-table');
+  if (tableDiv) {
+    // Find the outer container (grandparent of the table)
+    var container = tableDiv.closest('div[style*="margin:10px 16px"]')
+                  || tableDiv.parentElement && tableDiv.parentElement.parentElement;
+    if (container && container.parentElement) {
+      var banner = document.createElement('div');
+      banner.style.cssText = 'background:#dcfce7;border:1px solid #86efac;border-radius:10px;'
+        + 'padding:10px 14px;margin:10px 16px 4px;display:flex;gap:10px;align-items:center';
+      banner.innerHTML = '<span style="font-size:20px">✅</span>'
+        + '<div><div style="font-size:13px;font-weight:700;color:#065f46">Weekly log saved!</div>'
+        + '<div style="font-size:11px;color:#16a34a">Entry ID: ' + (entry.entryId||'') + ' &nbsp;·&nbsp; '
+        + (entry.presentCount||0) + ' present, ' + (entry.absentCount||0) + ' absent</div></div>'
+        + '<button onclick="openRehabHistory(selectedCase)" style="margin-left:auto;padding:6px 10px;'
+        + 'background:#0a3d2e;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;'
+        + 'cursor:pointer;white-space:nowrap;font-family:inherit">📋 View all logs</button>';
+      container.parentElement.insertBefore(banner, container);
+    }
+  }
+
+  // ── 2. Lock all P/A toggle spans in the table ─────────────────────────
+  var slotCount = window._rs_slotCount || 26;
+  for (var i = 0; i < slotCount; i++) {
+    var paEl = document.getElementById('rs-pa-' + i);
+    if (paEl) {
+      paEl.onclick = null;
+      paEl.style.cursor = 'default';
+      paEl.style.opacity = paEl.getAttribute('data-val') ? '1' : '0.35';
+    }
+    // Lock date inputs
+    var dtEl = document.getElementById('rs-date-' + i);
+    if (dtEl) dtEl.disabled = true;
+    // Lock activity dots
+    ['aud','spe','lan','cog','par'].forEach(function(a) {
+      var d = document.getElementById('rs-' + a + '-' + i);
+      if (d) { d.onclick = null; d.style.cursor = 'default'; }
+    });
+  }
+  // Lock S3 rows too
+  var numWeeks = Math.floor(slotCount / 2);
+  for (var w = 0; w < numWeeks; w++) {
+    var sid = 's3-' + w;
+    var pa3 = document.getElementById('rs-pa-' + sid);
+    if (pa3) { pa3.onclick = null; pa3.style.cursor = 'default'; }
+    var dt3 = document.getElementById('rs-date-' + sid);
+    if (dt3) dt3.disabled = true;
+    ['aud','spe','lan','cog','par'].forEach(function(a) {
+      var d = document.getElementById('rs-' + a + '-' + sid);
+      if (d) { d.onclick = null; d.style.cursor = 'default'; }
+    });
+  }
+
+  // ── 3. Update save button to show confirmation ────────────────────────
+  var btn = document.getElementById('rs-submit-btn');
+  if (btn) {
+    btn.textContent = '✅ Saved — tap to log next week\'s sessions';
+    btn.style.background = '#065f46';
+    btn.onclick = function() {
+      // Reset: unlock everything and clear for next week's entry
+      window._rs_frozen = false;
+      openRehabSession(selectedCase);
+    };
+  }
+
+  // ── 4. Hide the error div ─────────────────────────────────────────────
+  var errEl = document.getElementById('rs-error');
+  if (errEl) errEl.style.display = 'none';
+
+  window._rs_frozen = true;
+}
+
 async function submitRehabSession() {
   if (isDemo()) { alert('\uD83D\uDD12 Demo account \u2014 submissions are disabled.'); return; }
   var errEl = document.getElementById('rs-error');
@@ -7236,22 +7302,8 @@ async function submitRehabSession() {
     return; // stop here — don't show frozen view if save failed
   }
 
-  // Show frozen read-only view OUTSIDE try/catch so errors are visible
-  try {
-    showRehabLogFrozen(window._rs_lastSaved, selectedCase, 'just_saved');
-  } catch(fe) {
-    // Fallback: show simple success message if frozen view crashes
-    document.getElementById('rs-body').innerHTML =
-      '<div style="padding:24px 16px;text-align:center">'
-      + '<div style="font-size:36px;margin-bottom:12px">✅</div>'
-      + '<div style="font-size:16px;font-weight:700;color:#065f46;margin-bottom:6px">Saved successfully!</div>'
-      + '<div style="font-size:12px;color:#6b7280;margin-bottom:4px">Entry ID: ' + (window._rs_lastSaved ? window._rs_lastSaved.entryId : '') + '</div>'
-      + '<div style="font-size:11px;color:#dc2626;margin-top:8px">Display error: ' + fe.message + '</div>'
-      + '<button onclick="goBack()" style="margin-top:20px;padding:11px 24px;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">← Back to Cases</button>'
-      + '</div>';
-    showScreen('rehabsession');
-    console.error('showRehabLogFrozen error:', fe);
-  }
+  // Freeze the AVT table in-place: lock rows, show success banner above table
+  rsFreezeSavedTable(window._rs_lastSaved);
 }
 
 

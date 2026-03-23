@@ -1233,7 +1233,8 @@ const REHAB_CENTRES = ["AIISH Bengaluru", "AIISH Mysuru", "NIMHANS Bengaluru", "
   "KAHER Belagavi",
   "Vani Pradan Kendra, Bengaluru",
   "JSS ISH, Dharwad",
-  "Kasturba Medical College, Attavara Mangaluru"];
+  "Kasturba Medical College, Attavara Mangaluru",
+  "BLDE Deemed University's AVT Centre, Vijayapura"];
 
 const ROLE_META = {
   hospital: { label: 'Hospital', chip: 'chip-hospital', color: '#0a3d2e', icon: '🏥',
@@ -1244,7 +1245,8 @@ const ROLE_META = {
       "KAHER Belagavi",
   "Vani Pradan Kendra, Bengaluru",
   "JSS ISH, Dharwad",
-      "Kasturba Medical College, Attavara Mangaluru"],
+      "Kasturba Medical College, Attavara Mangaluru",
+      "BLDE Deemed University's AVT Centre, Vijayapura"],
     yearLabel: 'Enrolment year' },
   district: { label: 'District Officer', chip: 'chip-district', color: '#8a5a0a', icon: '📍',
     orgLabel: 'District', orgOptions: ["BAGALKOTE", "BALLARI", "BANGALORE - RURAL", "BANGALORE EAST", "BANGALORE NORTH", "BANGALORE SOUTH", "BANGALORE WEST", "BELAGAVI", "BENGALURU", "BENGALURU RURAL", "BIDAR", "CHAMARAJANAGARA", "CHIKKABALLAPURA", "CHIKKAMAGALURU", "CHITRADURGA", "DAKSHINA KANNADA", "DAVANAGERE", "DHARWAR", "GADAG", "HASSAN", "HAVERI", "KALABURAGI", "KODAGU", "KOLAR", "KOPPAL", "MANDYA", "MYSORE", "MYSURU", "RAICHUR", "RAMANAGARA", "SHIVAMOGGA", "TUMAKURU", "UDUPI", "UTTARA KANNADA", "VIJAYANAGAR", "VIJAYAPURA", "YADGIR"],
@@ -2645,16 +2647,16 @@ function openQEScreen(cas, quarterNum) {
     }
   }
 
-  var qRomans   = ['I','II','III','IV'];
-  var qOrdinals = ['1st','2nd','3rd','4th'];
-  var qLabel    = qRomans[quarterNum-1]   || String(quarterNum);
-  var qOrd      = qOrdinals[quarterNum-1] || quarterNum+'th';
+  var qRomans   = ['Baseline','I','II','III','IV'];
+  var qOrdinals = ['Baseline','1st','2nd','3rd','4th'];
+  var qLabel    = quarterNum === 0 ? 'Baseline' : (qRomans[quarterNum] || String(quarterNum));
+  var qOrd      = quarterNum === 0 ? 'Baseline' : (qOrdinals[quarterNum] || quarterNum+'th');
 
   // Scheduled date = switchOn + quarterNum * 3 months
   var schedDate = soStr && !isNaN(new Date(soStr))
     ? (function(){
         var d = new Date(soStr);
-        d.setMonth(d.getMonth() + quarterNum * 3);
+        d.setMonth(d.getMonth() + (quarterNum === 0 ? 0 : quarterNum * 3));
         return d.toISOString().substring(0,10);
       })()
     : today;
@@ -2666,7 +2668,7 @@ function openQEScreen(cas, quarterNum) {
 
   document.getElementById('qe-title').textContent = cas.name || 'Quarterly Evaluation';
   document.getElementById('qe-sub').textContent =
-    'Quarter ' + qLabel + ' \u00b7 ' + (quarterNum*3) + '-month \u00b7 Scheduled: ' + schedDisplay;
+    (quarterNum===0 ? 'Baseline Evaluation · First Assessment' : 'Quarter ' + qLabel + ' \u00b7 ' + (quarterNum*3) + '-month') + ' \u00b7 Scheduled: ' + schedDisplay;
 
   // ── helpers ───────────────────────────────────────────────────────────────
   function sec(title, icon) {
@@ -2745,7 +2747,7 @@ function openQEScreen(cas, quarterNum) {
     + infoCell('Rehab Centre', cas.rehabCentre||(window.currentUser&&window.currentUser.unit))
     + infoCell('Surgery Date', fmtDate(cas.surgAdmit))
     + infoCell('Switch-on Date', fmtDate(soStr||''))
-    + infoCell('AVT Start Date', fmtDate(soStr||''))
+    + infoCell('AVT Start Date', fmtDate(cas.avtStartDate||'') || '<span style="color:var(--amber);font-size:11px">Set on first session log</span>')
     + infoCell('Processor', cas.speechProcessor)
     + infoCell2('Implant (Co. / Model / Serial)', implantStr||(cas.implantModel||''))
     // Parent guidance — editable Yes/No
@@ -2777,7 +2779,7 @@ function openQEScreen(cas, quarterNum) {
     +'border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
     +'<span style="font-size:11px;font-weight:700;color:#374151;flex-shrink:0">Quarter:</span>'
     + qRomans.map(function(ql, i) {
-        var qn = i+1;
+        var qn = i;
         var active = qn === quarterNum;
         var done   = cas['_evalQ'+qn] ? ' \u2713' : '';
         return '<div onclick="openQEScreen(selectedCase,'+qn+')" '
@@ -2850,7 +2852,7 @@ function openQEScreen(cas, quarterNum) {
     // Post Implant Rehab info
     +'<div class="form-section" style="padding:0 16px">'
     + sec('\ud83c\udfe5 Post Implant Rehabilitation')
-    + editRow('AVT Start Date', '<span style="font-size:13px;color:#374151">'+fmtDate(soStr||'')+'</span>')
+    + editRow('AVT Start Date', '<span style="font-size:13px;color:#374151">'+(cas.avtStartDate ? fmtDate(cas.avtStartDate) : '<span style="color:var(--amber)">Not yet set (auto on first session)</span>')+'</span>')
     + editRow('Mapping Start Date', '<span style="font-size:13px;color:#374151">'+fmtDate(soStr||'')+'</span>')
     + editRow('Speech Processor Details', inp('processor-detail', pv(cas.speechProcessor||saved.processorDetails), 'e.g. CP802'))
     + editRow('Warranty Card Issued', yesno('warranty','yes',saved.warrantyIssued))
@@ -2862,15 +2864,29 @@ function openQEScreen(cas, quarterNum) {
     + evalTableHeader()
     + er('Aided Audiogram',   'aud-done','aud-result',  saved.audDateCompleted, saved.audResult,  'e.g. Upper border of speech spectrum')
     + er('Speech Perception', 'spi-done','spi-result',  saved.spiDateCompleted, saved.spiResult,  'e.g. 20/25 Open set')
-    + er('MAIS (/40)',        'mais-done','mais',        saved.maisDateCompleted,saved.maisScore,  'e.g. 40/40')
+    + er((parseInt(cas.age||99)<=36?'IT-MAIS (/40)':'MAIS (/40)'), 'mais-done','mais', saved.maisDateCompleted, saved.maisScore, 'e.g. 40/40')
     +'</tbody></table></div>'
     +'</div>'
 
-    // Section 2: Speech and Language Evaluation (ISD)
+    // Section 2: Speech and Language Evaluation (ACSLS or ISD — user selects)
     +'<div style="padding:0 16px">'
     + sec('\ud83d\udde3\ufe0f 2. Speech and Language Evaluation')
     + editRow('Evaluation date', inp('lang-done', pv(saved.langDateCompleted||today), '', 'date'))
-    +'<div style="overflow-x:auto;margin-top:2px">'
+    // Tool selector
+    +'<div style="margin:8px 0 10px;background:var(--amber-light);border:1px solid #FAC775;border-radius:8px;padding:8px 12px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:6px">Select evaluation tool used</div>'
+    +'<div style="display:flex;gap:10px">'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:600">'
+    +'<input type="radio" name="lang-tool" value="ISD" id="lt-isd" '+(saved.langTool==='ACSLS'?'':'checked')+' onchange="rsLangTool(this.value)" style="accent-color:var(--blue)"> ISD'
+    +'</label>'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:600">'
+    +'<input type="radio" name="lang-tool" value="ACSLS" '+(saved.langTool==='ACSLS'?'checked':'')+' onchange="rsLangTool(this.value)" style="accent-color:var(--amber)"> ACSLS'
+    +'</label>'
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--amber);margin-top:4px">ISD = Indian Scale of Development &nbsp;|&nbsp; ACSLS = Auditory Communication Scale for Language & Speech</div>'
+    +'</div>'
+    // ISD table
+    +'<div id="lang-isd-table" style="overflow-x:auto;margin-top:2px;display:'+(saved.langTool==='ACSLS'?'none':'block')+'">'
     +'<table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">'
     +'<thead><tr style="background:#e8f0fe">'
     +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;min-width:160px">ISD Domain</th>'
@@ -2883,6 +2899,13 @@ function openQEScreen(cas, quarterNum) {
     + isdRow('Cognition',            'cogn')
     + isdRow('Social Communication', 'social')
     +'</tbody></table></div>'
+    // ACSLS input
+    +'<div id="lang-acsls-table" style="display:'+(saved.langTool==='ACSLS'?'block':'none')+'">'
+    + editRow('ACSLS Score', inp('f-acsls', pv(saved.acslsScore), 'e.g. Level 4 or 12/20'))
+    + editRow('ACSLS — Auditory', inp('f-acsls-aud', pv(saved.acslsAud), 'Auditory subscale score'))
+    + editRow('ACSLS — Verbal',   inp('f-acsls-ver', pv(saved.acslsVer), 'Verbal subscale score'))
+    + editRow('ACSLS — Notes',    inp('f-acsls-note', pv(saved.acslsNote), 'Any remarks'))
+    +'</div>'
     +'</div>'
 
     // Closing fields
@@ -2897,7 +2920,7 @@ function openQEScreen(cas, quarterNum) {
     +'</div>'
     +'<div class="form-section" style="padding:0 16px">'
     + sec('\u270f Signatures')
-    + editRow('AVT Therapist',        inp('therapist',     pv(saved.therapist),     'Full name'))
+    + editRow('Therapist name / Under the Supervision of', inp('therapist', pv(saved.therapist), 'Full name / Supervisor name'))
     + editRow('Mapping Audiologist',   inp('audiologist',   pv(saved.audiologist),   'Full name (if mapping done this quarter)'))
     + editRow('Supervisor',            inp('supervisor',    pv(saved.supervisor),    'Full name'))
     + editRow('Date',                  inp('sig-date',      pv(saved.evalDate||today), '', 'date'))
@@ -4455,7 +4478,7 @@ function buildHospitalForm(cas) {
         <select class="field-input" id="f-rehabcentre">
           <option value="">Select institute...</option>
           ${REHAB_CENTRES.map(o=>`<option>${o}</option>`).join('')}
-        <option>KAHER Belagavi</option><option>Vani Pradan Kendra, Bengaluru</option><option>JSS ISH, Dharwad</option><option>Kasturba Medical College, Attavara Mangaluru</option></select>
+        <option>KAHER Belagavi</option><option>Vani Pradan Kendra, Bengaluru</option><option>JSS ISH, Dharwad</option><option>Kasturba Medical College, Attavara Mangaluru</option><option>BLDE Deemed University's AVT Centre, Vijayapura</option></select>
       </div>
       <div class="field">
         <div class="field-label">Residential district of child</div>
@@ -4522,8 +4545,8 @@ function buildRehabForm(cas) {
   // Build 14-row weekly attendance table matching the paper form exactly
   const today = new Date().toISOString().split('T')[0];
   const sessStart = (qtrNum-1)*26 + 1;
-  const weeks = ['Week 1','Week 1','Week 1','Week 1','Week 2','Week 2','Week 2','Week 3','Week 3','Week 3','Week 4','Week 4','Week 4','Week 4'];
-  const sessNums = Array.from({length:14}, (_,i) => sessStart + i);
+  const weeks = ['Week 1','Week 1','Week 1','Week 1','Week 2','Week 2','Week 2','Week 3','Week 3','Week 3','Week 3 (3rd)','Week 4','Week 4','Week 4','Week 4'];
+  const sessNums = Array.from({length:15}, (_,i) => sessStart + i);
 
   const tableRows = weeks.map((w,i) => {
     const sn = sessNums[i];
@@ -4537,6 +4560,7 @@ function buildRehabForm(cas) {
           <option value="P">P</option>
           <option value="A">A</option>
           <option value="H">Holiday</option>
+          ${w.includes('3rd') ? '<option value="NA">N/A</option>' : ''}
         </select>
       </td>
       <td style="padding:4px 6px;font-size:11px;color:var(--text-mid);text-align:center;border-bottom:1px solid var(--border)" id="f-sn-${i}"></td>
@@ -4561,7 +4585,7 @@ function buildRehabForm(cas) {
       <div style="background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
         <div style="font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Quarter being reported</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${['I – Month 1–3','II – Month 4–6','III – Month 7–9','IV – Month 10–12'].map((lbl,i) =>
+          ${['I – Month 1–3','II – Month 4–6','III – Month 7–9','IV – Month 10–12','V – Month 13+'].map((lbl,i) =>
             `<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
                <input type="radio" name="rg-qtr" value="${i+1}" ${qtrNum===i+1?'checked':''} style="accent-color:var(--blue)"> ${lbl}
              </label>`).join('')}
@@ -5853,12 +5877,13 @@ function openRehabSession(cas) {
     {id:2, label:'Q2 (Month 4\u20136)',   spw:2, rows:26, start:27},
     {id:3, label:'Q3 (Month 7\u20139)',   spw:2, rows:26, start:53},
     {id:4, label:'Q4 (Month 10\u201312)', spw:2, rows:26, start:79},
+    {id:5, label:'Q5 (Month 13+)',         spw:2, rows:26, start:105},
   ];
 
   // ── Auto-detect current quarter ───────────────────────────────
   var sessFromApp  = _rehabSess(cas);
   var sessionsDone = sessFromApp !== null ? sessFromApp : 0;
-  var qtrNum = sessionsDone < 26 ? 1 : sessionsDone < 52 ? 2 : sessionsDone < 78 ? 3 : 4;
+  var qtrNum = sessionsDone < 26 ? 1 : sessionsDone < 52 ? 2 : sessionsDone < 78 ? 3 : sessionsDone < 104 ? 4 : 5;
   var soStr  = (cas.switchOn || cas.switchOnDate || '').substring(0,10);
   var qtrBasis = '';
   if (soStr && !isNaN(new Date(soStr))) {
@@ -5915,6 +5940,7 @@ function openRehabSession(cas) {
     +rsInfoRow('Surgery Date',     fmtDate(cas.surgAdmit))
     +rsInfoRow('CI Surgeon',       cas.ciSurgeon || cas.mentorSurgeon || '')
     +rsInfoRow('Switch-on Date',   fmtDate(soStr))
+    +rsInfoRow('AVT Start Date',    cas.avtStartDate ? fmtDate(cas.avtStartDate) : '<span style="font-size:10px;color:var(--amber)">Auto-set on first session logged</span>')
     +rsInfoRow('Rehab Centre',     currentUser&&currentUser.unit ? currentUser.unit : (cas.rehabCentre||''))
     +'</div>'
     +((_implant||cas.implantNumber||cas.speechProcessor) ?
@@ -6012,22 +6038,40 @@ function openRehabSession(cas) {
   var sessStart  = sessFromApp !== null ? sessFromApp + 1 : curQtr.start;
 
   // Data rows — P/A only, session# counts only on P rows
-  var tableRows = weekLabels.map(function(w,i){
-    return '<tr id="rs-row-'+i+'">'
-      +'<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">'+(curQtr.id>1?(curQtr.id-1)*26+i+1:i+1)+'</td>'
-      +'<td style="padding:5px 3px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">'+w+'</td>'
-      +'<td style="padding:3px 3px;border-bottom:1px solid var(--border)">'
-        +'<input type="date" id="rs-date-'+i+'" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
-      +'<td style="padding:3px 3px;border-bottom:1px solid var(--border);text-align:center">'
-        +'<span id="rs-pa-'+i+'" onclick="rsTogglePA('+i+')" style="display:inline-block;min-width:28px;padding:4px 5px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;background:var(--gray);color:var(--text-light);">\u2014</span></td>'
-      +'<td style="padding:5px 3px;font-size:12px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;color:var(--text)" id="rs-snum-'+i+'"></td>'
-      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-aud-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-spe-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-lan-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-cog-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-par-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      +'</tr>';
-  }).join('');
+  // Standard 2 rows per week; after every 2nd row add a 3rd-session row (P/A/NA)
+  var tableRows = '';
+  var weeksSeen = {};
+  weekLabels.forEach(function(w, i) {
+    var slNo = (curQtr.id > 1 ? (curQtr.id - 1) * 26 + i + 1 : i + 1);
+    tableRows += '<tr id="rs-row-' + i + '">'
+      + '<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">' + slNo + '</td>'
+      + '<td style="padding:5px 3px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">' + w + '</td>'
+      + '<td style="padding:3px 3px;border-bottom:1px solid var(--border)">'
+        + '<input type="date" id="rs-date-' + i + '" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
+      + '<td style="padding:3px 3px;border-bottom:1px solid var(--border);text-align:center">'
+        + '<span id="rs-pa-' + i + '" onclick="rsTogglePA(' + i + ')" style="display:inline-block;min-width:28px;padding:4px 5px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;background:var(--gray);color:var(--text-light);">\u2014</span></td>'
+      + '<td style="padding:5px 3px;font-size:12px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;color:var(--text)" id="rs-snum-' + i + '"></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-aud-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-spe-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-lan-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-cog-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-par-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '</tr>';
+    // After every 2nd session of the same week (i is 0-based, even index = 2nd session of that week)
+    if (i % 2 === 1) {
+      var s3id = 's3-' + Math.floor(i / 2);
+      tableRows += '<tr id="rs-row-' + s3id + '" style="background:#fffbf0">'
+        + '<td style="padding:4px 3px;font-size:10px;text-align:center;border-bottom:2px solid var(--border);color:var(--amber)">—</td>'
+        + '<td style="padding:4px 3px;font-size:10px;border-bottom:2px solid var(--border);color:var(--amber);white-space:nowrap">' + w + ' S3</td>'
+        + '<td style="padding:3px 3px;border-bottom:2px solid var(--border)">'
+          + '<input type="date" id="rs-date-' + s3id + '" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
+        + '<td style="padding:3px 3px;border-bottom:2px solid var(--border);text-align:center">'
+          + '<span id="rs-pa-' + s3id + '" onclick="rsTogglePA3(\'' + s3id + '\')" style="display:inline-block;min-width:36px;padding:4px 5px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-align:center;background:#fef3c7;color:var(--amber);">N/A</span></td>'
+        + '<td style="padding:4px 3px;font-size:10px;text-align:center;border-bottom:2px solid var(--border);color:var(--amber)">—</td>'
+        + '<td colspan="5" style="padding:4px 6px;font-size:9px;border-bottom:2px solid var(--border);color:var(--amber);font-style:italic">3rd session — mark P / A / N/A</td>'
+        + '</tr>';
+    }
+  });
 
   var tableHTML =
     '<div style="margin:10px 16px 0">'
@@ -6124,8 +6168,8 @@ function openRehabSession(cas) {
 
   var commonHTML =
     '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
-    +'<div class="field" style="margin:0"><div class="field-label">Therapist name</div>'
-    +'<input class="field-input" id="rs-therapist" placeholder="Full name of therapist conducting this session"></div>'
+    +'<div class="field" style="margin:0"><div class="field-label">Therapist Name / Under the Supervision of</div>'
+    +'<input class="field-input" id="rs-therapist" placeholder="Therapist name / Supervisor name"></div>'
     +'</div>';
 
   window._rs_sessStart   = sessStart;
@@ -6252,6 +6296,15 @@ function rsTableAtt(rowIdx, val) {
   var totEl = document.getElementById('sess-total');
   if (totEl) totEl.textContent = total + ' / ' + possible + ' attended';
 }
+
+function rsLangTool(val) {
+  var isd   = document.getElementById('lang-isd-table');
+  var acsls = document.getElementById('lang-acsls-table');
+  if (!isd || !acsls) return;
+  isd.style.display   = val === 'ISD'   ? 'block' : 'none';
+  acsls.style.display = val === 'ACSLS' ? 'block' : 'none';
+}
+
 // Q4 section visibility
 document.addEventListener('change', function(e) {
   if (e.target && e.target.name === 'rg-qtr') {
@@ -6260,6 +6313,22 @@ document.addEventListener('change', function(e) {
   }
 });
 // ── Table-row helpers for new 14-row monthly form ────────────────────
+function rsTogglePA3(sid) {
+  // Cycle for 3rd session: N/A → P → A → N/A
+  var pa = document.getElementById('rs-pa-'+sid);
+  if (!pa) return;
+  var cur = pa.getAttribute('data-val') || 'NA';
+  var next = cur === 'NA' ? 'P' : cur === 'P' ? 'A' : 'NA';
+  pa.setAttribute('data-val', next);
+  if (next === 'P') {
+    pa.textContent = 'P'; pa.style.background = '#dcfce7'; pa.style.color = '#16a34a'; pa.style.fontWeight = '800';
+  } else if (next === 'A') {
+    pa.textContent = 'A'; pa.style.background = '#fee2e2'; pa.style.color = '#dc2626'; pa.style.fontWeight = '800';
+  } else {
+    pa.textContent = 'N/A'; pa.style.background = '#fef3c7'; pa.style.color = 'var(--amber)'; pa.style.fontWeight = '700';
+  }
+}
+
 function rsTogglePA(rowIdx) {
   var pa = document.getElementById('rs-pa-'+rowIdx);
   if (!pa) return;
@@ -6766,6 +6835,8 @@ function openOutcomeAssessment(cas) {
     +'<div class="field"><div class="field-label">Assessment date <span class="req">*</span></div><input type="date" class="field-input has-value" id="oa-date" value="'+today+'"></div>'
     +'<div class="field"><div class="field-label">Assessment period <span class="req">*</span></div>'
     +'<select class="field-input" id="oa-period"><option value="">Select</option>'
+    +'<option>Baseline — Pre switch-on</option>'
+    +'<option>Baseline — At switch-on</option>'
     +'<option>Baseline — 3 months post switch-on</option>'
     +'<option>6 months post switch-on</option>'
     +'<option>9 months post switch-on</option>'
@@ -6778,7 +6849,7 @@ function openOutcomeAssessment(cas) {
 
     // MAIS / IT-MAIS
     +'<div class="form-section" style="margin:0 16px">'
-    +'<div class="form-section-title">&#128266; '+maisLabel+'</div>'
+    +'<div class="form-section-title">&#128266; IT-MAIS (/40) — Meaningful Auditory Integration Scale</div>'
     +'<div style="font-size:11px;color:var(--text-light);margin-bottom:12px">Score each question 0–4 based on parent report. Total score: /40. Higher = better auditory integration.</div>'
     + maisQuestions.map(function(q,i){ return opts04('mais_q'+(i+1), q, i+1); }).join('')
     +'<div style="background:var(--gray);border-radius:8px;padding:10px 12px;font-size:12px;margin-top:4px">'
@@ -8695,6 +8766,8 @@ function buildAssessmentForm(today, cas, usesITMAIS) {
     +'<div class="field"><div class="field-label">Assessment date · ದಿನಾಂಕ <span class="req">*</span></div><input type="date" class="field-input has-value" id="oa-date" value="'+today+'"></div>'
     +'<div class="field"><div class="field-label">Period · ಅವಧಿ <span class="req">*</span></div>'
     +'<select class="field-input" id="oa-period"><option value="">Select</option>'
+    +'<option>Baseline — Pre switch-on</option>'
+    +'<option>Baseline — At switch-on</option>'
     +'<option>Baseline — 3 months post switch-on</option>'
     +'<option>6 months post switch-on</option>'
     +'<option>9 months post switch-on</option>'
@@ -8706,7 +8779,7 @@ function buildAssessmentForm(today, cas, usesITMAIS) {
 
     // MAIS section
     +'<div style="background:#fff;border:1px solid #c4b8f8;border-radius:10px;padding:12px;margin-bottom:12px">'
-    +'<div style="font-size:11px;font-weight:700;color:#4a2a7a;margin-bottom:4px">📊 '+maisLabel+' — Meaningful Auditory Integration Scale</div>'
+    +'<div style="font-size:11px;font-weight:700;color:#4a2a7a;margin-bottom:4px">📊 IT-MAIS (/40) — Infant-Toddler Meaningful Auditory Integration Scale</div>'
     +'<div style="font-size:10px;color:var(--text-light);margin-bottom:10px">Score each: 0=Never · 1=Rarely · 2=Sometimes · 3=Often · 4=Always &nbsp;|&nbsp; Total: /40</div>'
     +'<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q1</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child spontaneously respond to their own name in a quiet environment?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಪರಿಚಿತ ವಾತಾವರಣದಲ್ಲಿ ತಮ್ಮ ಹೆಸರಿಗೆ ತಾನಾಗಿಯೇ ಪ್ರತಿಕ್ರಿಯಿಸುತ್ತದೆಯೇ?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q1" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q1" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q1" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q1" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q1" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q2</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child respond when called from another room (without seeing you)?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಬೇರೆ ಕೋಣೆಯಿಂದ ಕರೆದಾಗ (ನಿಮ್ಮನ್ನು ನೋಡದೆ) ಪ್ರತಿಕ್ರಿಯಿಸುತ್ತದೆಯೇ?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q2" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q2" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q2" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q2" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q2" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q3</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child alert to environmental sounds (doorbell, phone, TV)?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಪರಿಸರದ ಶಬ್ದಗಳಿಗೆ (ಬಾಗಿಲ ಗಂಟೆ, ಫೋನ್, ಟಿವಿ) ತಾನಾಗಿ ಗಮನ ಕೊಡುತ್ತದೆಯೇ?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q3" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q3" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q3" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q3" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q3" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q4</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child recognise familiar sounds (dog barking, car horn)?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಪರಿಚಿತ ಶಬ್ದಗಳನ್ನು (ನಾಯಿ ಬೊಗಳುವಿಕೆ, ಕಾರಿನ ಹಾರ್ನ್) ಗುರುತಿಸುತ್ತದೆಯೇ?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q4" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q4" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q4" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q4" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q4" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q5</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child tell the difference between speech and non-speech sounds?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಮಾತಿನ ಶಬ್ದ ಮತ್ತು ಇತರ ಶಬ್ದಗಳ ನಡುವೆ ವ್ಯತ್ಯಾಸ ತಿಳಿಯುತ್ತದೆಯೇ?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q5" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q5" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q5" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q5" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q5" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q6</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child respond differently to an angry or friendly voice (without seeing the speaker)?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಮಾತನಾಡುವ ವ್ಯಕ್ತಿಯ ಮುಖ ನೋಡದೆ ಕೋಪ/ಸ್ನೇಹದ ಧ್ವನಿಗೆ ಭಿನ್ನವಾಗಿ ಪ್ರತಿಕ್ರಿಯಿಸುತ್ತದೆಯೇ?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q6" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q6" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q6" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q6" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q6" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q7</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child spontaneously use voice in quiet situations (babbling/talking)?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಶಾಂತ ವಾತಾವರಣದಲ್ಲಿ ತಾನಾಗಿ ಧ್ವನಿ ಬಳಸುತ್ತದೆಯೇ (ಮಾತಾಡುವುದು/ಗೊಣಗಾಡುವುದು)?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q7" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q7" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q7" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q7" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q7" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q8</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child use voice to get attention in a noisy environment?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಗದ್ದಲದ ವಾತಾವರಣದಲ್ಲಿ ಗಮನ ಸೆಳೆಯಲು ಧ್ವನಿ ಬಳಸುತ್ತದೆಯೇ?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q8" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q8" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q8" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q8" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q8" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q9</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child use different voice patterns for different wants (requesting vs greeting)?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ವಿವಿಧ ಅಗತ್ಯಗಳಿಗೆ ಭಿನ್ನ ಧ್ವನಿ ಮಾದರಿ ಬಳಸುತ್ತದೆಯೇ (ಕೇಳುವುದು vs ಸ್ವಾಗತಿಸುವುದು)?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q9" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q9" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q9" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q9" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q9" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div><div style="background:var(--surface);border:0.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px"><div style="display:flex;gap:6px;margin-bottom:8px"><span style="background:#4a2a7a;color:#fff;border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;flex-shrink:0">Q10</span><div><div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.4">Does the child use voice rather than gesture as primary means of communication?</div><div style="font-size:11px;color:#7a4f1a;margin-top:3px;line-height:1.4">ಮಗು ಸಂವಹನಕ್ಕೆ ಮುಖ್ಯ ಸಾಧನವಾಗಿ ಸನ್ನೆ ಬದಲು ಧ್ವನಿ ಬಳಸುತ್ತದೆಯೇ?</div></div></div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px"><div class="score-btn" data-group="mais_q10" data-val="0" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">0</div><div style="font-size:9px;color:var(--text-light)">Never</div><div style="font-size:9px;color:#7a4f1a">ಎಂದಿಗೂ ಇಲ್ಲ</div></div><div class="score-btn" data-group="mais_q10" data-val="1" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">1</div><div style="font-size:9px;color:var(--text-light)">Rarely</div><div style="font-size:9px;color:#7a4f1a">ವಿರಳವಾಗಿ</div></div><div class="score-btn" data-group="mais_q10" data-val="2" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">2</div><div style="font-size:9px;color:var(--text-light)">Sometimes</div><div style="font-size:9px;color:#7a4f1a">ಕೆಲವೊಮ್ಮೆ</div></div><div class="score-btn" data-group="mais_q10" data-val="3" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">3</div><div style="font-size:9px;color:var(--text-light)">Often</div><div style="font-size:9px;color:#7a4f1a">ಹೆಚ್ಚಾಗಿ</div></div><div class="score-btn" data-group="mais_q10" data-val="4" onclick="selectScore(this)" style="text-align:center;padding:5px 2px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;background:var(--surface)"><div style="font-weight:700">4</div><div style="font-size:9px;color:var(--text-light)">Always</div><div style="font-size:9px;color:#7a4f1a">ಯಾವಾಗಲೂ</div></div></div></div>'
     +'<div style="background:#EEEDFE;border-radius:8px;padding:8px 12px;font-size:12px;margin-top:4px;display:flex;justify-content:space-between;align-items:center">'

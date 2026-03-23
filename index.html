@@ -6585,158 +6585,166 @@ function rsIssueNone(el) {
 // REHAB LOG — FROZEN VIEW (read-only after save, with tier edit rules)
 // ══════════════════════════════════════════════════════════════════
 function showRehabLogFrozen(entry, cas, mode) {
-  // Ensure the rehab session screen is visible
-  showScreen('rehabsession');
-  var submittedAt  = entry.timestamp || '';
-  var submittedBy  = entry.submittedBy || '';
-  var ageMs        = submittedAt ? (Date.now() - new Date(submittedAt).getTime()) : Infinity;
-  var within24h    = ageMs < 24 * 60 * 60 * 1000;
-  var isMyUnit     = currentUser && currentUser.unit &&
-                     entry.rehabCentre === currentUser.unit;
-  var isState      = currentRole === 'state';
+  if (!entry) return;
+  var submittedAt = entry.timestamp || '';
+  var ageMs       = submittedAt ? (Date.now() - new Date(submittedAt).getTime()) : Infinity;
+  var within24h   = ageMs < 24 * 60 * 60 * 1000;
+  var isMyUnit    = currentUser && currentUser.unit && entry.rehabCentre === currentUser.unit;
+  var isState     = currentRole === 'state';
 
-  // Tier rules
-  // Tier 1: same unit, within 24h → can re-open form with reason
-  // Tier 2: same unit, after 24h  → request correction (goes to state)
-  // Tier 3: state only             → always editable (override)
   var canT1 = isMyUnit && within24h;
   var canT2 = isMyUnit && !within24h;
   var canT3 = isState;
 
   var fmtTs = submittedAt
-    ? new Date(submittedAt).toLocaleString('en-IN', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
-    : '—';
+    ? new Date(submittedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
+    : '';
 
-  // ── Build frozen attendance table ──────────────────────────────
-  var ACTS = ['Audition','Speech','Language','Cognition','Parent\u00a0Guidance'];
-  var actKeys = ['audition','speech','language','cognition','parentGuide'];
+  // ── Attendance table rows ──────────────────────────────────────
+  var ACTKEYS = ['audition','speech','language','cognition','parentGuide'];
+  var slots   = entry.slots || [];
 
-  function actCell(slot, key) {
-    if (!slot.isPresent) return '<td style="text-align:center;padding:4px 3px;border-bottom:0.5px solid #e5e7eb;color:#9ca3af;font-size:11px">—</td>';
-    var v = slot[key];
-    if (v === true)  return '<td style="text-align:center;padding:4px 3px;border-bottom:0.5px solid #e5e7eb;color:#16a34a;font-size:13px;font-weight:700">✓</td>';
-    if (v === 'NA')  return '<td style="text-align:center;padding:4px 3px;border-bottom:0.5px solid #e5e7eb;color:#d97706;font-size:10px;font-weight:700">NA</td>';
-    return '<td style="text-align:center;padding:4px 3px;border-bottom:0.5px solid #e5e7eb;color:#9ca3af;font-size:11px">—</td>';
+  function actCell(sl, key) {
+    if (!sl.isPresent) return '<td style="text-align:center;padding:4px 2px;border-bottom:1px solid #e5e7eb;color:#9ca3af;font-size:11px">—</td>';
+    var v = sl[key];
+    if (v === true)  return '<td style="text-align:center;padding:4px 2px;border-bottom:1px solid #e5e7eb;color:#16a34a;font-size:14px;font-weight:700">✓</td>';
+    if (v === 'NA')  return '<td style="text-align:center;padding:4px 2px;border-bottom:1px solid #e5e7eb;color:#d97706;font-size:10px;font-weight:700">NA</td>';
+    return '<td style="text-align:center;padding:4px 2px;border-bottom:1px solid #e5e7eb;color:#9ca3af;font-size:11px">—</td>';
   }
 
-  var slots = entry.slots || [];
   var tableRows = slots.map(function(sl, i) {
-    var attColor = sl.isPresent ? '#16a34a' : sl.attendance === 'NA' ? '#d97706' : '#dc2626';
-    var attText  = sl.isPresent ? 'P' : sl.attendance === 'NA' ? 'N/A' : 'A';
-    var isS3     = sl.isS3 || false;
-    var rowBg    = isS3 ? '#fffbf0' : (i%2===0 ? '#fff' : '#f9fafb');
+    var isS3   = sl.isS3 || false;
+    var rowBg  = isS3 ? '#fffbf0' : (i % 2 === 0 ? '#fff' : '#f9fafb');
+    var attClr = sl.isPresent ? '#16a34a' : sl.attendance === 'NA' ? '#d97706' : '#dc2626';
+    var attBg  = sl.isPresent ? '#dcfce7' : sl.attendance === 'NA' ? '#fef3c7' : '#fee2e2';
+    var attTxt = sl.isPresent ? 'P'       : sl.attendance === 'NA' ? 'N/A'     : 'A';
     return '<tr style="background:' + rowBg + '">'
-      + '<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:0.5px solid #e5e7eb;color:#6b7280">' + (i+1) + '</td>'
-      + '<td style="padding:5px 3px;font-size:11px;border-bottom:0.5px solid #e5e7eb;color:#374151;white-space:nowrap">' + (sl.weekLabel || sl.week || '—') + (isS3?' <span style="font-size:9px;color:#d97706">S3</span>':'') + '</td>'
-      + '<td style="padding:5px 3px;font-size:11px;border-bottom:0.5px solid #e5e7eb;color:#374151">' + (sl.sessdate || '—') + '</td>'
-      + '<td style="padding:4px 3px;text-align:center;border-bottom:0.5px solid #e5e7eb"><span style="display:inline-block;min-width:28px;padding:3px 5px;border-radius:5px;font-size:12px;font-weight:800;background:' + (sl.isPresent?'#dcfce7':sl.attendance==='NA'?'#fef3c7':'#fee2e2') + ';color:' + attColor + '">' + attText + '</span></td>'
-      + '<td style="padding:5px 3px;font-size:12px;text-align:center;border-bottom:0.5px solid #e5e7eb;font-weight:700;color:#1e40af">' + (sl.sessNum || '—') + '</td>'
-      + actKeys.map(function(k){ return actCell(sl, k); }).join('')
+      + '<td style="padding:4px 2px;font-size:11px;text-align:center;border-bottom:1px solid #e5e7eb;color:#6b7280">' + (i+1) + '</td>'
+      + '<td style="padding:4px 2px;font-size:10px;border-bottom:1px solid #e5e7eb;color:#374151;white-space:nowrap">'
+        + (sl.weekLabel || '—') + (isS3 ? ' <span style="font-size:9px;color:#d97706">S3</span>' : '') + '</td>'
+      + '<td style="padding:4px 2px;font-size:10px;border-bottom:1px solid #e5e7eb;color:#374151">' + (sl.sessdate || '—') + '</td>'
+      + '<td style="padding:3px 2px;text-align:center;border-bottom:1px solid #e5e7eb">'
+        + '<span style="display:inline-block;min-width:28px;padding:2px 4px;border-radius:5px;font-size:11px;font-weight:800;background:' + attBg + ';color:' + attClr + '">' + attTxt + '</span></td>'
+      + '<td style="padding:4px 2px;font-size:11px;text-align:center;border-bottom:1px solid #e5e7eb;font-weight:700;color:#1e40af">' + (sl.sessNum || '—') + '</td>'
+      + ACTKEYS.map(function(k) { return actCell(sl, k); }).join('')
       + '</tr>';
   }).join('');
 
   // ── Mapping summary ────────────────────────────────────────────
-  var mapRows = [
-    ['Map Date',       entry.mapDate     || '—'],
-    ['Maps Done',      entry.mapCount    || '—'],
-    ['Sound Field',    entry.soundField  || '—'],
-    ['ECAP',           entry.ecap        || '—'],
-    ['Magnet',         entry.magnetOk    || '—'],
-    ['ENT Referral',   entry.entReferral || '—'],
-    ['Device Status',  entry.deviceStatus|| '—'],
-  ].filter(function(r){ return r[1] && r[1] !== '—'; });
+  var mapItems = [
+    ['Map Date', entry.mapDate], ['Maps Done', entry.mapCount],
+    ['Sound Field', entry.soundField], ['ECAP', entry.ecap],
+    ['Magnet', entry.magnetOk], ['ENT Referral', entry.entReferral],
+    ['Device Status', entry.deviceStatus]
+  ].filter(function(r) { return r[1]; });
 
-  var mapHTML = mapRows.length ? mapRows.map(function(r){
-    return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid #e5e7eb">'
-      +'<span style="font-size:11px;color:#6b7280">' + r[0] + '</span>'
-      +'<span style="font-size:11px;font-weight:500;color:#374151">' + r[1] + '</span></div>';
-  }).join('') : '<div style="font-size:11px;color:#9ca3af">No mapping this quarter</div>';
+  var mapHTML = mapItems.length
+    ? mapItems.map(function(r) {
+        return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f3f4f6">'
+          + '<span style="font-size:11px;color:#6b7280">' + r[0] + '</span>'
+          + '<span style="font-size:11px;font-weight:600;color:#374151">' + r[1] + '</span></div>';
+      }).join('')
+    : '<div style="font-size:11px;color:#9ca3af">No mapping this quarter</div>';
 
-  // ── Tier badge and action buttons ─────────────────────────────
-  var tierBadge = '';
-  var actionHTML = '';
-
+  // ── Tier action ────────────────────────────────────────────────
+  var tierHTML = '';
   if (canT3) {
-    tierBadge = '<span style="background:#4a2a7a;color:#fff;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">Tier 3 — State Override</span>';
-    actionHTML = '<button onclick="rsUnfreezeForEdit()" style="width:100%;padding:12px;background:#4a2a7a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">✏️ Edit (State Override — always logged)</button>';
+    tierHTML = '<div style="background:#EEEDFE;border:1px solid #c4b8f8;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+      + '<div style="font-size:11px;font-weight:700;color:#4a2a7a;margin-bottom:6px">Tier 3 — State Override</div>'
+      + '<button onclick="window._rs_frozen=false;openRehabSession(selectedCase)" style="width:100%;padding:9px;background:#4a2a7a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">✏️ Edit (logged automatically)</button>'
+      + '</div>';
   } else if (canT1) {
-    tierBadge = '<span style="background:#065f46;color:#fff;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">Tier 1 — Self-correction window open</span>';
-    actionHTML = '<div style="background:#e8f5ee;border:1px solid #9FE1CB;border-radius:8px;padding:10px 12px">'
-      +'<div style="font-size:11px;font-weight:700;color:#065f46;margin-bottom:6px">✏️ Correction within 24-hour window</div>'
-      +'<input class="field-input" id="rs-t1-reason" placeholder="Reason for correction (required)" style="margin-bottom:8px;font-size:12px">'
-      +'<button onclick="rsUnfreezeForEdit()" style="width:100%;padding:10px;background:#0a3d2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Edit with Reason →</button>'
-      +'</div>';
+    tierHTML = '<div style="background:#E1F5EE;border:1px solid #9FE1CB;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+      + '<div style="font-size:11px;font-weight:700;color:#065f46;margin-bottom:4px">✏️ Tier 1 — Self-correction (within 24 hours)</div>'
+      + '<input id="rs-t1-reason" class="field-input" placeholder="Reason for correction (required)" style="margin-bottom:6px;font-size:12px">'
+      + '<button onclick="rsUnfreezeT1()" style="width:100%;padding:9px;background:#0a3d2e;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Edit with Reason →</button>'
+      + '</div>';
   } else if (canT2) {
-    tierBadge = '<span style="background:#92400e;color:#fff;font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:8px">Tier 2 — Requires State approval</span>';
-    actionHTML = '<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:10px 12px">'
-      +'<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:4px">⏰ 24-hour self-correction window has closed</div>'
-      +'<div style="font-size:10px;color:#78350f;margin-bottom:8px">To correct this entry, submit a correction request. The State Team will review and approve it.</div>'
-      +'<input class="field-input" id="rs-t2-reason" placeholder="Describe what needs to be corrected and why" style="margin-bottom:8px;font-size:12px">'
-      +'<button onclick="rsRequestCorrection()" style="width:100%;padding:10px;background:#92400e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">📨 Submit Correction Request →</button>'
-      +'</div>';
+    tierHTML = '<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+      + '<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:2px">⏰ Tier 2 — Correction request (24-hour window closed)</div>'
+      + '<div style="font-size:10px;color:#78350f;margin-bottom:6px">Submit a request — State Team will review and approve.</div>'
+      + '<input id="rs-t2-reason" class="field-input" placeholder="What needs to be corrected and why" style="margin-bottom:6px;font-size:12px">'
+      + '<button onclick="rsRequestCorrection()" style="width:100%;padding:9px;background:#92400e;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">📨 Submit Correction Request →</button>'
+      + '</div>';
   }
 
-  var modeMsg = mode === 'just_saved'
-    ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;gap:8px;align-items:center"><span style="font-size:18px">✅</span><div><div style="font-size:13px;font-weight:700;color:#065f46">Saved successfully!</div><div style="font-size:11px;color:#16a34a">Entry ID: ' + (entry.entryId||'—') + '</div></div></div>'
+  // ── Saved banner ───────────────────────────────────────────────
+  var savedBanner = mode === 'just_saved'
+    ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:8px;align-items:center">'
+      + '<span style="font-size:20px">✅</span>'
+      + '<div><div style="font-size:13px;font-weight:700;color:#065f46">Saved successfully!</div>'
+      + '<div style="font-size:11px;color:#16a34a">Entry ID: ' + (entry.entryId || '') + '</div></div></div>'
     : '';
 
-  var html =
-    '<div style="padding:14px 16px 40px">'
-    + modeMsg
-    // Submission info bar
-    + '<div style="background:#f0f4ff;border:1px solid #c0cff8;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:4px">'
-    + '<div><div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase">Submitted by</div>'
-    + '<div style="font-size:12px;font-weight:600;color:#1e3a5f">' + (entry.rehabCentre||submittedBy||'—') + '</div></div>'
-    + '<div style="text-align:right"><div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase">Date &amp; Time</div>'
-    + '<div style="font-size:11px;font-weight:500;color:#374151">' + fmtTs + '</div></div>'
+  // ── Full page HTML ──────────────────────────────────────────────
+  var pageHTML = '<div style="padding:14px 16px 40px">'
+    + savedBanner
+    // Header card
+    + '<div style="background:#EBF3FC;border:1px solid #B5D4F4;border-radius:10px;padding:10px 14px;margin-bottom:12px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">'
+    + '<div><div style="font-size:10px;color:#1e3a5f;font-weight:700;text-transform:uppercase">Quarter</div>'
+    + '<div style="font-size:13px;font-weight:700;color:#1a4a7a">' + (entry.quarter || '') + '</div></div>'
+    + '<div style="text-align:right"><div style="font-size:10px;color:#1e3a5f;font-weight:700;text-transform:uppercase">Saved</div>'
+    + '<div style="font-size:11px;color:#374151">' + fmtTs + '</div></div>'
     + '</div>'
-    // Quarter + therapist
-    + '<div style="background:#e8f0fe;border-radius:8px;padding:8px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'
-    + '<div><span style="font-size:10px;color:#1e3a5f;font-weight:700;text-transform:uppercase">Quarter</span>'
-    + '<div style="font-size:13px;font-weight:700;color:#1a4a7a">' + (entry.quarter||'—') + tierBadge + '</div></div>'
-    + '<div style="text-align:right"><span style="font-size:10px;color:#1e3a5f;font-weight:700;text-transform:uppercase">Therapist / Supervisor</span>'
-    + '<div style="font-size:12px;font-weight:600;color:#1a4a7a">' + (entry.therapist||'—') + '</div></div>'
+    + '<div style="margin-top:6px;font-size:11px;color:#1e3a5f"><strong>Therapist:</strong> ' + (entry.therapist || '') + '</div>'
     + '</div>'
     // AVT Table
-    + '<div style="font-size:11px;font-weight:700;color:var(--blue);text-align:center;padding:6px 0;border:1px solid var(--blue-mid);border-bottom:none;border-radius:8px 8px 0 0;background:var(--blue-light);letter-spacing:.03em">REPORT OF AUDITORY VERBAL THERAPY AND MAPPING</div>'
-    + '<div style="overflow-x:auto;border:1px solid var(--blue-mid);border-radius:0 0 10px 10px;margin-bottom:14px">'
-    + '<table style="width:100%;border-collapse:collapse;min-width:400px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--blue);text-align:center;padding:6px;background:var(--blue-light);border:1px solid var(--blue-mid);border-bottom:none;border-radius:8px 8px 0 0">REPORT OF AUDITORY VERBAL THERAPY AND MAPPING</div>'
+    + '<div style="overflow-x:auto;border:1px solid var(--blue-mid);border-radius:0 0 8px 8px;margin-bottom:12px">'
+    + '<table style="width:100%;border-collapse:collapse;min-width:380px">'
     + '<thead><tr style="background:var(--blue-light)">'
-    + '<th style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">#</th>'
-    + '<th style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);border-bottom:1px solid var(--blue-mid)">Week</th>'
-    + '<th style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);border-bottom:1px solid var(--blue-mid)">Date</th>'
-    + '<th style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid);line-height:1.3">P/A<br>/N/A</th>'
-    + '<th style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid);line-height:1.3">Sess<br>No.</th>'
-    + ['Aud','Sp','Lang','Cog','Par'].map(function(a){ return '<th style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">'+a+'</th>'; }).join('')
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">#</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);border-bottom:1px solid var(--blue-mid)">Week</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);border-bottom:1px solid var(--blue-mid)">Date</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">P/A</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Sess</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Aud</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Sp</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Lang</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Cog</th>'
+    + '<th style="padding:5px 2px;font-size:9px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Par</th>'
     + '</tr></thead>'
-    + '<tbody>' + tableRows + '</tbody>'
+    + '<tbody>' + (tableRows || '<tr><td colspan="10" style="padding:12px;text-align:center;color:#9ca3af;font-size:12px">No attendance rows recorded</td></tr>') + '</tbody>'
     + '</table></div>'
-    // Stats row
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'
-    + '<div style="background:#dcfce7;border-radius:8px;padding:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:#16a34a">' + (entry.presentCount||0) + '</div><div style="font-size:9px;color:#065f46;font-weight:600;text-transform:uppercase">Present</div></div>'
-    + '<div style="background:#fee2e2;border-radius:8px;padding:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:#dc2626">' + (entry.absentCount||0) + '</div><div style="font-size:9px;color:#991b1b;font-weight:600;text-transform:uppercase">Absent</div></div>'
-    + '<div style="background:#e8f0fe;border-radius:8px;padding:8px;text-align:center"><div style="font-size:20px;font-weight:700;color:#1e40af">' + (entry.attendancePct||0) + '%</div><div style="font-size:9px;color:#1e3a5f;font-weight:600;text-transform:uppercase">Attendance</div></div>'
+    // Stats
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'
+    + '<div style="background:#dcfce7;border-radius:8px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#16a34a">' + (entry.presentCount || 0) + '</div><div style="font-size:9px;color:#065f46;font-weight:700;text-transform:uppercase">Present</div></div>'
+    + '<div style="background:#fee2e2;border-radius:8px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#dc2626">' + (entry.absentCount || 0) + '</div><div style="font-size:9px;color:#991b1b;font-weight:700;text-transform:uppercase">Absent</div></div>'
+    + '<div style="background:#e8f0fe;border-radius:8px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:#1e40af">' + (entry.attendancePct || 0) + '%</div><div style="font-size:9px;color:#1e3a5f;font-weight:700;text-transform:uppercase">Attendance</div></div>'
     + '</div>'
     // Mapping
-    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px">'
-    + '<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:8px">🎧 Mapping &amp; Device</div>'
+    + '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">🎧 Mapping &amp; Device</div>'
     + mapHTML + '</div>'
     // Notes
-    + (entry.notes ? '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#374151">' + entry.notes + '</div></div>' : '')
-    // Edit / correction action
-    + actionHTML
+    + (entry.notes ? '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Notes</div><div style="font-size:12px;color:#374151">' + entry.notes + '</div></div>' : '')
+    // Tier action
+    + tierHTML
     // Back button
-    + '<button onclick="goBack()" style="width:100%;margin-top:10px;padding:12px;background:transparent;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-mid);cursor:pointer;font-family:inherit">← Back to Cases</button>'
+    + '<button onclick="goBack()" style="width:100%;padding:11px;background:transparent;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-mid);cursor:pointer;font-family:inherit">← Back</button>'
     + '</div>';
 
-  // Mark as frozen so fetch-on-open doesn't overwrite
+  // ── Display on screen-rehabsession ────────────────────────────
   window._rs_frozen = true;
+  document.getElementById('rs-title').textContent = (cas && cas.name) ? cas.name : 'AVT Session Log';
+  document.getElementById('rs-sub').textContent   = entry.quarter || 'Saved';
+  document.getElementById('rs-body').innerHTML    = pageHTML;
   showScreen('rehabsession');
-  document.getElementById('rs-body').innerHTML = html;
-  // Scroll to top of rs-body
-  var rsBody = document.getElementById('rs-body');
-  if (rsBody) rsBody.scrollTop = 0;
+  document.getElementById('rs-body').scrollTop = 0;
 }
+
+function rsUnfreezeT1() {
+  var reason = (document.getElementById('rs-t1-reason') || {}).value;
+  if (!reason || !reason.trim()) { alert('Please enter a reason for the correction.'); return; }
+  if (window._rs_lastSaved) {
+    logAmendment({ caseId: String(selectedCase.id), tier: 1, status: 'applied',
+      role: currentRole, field: 'AVT quarterly log', reason: reason.trim() });
+  }
+  window._rs_frozen = false;
+  openRehabSession(selectedCase);
+}
+
 
 // ── Un-freeze for Tier 1 / Tier 3 edit ───────────────────────────────────────
 function rsUnfreezeForEdit() {

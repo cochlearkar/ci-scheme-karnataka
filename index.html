@@ -6068,7 +6068,11 @@ function openRehabSession(cas) {
         + '<td style="padding:3px 3px;border-bottom:2px solid var(--border);text-align:center">'
           + '<span id="rs-pa-' + s3id + '" onclick="rsTogglePA3(\'' + s3id + '\')" style="display:inline-block;min-width:36px;padding:4px 5px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-align:center;background:#fef3c7;color:var(--amber);">N/A</span></td>'
         + '<td style="padding:4px 3px;font-size:10px;text-align:center;border-bottom:2px solid var(--border);color:var(--amber)">—</td>'
-        + '<td colspan="5" style="padding:4px 6px;font-size:9px;border-bottom:2px solid var(--border);color:var(--amber);font-style:italic">3rd session — mark P / A / N/A</td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-aud-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-spe-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-lan-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-cog-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-par-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
         + '</tr>';
     }
   });
@@ -6094,7 +6098,7 @@ function openRehabSession(cas) {
     // Date — rowspan 2
     +'<th rowspan="2" style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);border-right:1px solid var(--blue-mid);border-bottom:1px solid var(--blue-mid);vertical-align:middle">Date</th>'
     // Present/Absent — rowspan 2
-    +'<th rowspan="2" style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-right:1px solid var(--blue-mid);border-bottom:1px solid var(--blue-mid);vertical-align:middle;line-height:1.4">Present(P)<br>/<br>Absent(A)</th>'
+    +'<th rowspan="2" style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-right:1px solid var(--blue-mid);border-bottom:1px solid var(--blue-mid);vertical-align:middle;line-height:1.4">Present(P)<br>/<br>Absent(A)<br>/<br>N/A</th>'
     // Session Number of AV Therapy — rowspan 2
     +'<th rowspan="2" style="padding:5px 3px;font-size:10px;font-weight:600;color:var(--blue);text-align:center;border-right:1px solid var(--blue-mid);border-bottom:1px solid var(--blue-mid);vertical-align:middle;line-height:1.4">Session<br>Number<br>of AV<br>Therapy*</th>'
     // "Session activities..." spans 5
@@ -6320,12 +6324,16 @@ function rsTogglePA3(sid) {
   var cur = pa.getAttribute('data-val') || 'NA';
   var next = cur === 'NA' ? 'P' : cur === 'P' ? 'A' : 'NA';
   pa.setAttribute('data-val', next);
+  var acts = ['aud','spe','lan','cog','par'];
   if (next === 'P') {
     pa.textContent = 'P'; pa.style.background = '#dcfce7'; pa.style.color = '#16a34a'; pa.style.fontWeight = '800';
+    acts.forEach(function(a){ var d=document.getElementById('rs-'+a+'-'+sid); if(d){ d.classList.remove('off'); } });
   } else if (next === 'A') {
     pa.textContent = 'A'; pa.style.background = '#fee2e2'; pa.style.color = '#dc2626'; pa.style.fontWeight = '800';
+    acts.forEach(function(a){ var d=document.getElementById('rs-'+a+'-'+sid); if(d){ d.classList.add('off'); d.setAttribute('data-val',''); d.textContent='\u2014'; } });
   } else {
     pa.textContent = 'N/A'; pa.style.background = '#fef3c7'; pa.style.color = 'var(--amber)'; pa.style.fontWeight = '700';
+    acts.forEach(function(a){ var d=document.getElementById('rs-'+a+'-'+sid); if(d){ d.classList.add('off'); d.setAttribute('data-val',''); d.textContent='\u2014'; } });
   }
 }
 

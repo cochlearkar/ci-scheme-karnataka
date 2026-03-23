@@ -6216,12 +6216,60 @@ function openRehabSession(cas) {
         var existingAVT = matchingQtr || allAvtDocs[0];
 
         window._rs_lastSaved = existingAVT;
-        // Sync the quarter selector to whichever entry we're showing
-        if (existingAVT.quarterNum && existingAVT.quarterNum !== qNum) {
+
+        // Sync quarter globals before rendering form
+        if (existingAVT.quarterNum) {
           window._rs_curQtrId = existingAVT.quarterNum;
+          // Find the matching quarter definition and update sessStart/slotCount
+          var savedQtr = (window._rs_qtrs || []).find(function(q){ return q.id === existingAVT.quarterNum; });
+          if (savedQtr) {
+            window._rs_slotCount   = savedQtr.rows;
+            window._rs_sessPerWeek = savedQtr.spw;
+          }
+          if (existingAVT.sessStart) window._rs_sessStart = existingAVT.sessStart;
         }
-        showRehabLogFrozen(existingAVT, cas, 'existing');
-        return; // full screen frozen — no need to check mapping separately
+
+        // Rebuild fullFormHTML with the corrected quarter selected
+        var savedQtrObj = (window._rs_qtrs || []).find(function(q){ return q.id === window._rs_curQtrId; }) || curQtr;
+        var savedWkLabels = [];
+        var savedWkStart = (savedQtrObj.id - 1) * 13 + 1;
+        for (var ww2 = savedWkStart; ww2 <= savedWkStart + 12; ww2++) {
+          for (var ss2 = 0; ss2 < savedQtrObj.spw; ss2++) {
+            savedWkLabels.push('Week ' + ww2);
+            if (savedWkLabels.length >= savedQtrObj.rows) break;
+          }
+          if (savedWkLabels.length >= savedQtrObj.rows) break;
+        }
+        var savedTableRows = rsBuildTableRows(savedQtrObj, savedWkLabels);
+        var savedTableHTML =
+          '<div style="margin:10px 16px 0">'
+          + '<div id="rs-sess-badge" style="font-size:10px;color:var(--blue);font-weight:700;text-align:center;padding:5px 8px;background:var(--blue-light);border:1px solid var(--blue-mid);border-bottom:none;border-radius:8px 8px 0 0">'
+          + savedQtrObj.label + ' — Sessions ' + savedQtrObj.start + '–' + (savedQtrObj.start + savedQtrObj.rows - 1) + ' — ' + savedQtrObj.spw + 'x per week'
+          + '</div>'
+          + '<div style="overflow-x:auto;border:1px solid var(--blue-mid);border-radius:0 0 8px 8px"><table id="rs-avt-table" style="width:100%;border-collapse:collapse;min-width:360px">'
+          + '<thead><tr style="background:var(--blue-light)">'
+          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Sl.</th>'
+          + '<th style="padding:6px 4px;font-size:10px;color:var(--blue);border-bottom:1px solid var(--blue-mid)">Week<br>Session</th>'
+          + '<th style="padding:6px 4px;font-size:10px;color:var(--blue);border-bottom:1px solid var(--blue-mid)">Date</th>'
+          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">P/A</th>'
+          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Sess#</th>'
+          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Aud</th>'
+          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Sp</th>'
+          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Lang</th>'
+          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Cog</th>'
+          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Par</th>'
+          + '</tr></thead>'
+          + '<tbody id="rs-table-body">' + savedTableRows + '</tbody>'
+          + '</table></div>'
+          + '<div style="margin-top:4px;font-size:10px;color:var(--text-light)">P = Present &nbsp;·&nbsp; A = Absent &nbsp;·&nbsp; N/A = 3rd session not applicable &nbsp;·&nbsp; <span style="background:#fef9c3;padding:1px 4px;border-radius:3px;font-size:9px">S3</span> = 3rd session row (optional)</div>'
+          + '</div>';
+
+        // Render the full editable form (with corrected quarter table)
+        rsBody.innerHTML = alertHTML + infoHTML + qtrHTML + commonHTML + savedTableHTML + saveBtnHTML + mappingHTML + mappingSaveBtnHTML + submitHTML;
+
+        // Now populate every field with the saved data
+        rsRestoreFormFromEntry(existingAVT);
+        return; // done — form is showing with data pre-filled
       }
     } catch(e) { console.error('AVT pre-load failed:', e); rsBody.innerHTML = '<div style="padding:20px 16px;background:#fee2e2;margin:12px 16px;border-radius:8px;font-size:12px;color:#991b1b">⚠️ Could not load saved session data: ' + e.message + '<br>Please check your internet connection and reload.</div>' + fullFormHTML; return; }
 
@@ -6866,6 +6914,154 @@ async function rsRequestCorrection() {
 // ══════════════════════════════════════════════════════════════════════
 // REHAB HISTORY — shows all saved weekly logs for this case
 // ══════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB — RESTORE SAVED DATA INTO THE LIVE EDITABLE FORM
+// Called after the form HTML is in the DOM. Populates every row with the
+// saved slot data (date, P/A, activity dots), pre-fills therapist name,
+// notes, issue flags, and mapping fields — exactly as if the user had
+// filled them in manually. The form remains fully editable.
+// ══════════════════════════════════════════════════════════════════════════════
+function rsRestoreFormFromEntry(entry) {
+  if (!entry) return;
+
+  // ── 1. Therapist name ──────────────────────────────────────────
+  var therapistEl = document.getElementById('rs-therapist');
+  if (therapistEl && entry.therapist) therapistEl.value = entry.therapist;
+
+  // ── 2. Quarter selector — highlight the saved quarter ─────────
+  if (entry.quarterNum) {
+    var qtrPills = document.querySelectorAll('[onclick^="rsSelectQtr"]');
+    qtrPills.forEach(function(pill) {
+      var match = pill.getAttribute('onclick').match(/rsSelectQtr\((\d+)/);
+      if (match && parseInt(match[1]) === entry.quarterNum) {
+        pill.style.background = 'var(--blue)';
+        pill.style.color = '#fff';
+        pill.style.fontWeight = '700';
+        pill.style.borderColor = 'var(--blue)';
+      } else {
+        pill.style.background = 'var(--gray)';
+        pill.style.color = 'var(--text)';
+        pill.style.fontWeight = '500';
+        pill.style.borderColor = 'transparent';
+      }
+    });
+    window._rs_curQtrId = entry.quarterNum;
+    if (entry.sessStart) window._rs_sessStart = entry.sessStart;
+  }
+
+  // ── 3. Attendance rows (slots) ─────────────────────────────────
+  var slots = entry.slots || [];
+  slots.forEach(function(sl, i) {
+    var isS3 = sl.isS3 || false;
+    var rowId = isS3 ? ('s3-' + sl.s3WeekIdx) : i;
+
+    // For S3 rows we need to find them by matching week position
+    // Simple approach: use index for regular rows; S3 rows are interspersed
+    // The saved slot array mirrors the order they were built, so we can
+    // use the slot index directly mapped to row IDs.
+    // We re-derive the rowId from the slot order as built by rsBuildTableRows:
+    // regular rows get index 0,1,2... and S3 rows get id 's3-0','s3-1'...
+  });
+
+  // Re-derive row IDs matching the DOM structure built by rsBuildTableRows.
+  // Regular rows: rs-row-0, rs-row-1, ... (ids 0,1,2,...)
+  // S3 rows:      rs-row-s3-0, rs-row-s3-1, ...
+  // Slots array is in DOM order: [reg0, reg1, s3-0, reg2, reg3, s3-1, ...]
+  var regIdx = 0;
+  var s3Idx  = 0;
+  slots.forEach(function(sl) {
+    var domId;
+    if (sl.isS3) {
+      domId = 's3-' + s3Idx;
+      s3Idx++;
+    } else {
+      domId = String(regIdx);
+      regIdx++;
+    }
+
+    // Date
+    var dateEl = document.getElementById('rs-date-' + domId);
+    if (dateEl && sl.sessdate) dateEl.value = sl.sessdate;
+
+    // P / A / N/A
+    var paEl = document.getElementById('rs-pa-' + domId);
+    if (paEl) {
+      var att = sl.isPresent ? 'P' : (sl.attendance === 'NA' || sl.attendance === 'N/A') ? 'NA' : sl.isAbsent ? 'A' : '';
+      if (att === 'P') {
+        paEl.setAttribute('data-val', 'P');
+        paEl.textContent = 'P';
+        paEl.style.background = '#dcfce7';
+        paEl.style.color = '#16a34a';
+        paEl.style.fontWeight = '800';
+        // Enable activity dots
+        ['aud','spe','lan','cog','par'].forEach(function(a) {
+          var d = document.getElementById('rs-' + a + '-' + domId);
+          if (d) d.classList.remove('off');
+        });
+      } else if (att === 'A') {
+        paEl.setAttribute('data-val', 'A');
+        paEl.textContent = 'A';
+        paEl.style.background = '#fee2e2';
+        paEl.style.color = '#dc2626';
+        paEl.style.fontWeight = '800';
+      } else if (att === 'NA') {
+        // S3 N/A row — already default N/A, no change needed
+      }
+    }
+
+    // Activity dots (only for present rows)
+    if (sl.isPresent) {
+      var actMap = {aud:'audition', spe:'speech', lan:'language', cog:'cognition', par:'parentGuide'};
+      Object.keys(actMap).forEach(function(domKey) {
+        var val = sl[actMap[domKey]];
+        var d = document.getElementById('rs-' + domKey + '-' + domId);
+        if (!d) return;
+        if (val === true) {
+          d.classList.add('tick'); d.classList.remove('na','off'); d.textContent = '✓';
+        } else if (val === 'NA') {
+          d.classList.add('na'); d.classList.remove('tick','off'); d.textContent = 'NA';
+        }
+      });
+    }
+  });
+
+  // Recalculate session numbers and totals
+  rsUpdateTotal();
+
+  // ── 4. Notes & issues ─────────────────────────────────────────
+  var notesEl = document.getElementById('rs-notes');
+  if (notesEl && entry.notes) notesEl.value = entry.notes;
+
+  var issueNone = document.getElementById('rs-issue-none');
+  if (issueNone) issueNone.checked = !!entry.issueNone;
+  var issueProc = document.getElementById('rs-issue-proc');
+  if (issueProc) issueProc.checked = !!entry.issueProcessor;
+  var issueSuture = document.getElementById('rs-issue-suture');
+  if (issueSuture) issueSuture.checked = !!entry.issueSutures;
+  var issueSkin = document.getElementById('rs-issue-skin');
+  if (issueSkin) issueSkin.checked = !!entry.issueSkin;
+  var issueOther = document.getElementById('rs-issue-other');
+  if (issueOther) issueOther.checked = !!entry.issueOther;
+  var issuesEl = document.getElementById('rs-issues');
+  if (issuesEl && entry.issues) issuesEl.value = entry.issues;
+
+  // ── 5. Show a soft "previously saved" notice above the table ──
+  var tableDiv = document.getElementById('rs-avt-table');
+  if (tableDiv && !document.getElementById('rs-prefill-notice')) {
+    var notice = document.createElement('div');
+    notice.id = 'rs-prefill-notice';
+    notice.style.cssText = 'background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;'
+      + 'padding:8px 14px;margin:10px 16px 0;display:flex;align-items:center;gap:10px;font-size:12px;color:#1e40af';
+    var ts = entry.timestamp
+      ? new Date(entry.timestamp).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
+      : '';
+    notice.innerHTML = '<span style="font-size:16px">📋</span>'
+      + '<div><strong>Previously saved data loaded</strong> — ' + (entry.quarter || '') + (ts ? ' · Saved ' + ts : '')
+      + '<br><span style="font-size:11px;opacity:.8">Edit and tap Save to update.</span></div>';
+    tableDiv.parentElement.insertBefore(notice, tableDiv);
+  }
+}
+
 async function openRehabHistory(cas) {
   if (!cas) return;
   var body = document.getElementById('rs-body');
@@ -7279,8 +7475,18 @@ async function submitAVTLog() {
     var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(selectedCase.id); });
     if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
     window._rs_lastSaved = avtEntry;
-    if (btn) { btn.textContent = 'Save AVT Attendance Log →'; btn.disabled = false; }
-    showRehabLogFrozen(avtEntry, selectedCase, 'just_saved');
+    if (btn) { btn.textContent = '✅ Saved — edit to update'; btn.disabled = false; }
+    // Show a success banner above the table without replacing the form
+    var existingNotice = document.getElementById('rs-prefill-notice');
+    if (existingNotice) existingNotice.remove();
+    var savedNotice = document.createElement('div');
+    savedNotice.id = 'rs-prefill-notice';
+    savedNotice.style.cssText = 'background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:8px 14px;margin:10px 16px 0;display:flex;align-items:center;gap:10px;font-size:12px;color:#065f46';
+    savedNotice.innerHTML = '<span style="font-size:18px">✅</span>'
+      + '<div><strong>Saved successfully!</strong> — ' + (avtEntry.quarter||'') + ' · Entry ID: ' + (avtEntry.entryId||'')
+      + '<br><span style="font-size:11px;opacity:.8">You can continue editing and save again to update.</span></div>';
+    var tbl = document.getElementById('rs-avt-table');
+    if (tbl && tbl.parentElement) tbl.parentElement.insertBefore(savedNotice, tbl);
   } catch(e) {
     if (errEl) { errEl.textContent = 'Error saving AVT log: ' + e.message; errEl.style.display = 'block'; }
     if (btn) { btn.textContent = 'Save AVT Attendance Log →'; btn.disabled = false; }
@@ -7693,7 +7899,18 @@ async function submitRehabSession() {
   }
 
   // Show the confirmed frozen view with the saved entry
-  showRehabLogFrozen(window._rs_lastSaved, selectedCase, 'just_saved');
+  // Show success banner, keep form editable
+  var existingNotice2 = document.getElementById('rs-prefill-notice');
+  if (existingNotice2) existingNotice2.remove();
+  var savedNotice2 = document.createElement('div');
+  savedNotice2.id = 'rs-prefill-notice';
+  savedNotice2.style.cssText = 'background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:8px 14px;margin:10px 16px 0;display:flex;align-items:center;gap:10px;font-size:12px;color:#065f46';
+  var _saved2 = window._rs_lastSaved || {};
+  savedNotice2.innerHTML = '<span style="font-size:18px">✅</span>'
+    + '<div><strong>Saved successfully!</strong> — ' + (_saved2.quarter||'') + ' · Entry ID: ' + (_saved2.entryId||'')
+    + '<br><span style="font-size:11px;opacity:.8">You can continue editing and save again to update.</span></div>';
+  var tbl2 = document.getElementById('rs-avt-table');
+  if (tbl2 && tbl2.parentElement) tbl2.parentElement.insertBefore(savedNotice2, tbl2);
 }
 
 

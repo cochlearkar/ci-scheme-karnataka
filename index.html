@@ -5775,7 +5775,16 @@ function summaryAction() {
   if (currentRole === 'hospital') {
     openHospitalUpdate(cas);
   } else if (currentRole === 'rehab') {
-    openRehabSession(cas);
+    // Show history first
+    document.getElementById('rs-title').textContent = cas.name || 'AVT Sessions';
+    document.getElementById('rs-sub').textContent   = 'Loading…';
+    document.getElementById('rs-body').innerHTML    =
+      '<div style="padding:40px 16px;text-align:center">'
+      + '<div style="font-size:28px;margin-bottom:10px">⏳</div>'
+      + '<div style="font-size:13px;color:var(--text-light)">Loading session logs…</div>'
+      + '</div>';
+    showScreen('rehabsession');
+    openRehabHistory(cas);
   } else if (currentRole === 'district') {
     openDistrictFollowup(cas);
   } else {
@@ -10096,7 +10105,17 @@ function openCaseFromList(caseId) {
   if (currentRole === 'hospital') {
     openHospitalUpdate(cas);
   } else if (currentRole === 'rehab') {
-    openRehabSession(cas);
+    // Show history first — rehab users see saved data immediately
+    // They can tap "New Entry" to open the form
+    document.getElementById('rs-title').textContent = cas.name || 'AVT Sessions';
+    document.getElementById('rs-sub').textContent   = 'Loading…';
+    document.getElementById('rs-body').innerHTML    =
+      '<div style="padding:40px 16px;text-align:center">'
+      + '<div style="font-size:28px;margin-bottom:10px">⏳</div>'
+      + '<div style="font-size:13px;color:var(--text-light)">Loading session logs…</div>'
+      + '</div>';
+    showScreen('rehabsession');
+    openRehabHistory(cas);
   } else if (currentRole === 'district') {
     openDistrictUnified(cas);
   } else {

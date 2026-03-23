@@ -6113,24 +6113,6 @@ function openRehabSession(cas) {
     +'<input class="field-input" id="rs-map-audiologist" placeholder="Full name of audiologist"></div>'
     +'<div class="field"><div class="field-label">Issues / device status</div>'
     +'<input class="field-input" id="rs-devicestatus" placeholder="None, or describe..."></div>'
-    +'</div>';
-
-    // Save button 1 - AVT attendance table (below table, blue)
-  var saveBtnHTML =
-    '<div style="margin:10px 16px 0">'
-    +'<div id="rs-avt-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
-    +'<button onclick="submitAVTLog()" style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-avt-submit-btn">💾 Save AVT Attendance Log →</button>'
-    +'</div>';
-
-  // Save button 2 - Mapping session (below mapping section, dark green)
-  var mappingSaveBtnHTML =
-    '<div style="margin:10px 16px 24px">'
-    +'<div id="rs-map-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
-    +'<button onclick="submitMappingSession()" style="width:100%;padding:13px;background:#065f46;color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-map-submit-btn">💾 Save Mapping Session →</button>'
-    +'</div>';
-
-  var submitHTML =
-    '<div style="margin:10px 16px 40px">'
     +'<div class="field"><div class="field-label">Notes / observations</div>'
     +'<textarea class="field-input" id="rs-notes" rows="2" placeholder="Progress, parent feedback..."></textarea></div>'
     +'<div class="field"><div class="field-label">Issues to flag</div>'
@@ -6142,7 +6124,24 @@ function openRehabSession(cas) {
     +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="rs-issue-other"> Others</label>'
     +'<input class="field-input" id="rs-issues" placeholder="Details / notes on flagged issues" style="margin-top:2px">'
     +'</div></div>'
+    +'<div style="margin-top:14px">'
+    +'<div id="rs-avt-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
+    +'<button onclick="submitAVTAndMapping()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit" id="rs-avt-submit-btn">💾 Save Session Log →</button>'
+    +'</div>'
     +'</div>';
+
+    // Save button 1 - AVT attendance table (below table, blue)
+  // Error div for AVT save (button moved to combined save at bottom)
+  var saveBtnHTML =
+    '<div style="margin:10px 16px 0">'
+    +'<div id="rs-avt-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
+    +'</div>';
+
+  // Separate mapping save button removed — single combined save button at bottom
+  var mappingSaveBtnHTML = '';
+
+  // Notes/Issues moved into mappingHTML below — submitHTML is now empty
+  var submitHTML = '';
 
   var commonHTML =
     '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
@@ -6229,44 +6228,9 @@ function openRehabSession(cas) {
           if (existingAVT.sessStart) window._rs_sessStart = existingAVT.sessStart;
         }
 
-        // Rebuild fullFormHTML with the corrected quarter selected
-        var savedQtrObj = (window._rs_qtrs || []).find(function(q){ return q.id === window._rs_curQtrId; }) || curQtr;
-        var savedWkLabels = [];
-        var savedWkStart = (savedQtrObj.id - 1) * 13 + 1;
-        for (var ww2 = savedWkStart; ww2 <= savedWkStart + 12; ww2++) {
-          for (var ss2 = 0; ss2 < savedQtrObj.spw; ss2++) {
-            savedWkLabels.push('Week ' + ww2);
-            if (savedWkLabels.length >= savedQtrObj.rows) break;
-          }
-          if (savedWkLabels.length >= savedQtrObj.rows) break;
-        }
-        var savedTableRows = rsBuildTableRows(savedQtrObj, savedWkLabels);
-        var savedTableHTML =
-          '<div style="margin:10px 16px 0">'
-          + '<div id="rs-sess-badge" style="font-size:10px;color:var(--blue);font-weight:700;text-align:center;padding:5px 8px;background:var(--blue-light);border:1px solid var(--blue-mid);border-bottom:none;border-radius:8px 8px 0 0">'
-          + savedQtrObj.label + ' — Sessions ' + savedQtrObj.start + '–' + (savedQtrObj.start + savedQtrObj.rows - 1) + ' — ' + savedQtrObj.spw + 'x per week'
-          + '</div>'
-          + '<div style="overflow-x:auto;border:1px solid var(--blue-mid);border-radius:0 0 8px 8px"><table id="rs-avt-table" style="width:100%;border-collapse:collapse;min-width:360px">'
-          + '<thead><tr style="background:var(--blue-light)">'
-          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Sl.</th>'
-          + '<th style="padding:6px 4px;font-size:10px;color:var(--blue);border-bottom:1px solid var(--blue-mid)">Week<br>Session</th>'
-          + '<th style="padding:6px 4px;font-size:10px;color:var(--blue);border-bottom:1px solid var(--blue-mid)">Date</th>'
-          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">P/A</th>'
-          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Sess#</th>'
-          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Aud</th>'
-          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Sp</th>'
-          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Lang</th>'
-          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Cog</th>'
-          + '<th style="padding:6px 2px;font-size:10px;color:var(--blue);text-align:center;border-bottom:1px solid var(--blue-mid)">Par</th>'
-          + '</tr></thead>'
-          + '<tbody id="rs-table-body">' + savedTableRows + '</tbody>'
-          + '</table></div>'
-          + '<div style="margin-top:4px;font-size:10px;color:var(--text-light)">P = Present &nbsp;·&nbsp; A = Absent &nbsp;·&nbsp; N/A = 3rd session not applicable &nbsp;·&nbsp; <span style="background:#fef9c3;padding:1px 4px;border-radius:3px;font-size:9px">S3</span> = 3rd session row (optional)</div>'
-          + '</div>';
-
-        // Render the full editable form (with corrected quarter table)
-        rsBody.innerHTML = alertHTML + infoHTML + qtrHTML + commonHTML + savedTableHTML + saveBtnHTML + mappingHTML + mappingSaveBtnHTML + submitHTML;
-
+        // Render the original form (preserves original header/design), then populate with saved data.
+        rsBody.innerHTML = fullFormHTML;
+        rsRestoreFormFromEntry(existingAVT);
         // Now populate every field with the saved data
         rsRestoreFormFromEntry(existingAVT);
         return; // done — form is showing with data pre-filled
@@ -6383,9 +6347,38 @@ function rsSelectQtr(qtrId, el) {
     if (wkLabels.length >= newQtr.rows) break;
   }
 
-  // Use shared builder — includes S3 rows for every quarter
+  // Render blank rows first
   tableBody.innerHTML = rsBuildTableRows(newQtr, wkLabels);
   rsUpdateTotal();
+
+  // Remove any existing prefill notice
+  var oldNotice = document.getElementById('rs-prefill-notice');
+  if (oldNotice) oldNotice.remove();
+
+  // Now check Firestore for a saved entry for this quarter
+  if (!selectedCase || !window._fbDb || !window._fbFns) return;
+  var _caseId = String(selectedCase.id);
+  var _qNum   = qtrId;
+  (async function() {
+    try {
+      var _snap = await window._fbFns.getDocs(
+        window._fbFns.query(
+          window._fbFns.collection(window._fbDb, 'submissions_rehab'),
+          window._fbFns.where('caseId', '==', _caseId)
+        )
+      );
+      if (_snap.empty) return; // no data at all — blank form is correct
+      var _docs = [];
+      _snap.forEach(function(d) { _docs.push(d.data()); });
+      // Find entry for the selected quarter
+      var _match = _docs.find(function(d) { return d.quarterNum === _qNum; });
+      if (!_match) return; // no entry for this quarter — blank form is correct
+      // Pre-fill form with saved data for this quarter
+      if (_match.sessStart) window._rs_sessStart = _match.sessStart;
+      window._rs_lastSaved = _match;
+      rsRestoreFormFromEntry(_match);
+    } catch(e) { console.warn('rsSelectQtr Firestore load failed:', e); }
+  })();
 }
 
 
@@ -7334,6 +7327,25 @@ function rsFreezeSavedTable(entry) {
 // REHAB - SUBMIT AVT ATTENDANCE LOG (AVT table only, saved per week/quarter)
 // Saves attendance rows to submissions_rehab. Freezes table on success.
 // ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB — COMBINED SAVE: AVT Log + Mapping Session in one button tap
+// ══════════════════════════════════════════════════════════════════════════════
+async function submitAVTAndMapping() {
+  // Run AVT log save first; it handles validation and shows errors.
+  await submitAVTLog();
+  // Only proceed to mapping if AVT saved successfully (no error visible)
+  var errEl = document.getElementById('rs-avt-error');
+  if (errEl && errEl.style.display !== 'none') return;
+  // Save mapping only if any mapping field has been filled in
+  var mapDate  = (document.getElementById('rs-mapdate')  || {}).value || '';
+  var mapCount = (document.getElementById('rs-mapcount') || {}).value || '';
+  var audEl    = document.querySelector('#rs-map-audiologist');
+  var mapAud   = audEl ? audEl.value : '';
+  if (mapDate || mapCount || mapAud) {
+    await submitMappingSession();
+  }
+}
+
 async function submitAVTLog() {
   if (isDemo()) { alert('Demo account - submissions are disabled.'); return; }
   var errEl = document.getElementById('rs-avt-error');
@@ -11249,173 +11261,4 @@ window.addEventListener('load', async () => {
      Shows: logged-in user unit, case rehabCentre, and raw Firestore submissions
      Remove this <script> block once the issue is resolved.
      ═══════════════════════════════════════════════════════════════════════ -->
-<script>
-(function() {
-  // Floating debug button
-  var fab = document.createElement('button');
-  fab.textContent = '🔍 Debug';
-  fab.style.cssText = 'position:fixed;bottom:80px;right:12px;z-index:99999;background:#1e40af;color:#fff;'
-    + 'border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;'
-    + 'box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:inherit';
-  document.body.appendChild(fab);
-
-  fab.addEventListener('click', async function() {
-    var panel = document.getElementById('__debug_panel');
-    if (panel) { panel.remove(); return; }
-
-    panel = document.createElement('div');
-    panel.id = '__debug_panel';
-    panel.style.cssText = 'position:fixed;inset:0;background:#0f172a;color:#e2e8f0;z-index:999999;'
-      + 'overflow-y:auto;padding:16px;font-family:monospace;font-size:12px';
-
-    var closeBtn = '<button onclick="document.getElementById(\'__debug_panel\').remove()" '
-      + 'style="position:fixed;top:12px;right:12px;background:#ef4444;color:#fff;border:none;'
-      + 'border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px">✕ Close</button>';
-
-    var html = closeBtn + '<h2 style="color:#60a5fa;margin:0 0 16px">🔍 CI Scheme Debug Panel</h2>';
-
-    // 1. Logged-in user info
-    if (window.currentUser) {
-      html += '<div style="background:#1e3a5f;border-radius:8px;padding:12px;margin-bottom:12px">'
-        + '<div style="color:#93c5fd;font-weight:700;margin-bottom:6px">👤 Logged-in User</div>'
-        + '<div>username: <span style="color:#86efac">' + (currentUser.username||'—') + '</span></div>'
-        + '<div>role: <span style="color:#86efac">' + (currentUser.role||'—') + '</span></div>'
-        + '<div>unit: <span style="color:#fbbf24">"' + (currentUser.unit||'—') + '"</span></div>'
-        + '<div>district: <span style="color:#86efac">' + (currentUser.district||'—') + '</span></div>'
-        + '</div>';
-    } else {
-      html += '<div style="color:#f87171">⚠️ currentUser is null — not logged in</div>';
-    }
-
-    // 2. Cases visible to this user
-    if (window.SAMPLE_CASES) {
-      var myCases = window.currentUser && window.currentUser.role === 'rehab'
-        ? SAMPLE_CASES.filter(function(c) {
-            var rec  = (c.rehabCentre||'').toLowerCase().trim();
-            var unit = (currentUser.unit||'').toLowerCase().trim();
-            return rec && rec === unit;
-          })
-        : [];
-      var allWithCentre = SAMPLE_CASES.filter(function(c){ return c.rehabCentre; });
-
-      html += '<div style="background:#1a2e1a;border-radius:8px;padding:12px;margin-bottom:12px">'
-        + '<div style="color:#86efac;font-weight:700;margin-bottom:6px">📋 Cases (rehabCentre check)</div>'
-        + '<div>Total cases loaded: <span style="color:#fbbf24">' + SAMPLE_CASES.length + '</span></div>'
-        + '<div>Cases with any rehabCentre: <span style="color:#fbbf24">' + allWithCentre.length + '</span></div>'
-        + '<div>Cases matching YOUR unit exactly: <span style="color:' + (myCases.length > 0 ? '#86efac' : '#f87171') + '">' + myCases.length + '</span></div>';
-
-      // Show all unique rehabCentre values vs user unit
-      var centres = {};
-      SAMPLE_CASES.forEach(function(c){ if(c.rehabCentre) centres[c.rehabCentre] = (centres[c.rehabCentre]||0)+1; });
-      html += '<div style="margin-top:8px;color:#94a3b8">All rehabCentre values in cases:</div>'
-        + '<div style="margin-left:8px">';
-      Object.keys(centres).sort().forEach(function(k) {
-        var match = window.currentUser && k.toLowerCase().trim() === (currentUser.unit||'').toLowerCase().trim();
-        html += '<div style="color:' + (match ? '#86efac' : '#e2e8f0') + '">'
-          + (match ? '✅ ' : '   ') + '"' + k + '" (' + centres[k] + ' cases)</div>';
-      });
-      html += '</div>';
-
-      // Show the first few matching cases
-      if (myCases.length > 0) {
-        html += '<div style="margin-top:8px;color:#94a3b8">Your cases (first 5):</div>';
-        myCases.slice(0,5).forEach(function(c) {
-          html += '<div style="margin-left:8px;color:#e2e8f0">ID: <span style="color:#fbbf24">' + c.id + '</span> — ' + (c.name||'?') + ' | switchOn: ' + (c.switchOn||c.switchOnDate||'none') + '</div>';
-        });
-      }
-      html += '</div>';
-    }
-
-    // 3. Firestore submissions_rehab for selected case
-    if (window.selectedCase && window._fbDb && window._fbFns) {
-      html += '<div style="background:#1e1a3a;border-radius:8px;padding:12px;margin-bottom:12px">'
-        + '<div style="color:#c4b5fd;font-weight:700;margin-bottom:6px">🗄️ Firestore: submissions_rehab for selected case</div>'
-        + '<div>Selected case ID: <span style="color:#fbbf24">' + selectedCase.id + '</span> — ' + (selectedCase.name||'?') + '</div>'
-        + '<div id="__debug_fs_result" style="margin-top:8px;color:#94a3b8">Querying Firestore…</div>'
-        + '</div>';
-      panel.innerHTML = html;
-      document.body.appendChild(panel);
-
-      try {
-        var q = window._fbFns.query(
-          window._fbFns.collection(window._fbDb, 'submissions_rehab'),
-          window._fbFns.where('caseId', '==', String(selectedCase.id)),
-          window._fbFns.orderBy('timestamp', 'desc')
-        );
-        var snap = await window._fbFns.getDocs(q);
-        var fsEl = document.getElementById('__debug_fs_result');
-        if (!fsEl) return;
-        if (snap.empty) {
-          fsEl.innerHTML = '<span style="color:#f87171">❌ NO submissions found for caseId="' + selectedCase.id + '"</span><br>'
-            + '<span style="color:#fbbf24">This means either: (a) data was saved under a different caseId, or (b) nothing has been saved yet.</span>';
-        } else {
-          var rows = '';
-          snap.forEach(function(d) {
-            var data = d.data();
-            rows += '<div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px;margin-top:6px">'
-              + '<div>docId: <span style="color:#fbbf24">' + d.id + '</span></div>'
-              + '<div>quarterNum: <span style="color:#86efac">' + data.quarterNum + '</span> | quarter: ' + (data.quarter||'?') + '</div>'
-              + '<div>rehabCentre: <span style="color:#fbbf24">"' + (data.rehabCentre||'—') + '"</span></div>'
-              + '<div>submittedBy: ' + (data.submittedBy||'?') + '</div>'
-              + '<div>timestamp: ' + (data.timestamp||'?') + '</div>'
-              + '<div>presentCount: ' + (data.presentCount||0) + ' | absentCount: ' + (data.absentCount||0) + '</div>'
-              + '<div>slots: ' + (data.slots ? data.slots.length + ' rows' : 'none') + '</div>'
-              + '</div>';
-          });
-          fsEl.innerHTML = '<span style="color:#86efac">✅ Found ' + snap.size + ' submission(s)</span>' + rows;
-        }
-      } catch(e) {
-        var fsEl2 = document.getElementById('__debug_fs_result');
-        if (fsEl2) fsEl2.innerHTML = '<span style="color:#f87171">Error querying: ' + e.message + '</span>';
-      }
-      return;
-    } else if (!window.selectedCase) {
-      html += '<div style="background:#1e1a3a;border-radius:8px;padding:12px;margin-bottom:12px">'
-        + '<div style="color:#c4b5fd;font-weight:700">🗄️ Firestore: submissions_rehab</div>'
-        + '<div style="color:#fbbf24;margin-top:6px">⚠️ No case selected yet. Open a case first, then tap 🔍 Debug.</div>'
-        + '</div>';
-    }
-
-    // 4. Also query by rehabCentre to find what's actually stored
-    if (window.currentUser && window._fbDb && window._fbFns) {
-      html += '<div style="background:#1a1e2e;border-radius:8px;padding:12px;margin-bottom:80px">'
-        + '<div style="color:#93c5fd;font-weight:700;margin-bottom:6px">🔎 Firestore: all submissions by YOUR unit</div>'
-        + '<div id="__debug_unit_result" style="color:#94a3b8">Querying…</div>'
-        + '</div>';
-      panel.innerHTML = html;
-      document.body.appendChild(panel);
-
-      try {
-        var q2 = window._fbFns.query(
-          window._fbFns.collection(window._fbDb, 'submissions_rehab'),
-          window._fbFns.where('rehabCentre', '==', currentUser.unit),
-          window._fbFns.orderBy('timestamp', 'desc')
-        );
-        var snap2 = await window._fbFns.getDocs(q2);
-        var unitEl = document.getElementById('__debug_unit_result');
-        if (!unitEl) return;
-        if (snap2.empty) {
-          unitEl.innerHTML = '<span style="color:#f87171">❌ No submissions with rehabCentre="' + currentUser.unit + '"</span><br>'
-            + '<span style="color:#fbbf24">Check if data was saved under a different unit name.</span>';
-        } else {
-          var unitRows = '';
-          snap2.forEach(function(d) {
-            var data = d.data();
-            unitRows += '<div style="margin-top:4px">caseId: <span style="color:#fbbf24">' + data.caseId + '</span> | Q' + data.quarterNum + ' | ' + (data.caseName||'?') + ' | ' + (data.timestamp||'').substring(0,10) + '</div>';
-          });
-          unitEl.innerHTML = '<span style="color:#86efac">✅ Found ' + snap2.size + ' submission(s) for your unit</span>' + unitRows;
-        }
-      } catch(e2) {
-        var unitEl2 = document.getElementById('__debug_unit_result');
-        if (unitEl2) unitEl2.innerHTML = '<span style="color:#f87171">Error: ' + e2.message + '</span>';
-      }
-      return;
-    }
-
-    panel.innerHTML = html;
-    document.body.appendChild(panel);
-  });
-})();
-</script>
 </body>
-</html>

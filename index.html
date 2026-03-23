@@ -19,6 +19,7 @@ import { getAuth, signInWithEmailAndPassword,
          EmailAuthProvider }                           from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, getDoc,
          doc, setDoc, updateDoc, addDoc,
+         query, where, orderBy,
          serverTimestamp }                             from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -41,7 +42,8 @@ window._fbDb   = _db;
 window._fbFns  = {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
-  collection, getDocs, getDoc, doc, setDoc, updateDoc, addDoc, serverTimestamp
+  collection, getDocs, getDoc, doc, setDoc, updateDoc, addDoc,
+  query, where, orderBy, serverTimestamp
 };
 
 // Signal that Firebase is fully ready
@@ -6807,17 +6809,18 @@ async function openRehabHistory(cas) {
   document.getElementById('rs-sub').textContent   = 'All saved entries';
 
   try {
-    var snap = await window._fbFns.getDocs(
-      window._fbFns.collection(window._fbDb, 'submissions_rehab')
+    // Query only this case's submissions — much faster than fetching all
+    var _q = window._fbFns.query(
+      window._fbFns.collection(window._fbDb, 'submissions_rehab'),
+      window._fbFns.where('caseId', '==', String(cas.id))
     );
+    var snap = await window._fbFns.getDocs(_q);
 
     // Collect submissions for this case, sorted newest first
     var subs = [];
     snap.forEach(function(d) {
       var data = d.data();
-      if (String(data.caseId) === String(cas.id)) {
-        subs.push(Object.assign({ _docId: d.id }, data));
-      }
+      subs.push(Object.assign({ _docId: d.id }, data));
     });
     subs.sort(function(a, b) {
       return new Date(b.timestamp||0) - new Date(a.timestamp||0);

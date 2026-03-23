@@ -6188,23 +6188,39 @@ function openRehabSession(cas) {
     var _get = window._fbFns.getDocs;
     var caseIdStr = String(cas.id);
     var qNum = curQtr.id;
+
+    // FIX: Query ALL submissions for this case (not just the auto-detected quarter).
+    // Previously the query filtered by quarterNum == auto-detected quarter, so if data
+    // was saved for Q1 and Q2, opening the case (auto-detected to Q2) would miss Q1 data,
+    // and vice versa. Now we fetch all, then show the best match.
     try {
       var avtQ = _qfn(
         _col(window._fbDb, 'submissions_rehab'),
         _whr('caseId', '==', caseIdStr),
-        _whr('quarterNum', '==', qNum),
         _ord('timestamp', 'desc')
       );
       var avtSnap = await _get(avtQ);
       if (!avtSnap.empty) {
-        var existingAVT = avtSnap.docs[0].data();
+        // Collect all saved entries for this case
+        var allAvtDocs = [];
+        avtSnap.forEach(function(d) { allAvtDocs.push(d.data()); });
+
+        // Prefer the entry that matches the currently auto-detected quarter;
+        // fall back to the most recent entry across all quarters.
+        var matchingQtr = allAvtDocs.find(function(d) { return d.quarterNum === qNum; });
+        var existingAVT = matchingQtr || allAvtDocs[0];
+
         window._rs_lastSaved = existingAVT;
+        // Sync the quarter selector to whichever entry we're showing
+        if (existingAVT.quarterNum && existingAVT.quarterNum !== qNum) {
+          window._rs_curQtrId = existingAVT.quarterNum;
+        }
         showRehabLogFrozen(existingAVT, cas, 'existing');
         return; // full screen frozen — no need to check mapping separately
       }
     } catch(e) { console.warn('AVT pre-load failed:', e); }
 
-    // No existing AVT log — render the blank editable form now
+    // No saved AVT log at all for this case — render the blank editable form now
     rsBody.innerHTML = fullFormHTML;
 
     try {

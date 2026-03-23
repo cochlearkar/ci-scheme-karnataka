@@ -6194,18 +6194,23 @@ function openRehabSession(cas) {
     // was saved for Q1 and Q2, opening the case (auto-detected to Q2) would miss Q1 data,
     // and vice versa. Now we fetch all, then show the best match.
     try {
+      // NO orderBy here — orderBy('timestamp') + where('caseId') requires a composite
+      // Firestore index. If that index doesn't exist the query throws and the catch
+      // swallows it silently, leaving a blank form. Sort in JS instead.
       var avtQ = _qfn(
         _col(window._fbDb, 'submissions_rehab'),
-        _whr('caseId', '==', caseIdStr),
-        _ord('timestamp', 'desc')
+        _whr('caseId', '==', caseIdStr)
       );
       var avtSnap = await _get(avtQ);
       if (!avtSnap.empty) {
-        // Collect all saved entries for this case
+        // Collect all saved entries and sort newest-first in JavaScript
         var allAvtDocs = [];
         avtSnap.forEach(function(d) { allAvtDocs.push(d.data()); });
+        allAvtDocs.sort(function(a, b) {
+          return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+        });
 
-        // Prefer the entry that matches the currently auto-detected quarter;
+        // Prefer the entry matching the auto-detected quarter;
         // fall back to the most recent entry across all quarters.
         var matchingQtr = allAvtDocs.find(function(d) { return d.quarterNum === qNum; });
         var existingAVT = matchingQtr || allAvtDocs[0];
@@ -6218,7 +6223,7 @@ function openRehabSession(cas) {
         showRehabLogFrozen(existingAVT, cas, 'existing');
         return; // full screen frozen — no need to check mapping separately
       }
-    } catch(e) { console.warn('AVT pre-load failed:', e); }
+    } catch(e) { console.error('AVT pre-load failed:', e); rsBody.innerHTML = '<div style="padding:20px 16px;background:#fee2e2;margin:12px 16px;border-radius:8px;font-size:12px;color:#991b1b">⚠️ Could not load saved session data: ' + e.message + '<br>Please check your internet connection and reload.</div>' + fullFormHTML; return; }
 
     // No saved AVT log at all for this case — render the blank editable form now
     rsBody.innerHTML = fullFormHTML;

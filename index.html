@@ -6040,43 +6040,7 @@ function openRehabSession(cas) {
 
   // Data rows — P/A only, session# counts only on P rows
   // Standard 2 rows per week; after every 2nd row add a 3rd-session row (P/A/NA)
-  var tableRows = '';
-  var weeksSeen = {};
-  weekLabels.forEach(function(w, i) {
-    var slNo = (curQtr.id > 1 ? (curQtr.id - 1) * 26 + i + 1 : i + 1);
-    tableRows += '<tr id="rs-row-' + i + '">'
-      + '<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">' + slNo + '</td>'
-      + '<td style="padding:5px 3px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">' + w + '</td>'
-      + '<td style="padding:3px 3px;border-bottom:1px solid var(--border)">'
-        + '<input type="date" id="rs-date-' + i + '" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
-      + '<td style="padding:3px 3px;border-bottom:1px solid var(--border);text-align:center">'
-        + '<span id="rs-pa-' + i + '" onclick="rsTogglePA(' + i + ')" style="display:inline-block;min-width:28px;padding:4px 5px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;background:var(--gray);color:var(--text-light);">\u2014</span></td>'
-      + '<td style="padding:5px 3px;font-size:12px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;color:var(--text)" id="rs-snum-' + i + '"></td>'
-      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-aud-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-spe-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-lan-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-cog-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-par-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-      + '</tr>';
-    // After every 2nd session of the same week (i is 0-based, even index = 2nd session of that week)
-    if (i % 2 === 1) {
-      var s3id = 's3-' + Math.floor(i / 2);
-      tableRows += '<tr id="rs-row-' + s3id + '" style="background:#fffbf0">'
-        + '<td style="padding:4px 3px;font-size:10px;text-align:center;border-bottom:2px solid var(--border);color:var(--amber)">—</td>'
-        + '<td style="padding:4px 3px;font-size:10px;border-bottom:2px solid var(--border);color:var(--amber);white-space:nowrap">' + w + ' S3</td>'
-        + '<td style="padding:3px 3px;border-bottom:2px solid var(--border)">'
-          + '<input type="date" id="rs-date-' + s3id + '" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
-        + '<td style="padding:3px 3px;border-bottom:2px solid var(--border);text-align:center">'
-          + '<span id="rs-pa-' + s3id + '" onclick="rsTogglePA3(\'' + s3id + '\')" style="display:inline-block;min-width:36px;padding:4px 5px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-align:center;background:#fef3c7;color:var(--amber);">N/A</span></td>'
-        + '<td style="padding:4px 3px;font-size:10px;text-align:center;border-bottom:2px solid var(--border);color:var(--amber)">—</td>'
-        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-aud-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-spe-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-lan-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-cog-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-par-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-        + '</tr>';
-    }
-  });
+  var tableRows = rsBuildTableRows(curQtr, weekLabels);
 
   var tableHTML =
     '<div style="margin:10px 16px 0">'
@@ -6214,6 +6178,51 @@ function openRehabSession(cas) {
     });
 }
 
+// ── Shared table-row builder — used by openRehabSession AND rsSelectQtr ────────
+// Builds all table rows for a given quarter including S3 (3rd session) rows.
+// qtr     = {id, spw, rows, start}
+// weekLabels = array of 'Week N' strings (length = qtr.rows)
+function rsBuildTableRows(qtr, weekLabels) {
+  var tableRows = '';
+  weekLabels.forEach(function(w, i) {
+    var slNo = (qtr.id > 1 ? (qtr.id - 1) * 26 + i + 1 : i + 1);
+    // Standard row (session 1 or 2 of the week)
+    tableRows += '<tr id="rs-row-' + i + '">'
+      + '<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">' + slNo + '</td>'
+      + '<td style="padding:5px 3px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">' + w + '</td>'
+      + '<td style="padding:3px 3px;border-bottom:1px solid var(--border)">'
+        + '<input type="date" id="rs-date-' + i + '" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
+      + '<td style="padding:3px 3px;border-bottom:1px solid var(--border);text-align:center">'
+        + '<span id="rs-pa-' + i + '" onclick="rsTogglePA(' + i + ')" style="display:inline-block;min-width:28px;padding:4px 5px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;background:var(--gray);color:var(--text-light);">\u2014</span></td>'
+      + '<td style="padding:5px 3px;font-size:12px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;color:var(--text)" id="rs-snum-' + i + '"></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-aud-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-spe-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-lan-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-cog-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-par-' + i + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+      + '</tr>';
+    // After every 2nd row of the same week → insert S3 row
+    if (i % 2 === 1) {
+      var s3id = 's3-' + Math.floor(i / 2);
+      tableRows += '<tr id="rs-row-' + s3id + '" style="background:#fffbf0">'
+        + '<td style="padding:4px 3px;font-size:10px;text-align:center;border-bottom:2px solid var(--border);color:var(--amber)">—</td>'
+        + '<td style="padding:4px 3px;font-size:10px;border-bottom:2px solid var(--border);color:var(--amber);white-space:nowrap">' + w + ' S3</td>'
+        + '<td style="padding:3px 3px;border-bottom:2px solid var(--border)">'
+          + '<input type="date" id="rs-date-' + s3id + '" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
+        + '<td style="padding:3px 3px;border-bottom:2px solid var(--border);text-align:center">'
+          + '<span id="rs-pa-' + s3id + '" onclick="rsTogglePA3(\'' + s3id + '\')" style="display:inline-block;min-width:36px;padding:4px 5px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-align:center;background:#fef3c7;color:var(--amber);">N/A</span></td>'
+        + '<td style="padding:4px 3px;font-size:10px;text-align:center;border-bottom:2px solid var(--border);color:var(--amber)">—</td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-aud-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-spe-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-lan-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-cog-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '<td style="padding:3px 2px;border-bottom:2px solid var(--border);text-align:center"><span id="rs-par-' + s3id + '" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
+        + '</tr>';
+    }
+  });
+  return tableRows;
+}
+
 function rsSelectQtr(qtrId, el) {
   // Update pill active state
   if (el && el.parentNode) {
@@ -6228,59 +6237,42 @@ function rsSelectQtr(qtrId, el) {
     el.style.fontWeight = '700';
     el.style.borderColor = 'var(--blue)';
   }
-  // Rebuild table for new quarter
-  if (window._rs_qtrs) {
-    var newQtr = window._rs_qtrs.find(function(q){ return q.id === qtrId; });
-    if (newQtr) {
-      window._rs_curQtrId    = qtrId;
-      // Use actual attended sessions, not scheduled slot start
-      var _actualSess = selectedCase && _rehabSess(selectedCase) !== null
-        ? _rehabSess(selectedCase) : null;
-      window._rs_sessStart = _actualSess !== null ? _actualSess + 1 : newQtr.start;
-      window._rs_slotCount   = newQtr.rows;
-      window._rs_sessPerWeek = newQtr.spw;
-      // Rebuild just the table body — keep other form fields
-      // Update the dynamic badge below the table header
-      var badge = document.getElementById('rs-sess-badge');
-      if (badge) badge.textContent = newQtr.label + ' — Sessions ' + newQtr.start + '–' + (newQtr.start+newQtr.rows-1) + ' — ' + newQtr.spw + 'x per week';
-      var tableBody = document.getElementById('rs-table-body');
-      if (tableBody) {
-        var rows = [];
-        for (var w = 1; w <= 13; w++) {
-          for (var s = 0; s < newQtr.spw; s++) {
-            rows.push('Week-' + w);
-            if (rows.length >= newQtr.rows) break;
-          }
-          if (rows.length >= newQtr.rows) break;
-        }
-        var wkStart = (qtrId-1)*13+1;
-        var wkRows = [];
-        for (var ww=wkStart; ww<=wkStart+12; ww++) {
-          for (var ss=0; ss<newQtr.spw; ss++) {
-            wkRows.push('Week '+ww);
-            if (wkRows.length>=newQtr.rows) break;
-          }
-          if (wkRows.length>=newQtr.rows) break;
-        }
-        tableBody.innerHTML = wkRows.map(function(w, i) {
-          return '<tr id="rs-row-'+i+'">'
-            +'<td style="padding:5px 3px;font-size:11px;text-align:center;border-bottom:1px solid var(--border);color:var(--text-mid)">'+(newQtr.start+i)+'</td>'
-            +'<td style="padding:5px 3px;font-size:11px;border-bottom:1px solid var(--border);color:var(--text-mid);white-space:nowrap">'+w+'</td>'
-            +'<td style="padding:3px;border-bottom:1px solid var(--border)"><input type="date" id="rs-date-'+i+'" style="font-size:11px;border:none;background:transparent;width:100%;min-width:88px;color:var(--text)"></td>'
-            +'<td style="padding:3px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-pa-'+i+'" onclick="rsTogglePA('+i+')" style="display:inline-block;min-width:28px;padding:4px 5px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;text-align:center;background:var(--gray);color:var(--text-light);">\u2014</span></td>'
-            +'<td style="padding:5px 3px;font-size:12px;text-align:center;border-bottom:1px solid var(--border);font-weight:700;color:var(--text)" id="rs-snum-'+i+'"></td>'
-            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-aud-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-spe-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-lan-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-cog-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-            +'<td style="padding:3px 2px;border-bottom:1px solid var(--border);text-align:center"><span id="rs-par-'+i+'" class="rs-dot off" onclick="rsDotTap(this)">\u2014</span></td>'
-            +'</tr>';
-        }).join('');
-        rsUpdateTotal();
-      }
+  if (!window._rs_qtrs) return;
+  var newQtr = window._rs_qtrs.find(function(q){ return q.id === qtrId; });
+  if (!newQtr) return;
+
+  window._rs_curQtrId    = qtrId;
+  var _actualSess = selectedCase && _rehabSess(selectedCase) !== null
+    ? _rehabSess(selectedCase) : null;
+  window._rs_sessStart   = _actualSess !== null ? _actualSess + 1 : newQtr.start;
+  window._rs_slotCount   = newQtr.rows;
+  window._rs_sessPerWeek = newQtr.spw;
+
+  // Update badge
+  var badge = document.getElementById('rs-sess-badge');
+  if (badge) badge.textContent = newQtr.label + ' — Sessions ' + newQtr.start
+    + '–' + (newQtr.start + newQtr.rows - 1) + ' — ' + newQtr.spw + 'x per week';
+
+  // Rebuild table body using the shared S3-aware helper
+  var tableBody = document.getElementById('rs-table-body');
+  if (!tableBody) return;
+
+  // Build week labels for this quarter (continuous week numbers)
+  var wkLabels = [];
+  var wkStart  = (qtrId - 1) * 13 + 1;
+  for (var ww = wkStart; ww <= wkStart + 12; ww++) {
+    for (var ss = 0; ss < newQtr.spw; ss++) {
+      wkLabels.push('Week ' + ww);
+      if (wkLabels.length >= newQtr.rows) break;
     }
+    if (wkLabels.length >= newQtr.rows) break;
   }
+
+  // Use shared builder — includes S3 rows for every quarter
+  tableBody.innerHTML = rsBuildTableRows(newQtr, wkLabels);
+  rsUpdateTotal();
 }
+
 
 // ── New table-form helpers ─────────────────────────────────────────────
 function rsToggle(el) {

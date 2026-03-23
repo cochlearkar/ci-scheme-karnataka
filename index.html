@@ -11021,5 +11021,179 @@ window.addEventListener('load', async () => {
 });
 </script>
 <script src="cases.js" defer></script>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     DEBUG DIAGNOSTIC TOOL — tap the floating 🔍 button to open
+     Shows: logged-in user unit, case rehabCentre, and raw Firestore submissions
+     Remove this <script> block once the issue is resolved.
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  // Floating debug button
+  var fab = document.createElement('button');
+  fab.textContent = '🔍 Debug';
+  fab.style.cssText = 'position:fixed;bottom:80px;right:12px;z-index:99999;background:#1e40af;color:#fff;'
+    + 'border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;'
+    + 'box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:inherit';
+  document.body.appendChild(fab);
+
+  fab.addEventListener('click', async function() {
+    var panel = document.getElementById('__debug_panel');
+    if (panel) { panel.remove(); return; }
+
+    panel = document.createElement('div');
+    panel.id = '__debug_panel';
+    panel.style.cssText = 'position:fixed;inset:0;background:#0f172a;color:#e2e8f0;z-index:999999;'
+      + 'overflow-y:auto;padding:16px;font-family:monospace;font-size:12px';
+
+    var closeBtn = '<button onclick="document.getElementById(\'__debug_panel\').remove()" '
+      + 'style="position:fixed;top:12px;right:12px;background:#ef4444;color:#fff;border:none;'
+      + 'border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:13px">✕ Close</button>';
+
+    var html = closeBtn + '<h2 style="color:#60a5fa;margin:0 0 16px">🔍 CI Scheme Debug Panel</h2>';
+
+    // 1. Logged-in user info
+    if (window.currentUser) {
+      html += '<div style="background:#1e3a5f;border-radius:8px;padding:12px;margin-bottom:12px">'
+        + '<div style="color:#93c5fd;font-weight:700;margin-bottom:6px">👤 Logged-in User</div>'
+        + '<div>username: <span style="color:#86efac">' + (currentUser.username||'—') + '</span></div>'
+        + '<div>role: <span style="color:#86efac">' + (currentUser.role||'—') + '</span></div>'
+        + '<div>unit: <span style="color:#fbbf24">"' + (currentUser.unit||'—') + '"</span></div>'
+        + '<div>district: <span style="color:#86efac">' + (currentUser.district||'—') + '</span></div>'
+        + '</div>';
+    } else {
+      html += '<div style="color:#f87171">⚠️ currentUser is null — not logged in</div>';
+    }
+
+    // 2. Cases visible to this user
+    if (window.SAMPLE_CASES) {
+      var myCases = window.currentUser && window.currentUser.role === 'rehab'
+        ? SAMPLE_CASES.filter(function(c) {
+            var rec  = (c.rehabCentre||'').toLowerCase().trim();
+            var unit = (currentUser.unit||'').toLowerCase().trim();
+            return rec && rec === unit;
+          })
+        : [];
+      var allWithCentre = SAMPLE_CASES.filter(function(c){ return c.rehabCentre; });
+
+      html += '<div style="background:#1a2e1a;border-radius:8px;padding:12px;margin-bottom:12px">'
+        + '<div style="color:#86efac;font-weight:700;margin-bottom:6px">📋 Cases (rehabCentre check)</div>'
+        + '<div>Total cases loaded: <span style="color:#fbbf24">' + SAMPLE_CASES.length + '</span></div>'
+        + '<div>Cases with any rehabCentre: <span style="color:#fbbf24">' + allWithCentre.length + '</span></div>'
+        + '<div>Cases matching YOUR unit exactly: <span style="color:' + (myCases.length > 0 ? '#86efac' : '#f87171') + '">' + myCases.length + '</span></div>';
+
+      // Show all unique rehabCentre values vs user unit
+      var centres = {};
+      SAMPLE_CASES.forEach(function(c){ if(c.rehabCentre) centres[c.rehabCentre] = (centres[c.rehabCentre]||0)+1; });
+      html += '<div style="margin-top:8px;color:#94a3b8">All rehabCentre values in cases:</div>'
+        + '<div style="margin-left:8px">';
+      Object.keys(centres).sort().forEach(function(k) {
+        var match = window.currentUser && k.toLowerCase().trim() === (currentUser.unit||'').toLowerCase().trim();
+        html += '<div style="color:' + (match ? '#86efac' : '#e2e8f0') + '">'
+          + (match ? '✅ ' : '   ') + '"' + k + '" (' + centres[k] + ' cases)</div>';
+      });
+      html += '</div>';
+
+      // Show the first few matching cases
+      if (myCases.length > 0) {
+        html += '<div style="margin-top:8px;color:#94a3b8">Your cases (first 5):</div>';
+        myCases.slice(0,5).forEach(function(c) {
+          html += '<div style="margin-left:8px;color:#e2e8f0">ID: <span style="color:#fbbf24">' + c.id + '</span> — ' + (c.name||'?') + ' | switchOn: ' + (c.switchOn||c.switchOnDate||'none') + '</div>';
+        });
+      }
+      html += '</div>';
+    }
+
+    // 3. Firestore submissions_rehab for selected case
+    if (window.selectedCase && window._fbDb && window._fbFns) {
+      html += '<div style="background:#1e1a3a;border-radius:8px;padding:12px;margin-bottom:12px">'
+        + '<div style="color:#c4b5fd;font-weight:700;margin-bottom:6px">🗄️ Firestore: submissions_rehab for selected case</div>'
+        + '<div>Selected case ID: <span style="color:#fbbf24">' + selectedCase.id + '</span> — ' + (selectedCase.name||'?') + '</div>'
+        + '<div id="__debug_fs_result" style="margin-top:8px;color:#94a3b8">Querying Firestore…</div>'
+        + '</div>';
+      panel.innerHTML = html;
+      document.body.appendChild(panel);
+
+      try {
+        var q = window._fbFns.query(
+          window._fbFns.collection(window._fbDb, 'submissions_rehab'),
+          window._fbFns.where('caseId', '==', String(selectedCase.id)),
+          window._fbFns.orderBy('timestamp', 'desc')
+        );
+        var snap = await window._fbFns.getDocs(q);
+        var fsEl = document.getElementById('__debug_fs_result');
+        if (!fsEl) return;
+        if (snap.empty) {
+          fsEl.innerHTML = '<span style="color:#f87171">❌ NO submissions found for caseId="' + selectedCase.id + '"</span><br>'
+            + '<span style="color:#fbbf24">This means either: (a) data was saved under a different caseId, or (b) nothing has been saved yet.</span>';
+        } else {
+          var rows = '';
+          snap.forEach(function(d) {
+            var data = d.data();
+            rows += '<div style="background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px;margin-top:6px">'
+              + '<div>docId: <span style="color:#fbbf24">' + d.id + '</span></div>'
+              + '<div>quarterNum: <span style="color:#86efac">' + data.quarterNum + '</span> | quarter: ' + (data.quarter||'?') + '</div>'
+              + '<div>rehabCentre: <span style="color:#fbbf24">"' + (data.rehabCentre||'—') + '"</span></div>'
+              + '<div>submittedBy: ' + (data.submittedBy||'?') + '</div>'
+              + '<div>timestamp: ' + (data.timestamp||'?') + '</div>'
+              + '<div>presentCount: ' + (data.presentCount||0) + ' | absentCount: ' + (data.absentCount||0) + '</div>'
+              + '<div>slots: ' + (data.slots ? data.slots.length + ' rows' : 'none') + '</div>'
+              + '</div>';
+          });
+          fsEl.innerHTML = '<span style="color:#86efac">✅ Found ' + snap.size + ' submission(s)</span>' + rows;
+        }
+      } catch(e) {
+        var fsEl2 = document.getElementById('__debug_fs_result');
+        if (fsEl2) fsEl2.innerHTML = '<span style="color:#f87171">Error querying: ' + e.message + '</span>';
+      }
+      return;
+    } else if (!window.selectedCase) {
+      html += '<div style="background:#1e1a3a;border-radius:8px;padding:12px;margin-bottom:12px">'
+        + '<div style="color:#c4b5fd;font-weight:700">🗄️ Firestore: submissions_rehab</div>'
+        + '<div style="color:#fbbf24;margin-top:6px">⚠️ No case selected yet. Open a case first, then tap 🔍 Debug.</div>'
+        + '</div>';
+    }
+
+    // 4. Also query by rehabCentre to find what's actually stored
+    if (window.currentUser && window._fbDb && window._fbFns) {
+      html += '<div style="background:#1a1e2e;border-radius:8px;padding:12px;margin-bottom:80px">'
+        + '<div style="color:#93c5fd;font-weight:700;margin-bottom:6px">🔎 Firestore: all submissions by YOUR unit</div>'
+        + '<div id="__debug_unit_result" style="color:#94a3b8">Querying…</div>'
+        + '</div>';
+      panel.innerHTML = html;
+      document.body.appendChild(panel);
+
+      try {
+        var q2 = window._fbFns.query(
+          window._fbFns.collection(window._fbDb, 'submissions_rehab'),
+          window._fbFns.where('rehabCentre', '==', currentUser.unit),
+          window._fbFns.orderBy('timestamp', 'desc')
+        );
+        var snap2 = await window._fbFns.getDocs(q2);
+        var unitEl = document.getElementById('__debug_unit_result');
+        if (!unitEl) return;
+        if (snap2.empty) {
+          unitEl.innerHTML = '<span style="color:#f87171">❌ No submissions with rehabCentre="' + currentUser.unit + '"</span><br>'
+            + '<span style="color:#fbbf24">Check if data was saved under a different unit name.</span>';
+        } else {
+          var unitRows = '';
+          snap2.forEach(function(d) {
+            var data = d.data();
+            unitRows += '<div style="margin-top:4px">caseId: <span style="color:#fbbf24">' + data.caseId + '</span> | Q' + data.quarterNum + ' | ' + (data.caseName||'?') + ' | ' + (data.timestamp||'').substring(0,10) + '</div>';
+          });
+          unitEl.innerHTML = '<span style="color:#86efac">✅ Found ' + snap2.size + ' submission(s) for your unit</span>' + unitRows;
+        }
+      } catch(e2) {
+        var unitEl2 = document.getElementById('__debug_unit_result');
+        if (unitEl2) unitEl2.innerHTML = '<span style="color:#f87171">Error: ' + e2.message + '</span>';
+      }
+      return;
+    }
+
+    panel.innerHTML = html;
+    document.body.appendChild(panel);
+  });
+})();
+</script>
 </body>
 </html>

@@ -6115,10 +6115,18 @@ function openRehabSession(cas) {
     +'<input class="field-input" id="rs-devicestatus" placeholder="None, or describe..."></div>'
     +'</div>';
 
+    // Save button 1 - AVT attendance table (below table, blue)
   var saveBtnHTML =
     '<div style="margin:10px 16px 0">'
-    +'<div id="rs-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
-    +'<button onclick="submitRehabSession()" style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-submit-btn">💾 Save Weekly Attendance Log →</button>'
+    +'<div id="rs-avt-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
+    +'<button onclick="submitAVTLog()" style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-avt-submit-btn">💾 Save AVT Attendance Log →</button>'
+    +'</div>';
+
+  // Save button 2 - Mapping session (below mapping section, dark green)
+  var mappingSaveBtnHTML =
+    '<div style="margin:10px 16px 24px">'
+    +'<div id="rs-map-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
+    +'<button onclick="submitMappingSession()" style="width:100%;padding:13px;background:#065f46;color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-map-submit-btn">💾 Save Mapping Session →</button>'
     +'</div>';
 
   var submitHTML =
@@ -6152,11 +6160,50 @@ function openRehabSession(cas) {
 
   // Show screen immediately with form
   document.getElementById('rs-body').innerHTML =
-    alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + saveBtnHTML + mappingHTML + submitHTML;
+    alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + saveBtnHTML + mappingHTML + mappingSaveBtnHTML + submitHTML;
   showScreen('rehabsession');
 
-  // Async: check Firestore for an existing submission for this case + quarter
-  // (fetch-on-open removed — view history via case summary)
+  // Async: check Firestore for existing submissions for this case + quarter
+  // If AVT log already saved => show frozen. If mapping saved => pre-fill + freeze.
+  (async function() {
+    if (!window._fbDb || !window._fbFns) return;
+    var _col = window._fbFns.collection;
+    var _qfn = window._fbFns.query;
+    var _whr = window._fbFns.where;
+    var _ord = window._fbFns.orderBy;
+    var _get = window._fbFns.getDocs;
+    var caseIdStr = String(cas.id);
+    var qNum = curQtr.id;
+    try {
+      var avtQ = _qfn(
+        _col(window._fbDb, 'submissions_rehab'),
+        _whr('caseId', '==', caseIdStr),
+        _whr('quarterNum', '==', qNum),
+        _ord('timestamp', 'desc')
+      );
+      var avtSnap = await _get(avtQ);
+      if (!avtSnap.empty) {
+        var existingAVT = avtSnap.docs[0].data();
+        window._rs_lastSaved = existingAVT;
+        showRehabLogFrozen(existingAVT, cas, 'existing');
+        return; // full screen frozen - no need to check mapping separately
+      }
+    } catch(e) { console.warn('AVT pre-load failed:', e); }
+    try {
+      var mapQ = _qfn(
+        _col(window._fbDb, 'submissions_mapping'),
+        _whr('caseId', '==', caseIdStr),
+        _whr('quarterNum', '==', qNum),
+        _ord('timestamp', 'desc')
+      );
+      var mapSnap = await _get(mapQ);
+      if (!mapSnap.empty) {
+        var existingMap = mapSnap.docs[0].data();
+        window._rs_lastMapSaved = existingMap;
+        rsFreezeMapping(existingMap);
+      }
+    } catch(e) { console.warn('Mapping pre-load failed:', e); }
+  })();
 }
 
 // ── Shared table-row builder — used by openRehabSession AND rsSelectQtr ────────
@@ -7029,9 +7076,9 @@ function rsFreezeSavedTable(entry) {
   }
 
   // ── 3. Update save button to show confirmation ────────────────────────
-  var btn = document.getElementById('rs-submit-btn');
+  var btn = document.getElementById('rs-avt-submit-btn');
   if (btn) {
-    btn.textContent = '✅ Saved — tap to log next week\'s sessions';
+    btn.textContent = '✅ AVT Log Saved — tap to log next week\'s sessions';
     btn.style.background = '#065f46';
     btn.onclick = function() {
       // Reset: unlock everything and clear for next week's entry
@@ -7045,6 +7092,310 @@ function rsFreezeSavedTable(entry) {
   if (errEl) errEl.style.display = 'none';
 
   window._rs_frozen = true;
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB - SUBMIT AVT ATTENDANCE LOG (AVT table only, saved per week/quarter)
+// Saves attendance rows to submissions_rehab. Freezes table on success.
+// ══════════════════════════════════════════════════════════════════════════════
+async function submitAVTLog() {
+  if (isDemo()) { alert('Demo account - submissions are disabled.'); return; }
+  var errEl = document.getElementById('rs-avt-error');
+  var btn   = document.getElementById('rs-avt-submit-btn');
+  if (errEl) errEl.style.display = 'none';
+
+  var therapist = (document.getElementById('rs-therapist') || {}).value;
+  if (!therapist || !therapist.trim()) {
+    if (errEl) { errEl.textContent = 'Therapist name is required.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  var slotCount   = window._rs_slotCount    || 26;
+  var sessStart   = window._rs_sessStart    || 1;
+  var sessPerWeek = window._rs_sessPerWeek  || 2;
+  var sessYear    = window._rs_sessYear     || 1;
+  var curQtrId    = window._rs_curQtrId     || 1;
+  var QTRS_a      = window._rs_qtrs || [];
+  var qtrObj      = QTRS_a.find(function(q){ return q.id === curQtrId; }) || {};
+  var qtrLabel    = qtrObj.label || ('Q' + curQtrId);
+
+  var slots = [];
+  var presentCount = 0, absentCount = 0, atLeastOne = false, runningP = 0;
+
+  for (var s = 0; s < slotCount; s++) {
+    var paEl   = document.getElementById('rs-pa-' + s);
+    var dateEl = document.getElementById('rs-date-' + s);
+    if (!paEl) continue;
+    var att = paEl.getAttribute('data-val') || '';
+    if (att === '') continue;
+    atLeastOne = true;
+    var rowEl   = document.getElementById('rs-row-' + s);
+    var weekLbl = rowEl ? (rowEl.cells[1] ? rowEl.cells[1].textContent.trim() : '') : '';
+    var slot    = { rowIndex: s, weekLabel: weekLbl,
+                    sessdate: dateEl ? dateEl.value : '',
+                    attendance: att, isPresent: att === 'P', isAbsent: att === 'A' };
+    if (att === 'P') {
+      runningP++;
+      slot.sessNum     = sessStart + runningP - 1;
+      var _ga = function(id){ var e=document.getElementById(id); return e?e.classList.contains('tick'):false; };
+      slot.audition    = _ga('rs-aud-'+s);
+      slot.speech      = _ga('rs-spe-'+s);
+      slot.language    = _ga('rs-lan-'+s);
+      slot.cognition   = _ga('rs-cog-'+s);
+      slot.parentGuide = _ga('rs-par-'+s);
+      presentCount++;
+    } else { absentCount++; }
+    slots.push(slot);
+  }
+  // S3 rows
+  var numWeeks = Math.floor(slotCount / 2);
+  for (var w = 0; w < numWeeks; w++) {
+    var sid = 's3-' + w;
+    var pa3 = document.getElementById('rs-pa-' + sid);
+    var dt3 = document.getElementById('rs-date-' + sid);
+    if (!pa3) continue;
+    var att3 = pa3.getAttribute('data-val') || 'NA';
+    if (att3 === 'NA') continue;
+    atLeastOne = true;
+    var row3 = document.getElementById('rs-row-' + sid);
+    var wl3  = row3 ? (row3.cells[1] ? row3.cells[1].textContent.trim() : '') : '';
+    var s3   = { rowIndex: sid, weekLabel: wl3, isS3: true,
+                 sessdate: dt3 ? dt3.value : '',
+                 attendance: att3, isPresent: att3 === 'P', isAbsent: att3 === 'A' };
+    if (att3 === 'P') {
+      runningP++;
+      s3.sessNum = sessStart + runningP - 1;
+      var _gb = function(id){ var e=document.getElementById(id); return e?e.classList.contains('tick'):false; };
+      s3.audition    = _gb('rs-aud-'+sid);
+      s3.speech      = _gb('rs-spe-'+sid);
+      s3.language    = _gb('rs-lan-'+sid);
+      s3.cognition   = _gb('rs-cog-'+sid);
+      s3.parentGuide = _gb('rs-par-'+sid);
+      presentCount++;
+    } else { absentCount++; }
+    var insertPos = slots.findIndex(function(x){ return x.rowIndex === (2*w+1); });
+    if (insertPos >= 0) slots.splice(insertPos + 1, 0, s3); else slots.push(s3);
+  }
+
+  if (!atLeastOne) {
+    if (errEl) { errEl.textContent = 'Please mark attendance for at least one row.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+
+  var now       = new Date().toISOString();
+  var allDates  = slots.filter(function(s){ return s.sessdate; }).map(function(s){ return s.sessdate; }).sort();
+  var lastDate  = allDates[allDates.length-1] || '';
+  var firstDate = allDates[0] || '';
+  var monthStr  = lastDate.substring(0, 7);
+  var attendancePct = (presentCount + absentCount) > 0
+    ? Math.round(presentCount / (presentCount + absentCount) * 100) : 0;
+  var newTotalSessions = (sessStart - 1) + presentCount;
+
+  var newConsec = 0;
+  for (var ci = 0; ci < slots.length; ci++) { if (slots[ci].isAbsent) newConsec++; else newConsec = 0; }
+  if (slots.length > 0 && slots[0].isAbsent) newConsec = (selectedCase._consecAbsent || 0) + newConsec;
+  var prevMissed = (selectedCase._lastSessionMonth === monthStr) ? (selectedCase._missedThisMonth || 0) : 0;
+  var newMissed  = prevMissed + absentCount;
+  var newFlag = '';
+  if (newConsec >= 2) newFlag = 'yellow';
+  if (newConsec >= 4) newFlag = 'red';
+  if (newMissed >= 4) newFlag = 'red';
+  var thisPct = slots.length > 0 ? Math.round(presentCount / slots.length * 100) : 100;
+  if (thisPct < 75 && slots.length >= 4) newFlag = 'red';
+  var lastPresentDate = slots.filter(function(s){ return s.isPresent; })
+    .map(function(s){ return s.sessdate; }).sort().pop() || '';
+  var finalLastDate = lastPresentDate || (selectedCase._lastRehabDate || '');
+
+  var avtEntry = {
+    type: 'avt_log', quarter: qtrLabel, quarterNum: curQtrId, year: sessYear,
+    sessPerWeek: sessPerWeek, sessStart: sessStart, sessEnd: sessStart + runningP - 1,
+    caseId: String(selectedCase.id), caseName: selectedCase.name || '',
+    caseDistrict: selectedCase.district || '', caseHospital: selectedCase.hospital || '',
+    rehabCentre:   currentUser ? currentUser.unit : '',
+    submittedBy:   currentUser ? currentUser.username : '',
+    therapist: therapist.trim(), month: monthStr, dateFrom: firstDate, dateTo: lastDate,
+    slots: slots, totalRows: slots.length, presentCount: presentCount,
+    absentCount: absentCount, attendancePct: attendancePct,
+    notes:         (document.getElementById('rs-notes')          || {}).value || '',
+    issueNone:     !!((document.getElementById('rs-issue-none')   || {}).checked),
+    issueProcessor:!!((document.getElementById('rs-issue-proc')   || {}).checked),
+    issueSutures:  !!((document.getElementById('rs-issue-suture') || {}).checked),
+    issueSkin:     !!((document.getElementById('rs-issue-skin')   || {}).checked),
+    issueOther:    !!((document.getElementById('rs-issue-other')  || {}).checked),
+    issues:        (document.getElementById('rs-issues')         || {}).value || '',
+    timestamp: now, entryId: 'AVT-' + Date.now()
+  };
+  var caseUpdates = {
+    sessions: newTotalSessions, _rehabSessionsLogged: newTotalSessions,
+    _rehabLastSubmit: now, lastContact: lastDate || selectedCase.lastContact,
+    _lastRole: 'rehab', _lastModified: now, _lastRehabDate: finalLastDate,
+    _consecAbsent: newConsec, _missedThisMonth: newMissed,
+    _lastSessionMonth: monthStr, _attendanceFlag: newFlag, _monthAttendPct: attendancePct
+  };
+  try {
+    await window._fbFns.addDoc(window._fbFns.collection(window._fbDb, 'submissions_rehab'), avtEntry);
+    await window._fbFns.updateDoc(window._fbFns.doc(window._fbDb, 'cases', String(selectedCase.id)), caseUpdates);
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(selectedCase.id); });
+    if (idx > -1) Object.assign(SAMPLE_CASES[idx], caseUpdates);
+    window._rs_lastSaved = avtEntry;
+    if (btn) { btn.textContent = 'Save AVT Attendance Log →'; btn.disabled = false; }
+    rsFreezeSavedTable(avtEntry);
+  } catch(e) {
+    if (errEl) { errEl.textContent = 'Error saving AVT log: ' + e.message; errEl.style.display = 'block'; }
+    if (btn) { btn.textContent = 'Save AVT Attendance Log →'; btn.disabled = false; }
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB - SUBMIT MAPPING SESSION (saved once per quarter, separate button)
+// Saves to submissions_mapping collection. Freezes mapping section on success.
+// ══════════════════════════════════════════════════════════════════════════════
+async function submitMappingSession() {
+  if (isDemo()) { alert('Demo account - submissions are disabled.'); return; }
+  var errEl = document.getElementById('rs-map-error');
+  var btn   = document.getElementById('rs-map-submit-btn');
+  if (errEl) errEl.style.display = 'none';
+
+  var mapDate  = (document.getElementById('rs-mapdate')  || {}).value || '';
+  var mapCount = (document.getElementById('rs-mapcount') || {}).value || '';
+  if (!mapDate && !mapCount) {
+    if (errEl) { errEl.textContent = 'Please enter at least a mapping date or number of maps.'; errEl.style.display = 'block'; }
+    return;
+  }
+  var curQtrId  = window._rs_curQtrId || 1;
+  var QTRS_m    = window._rs_qtrs || [];
+  var qtrObj    = QTRS_m.find(function(q){ return q.id === curQtrId; }) || {};
+  var qtrLabel  = qtrObj.label || ('Q' + curQtrId);
+  var sfEl   = document.querySelector('#rs-soundfield .radio-item.checked');
+  var ecapEl = document.querySelector('#rs-ecap .radio-item.checked');
+  var magEl  = document.querySelector('#rs-magnet .radio-item.checked');
+  var entEl  = document.querySelector('#rs-entref .radio-item.checked');
+
+  var mapEntry = {
+    type: 'mapping_session', quarter: qtrLabel, quarterNum: curQtrId,
+    caseId: String(selectedCase.id), caseName: selectedCase.name || '',
+    caseDistrict: selectedCase.district || '', caseHospital: selectedCase.hospital || '',
+    rehabCentre:   currentUser ? currentUser.unit : '',
+    submittedBy:   currentUser ? currentUser.username : '',
+    mapDate: mapDate, mapCount: mapCount,
+    soundField:    sfEl   ? sfEl.textContent.trim()  : '',
+    ecap:          ecapEl ? ecapEl.textContent.trim() : '',
+    magnetOk:      magEl  ? magEl.textContent.trim()  : '',
+    entReferral:   entEl  ? entEl.textContent.trim()  : '',
+    mapAudiologist:(document.getElementById('rs-map-audiologist') || {}).value || '',
+    deviceStatus:  (document.getElementById('rs-devicestatus')   || {}).value || '',
+    timestamp: new Date().toISOString(), entryId: 'MAP-' + Date.now()
+  };
+  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; }
+  try {
+    await window._fbFns.addDoc(window._fbFns.collection(window._fbDb, 'submissions_mapping'), mapEntry);
+    window._rs_lastMapSaved = mapEntry;
+    if (btn) { btn.textContent = 'Save Mapping Session →'; btn.disabled = false; }
+    rsFreezeMapping(mapEntry);
+  } catch(e) {
+    if (errEl) { errEl.textContent = 'Error saving mapping: ' + e.message; errEl.style.display = 'block'; }
+    if (btn) { btn.textContent = 'Save Mapping Session →'; btn.disabled = false; }
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB - FREEZE MAPPING SECTION (after save or pre-load from Firestore)
+// Replaces editable mapping fields with read-only summary + tier edit rules.
+// ══════════════════════════════════════════════════════════════════════════════
+function rsFreezeMapping(entry) {
+  if (!entry) return;
+  var submittedAt = entry.timestamp || '';
+  var ageMs     = submittedAt ? (Date.now() - new Date(submittedAt).getTime()) : Infinity;
+  var within24h = ageMs < 24 * 60 * 60 * 1000;
+  var isMyUnit  = currentUser && currentUser.unit && entry.rehabCentre === currentUser.unit;
+  var isState   = currentRole === 'state';
+  var canT1 = isMyUnit && within24h;
+  var canT2 = isMyUnit && !within24h;
+  var canT3 = isState;
+
+  var fmtTs = submittedAt
+    ? new Date(submittedAt).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true})
+    : '';
+
+  var rows = [
+    ['Quarter', entry.quarter], ['Map Date', entry.mapDate], ['No. of Maps', entry.mapCount],
+    ['Sound Field', entry.soundField], ['ECAP', entry.ecap],
+    ['Magnet / Coil', entry.magnetOk], ['ENT Referral', entry.entReferral],
+    ['Audiologist', entry.mapAudiologist], ['Device Status', entry.deviceStatus]
+  ].filter(function(r){ return r[1]; })
+   .map(function(r){
+     return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6">'
+       + '<span style="font-size:11px;color:#6b7280">' + r[0] + '</span>'
+       + '<span style="font-size:11px;font-weight:600;color:#374151">' + r[1] + '</span></div>';
+   }).join('');
+
+  var editHTML = '';
+  if (canT3) {
+    editHTML = '<button onclick="rsUnfreezeMapping()" style="width:100%;margin-top:8px;padding:8px;background:#4a2a7a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Edit Mapping (State Override)</button>';
+  } else if (canT1) {
+    editHTML = '<div style="margin-top:8px">'
+      + '<input id="map-t1-reason" class="field-input" placeholder="Reason for correction (required)" style="margin-bottom:6px;font-size:12px">'
+      + '<button onclick="rsUnfreezeMapping()" style="width:100%;padding:8px;background:#0a3d2e;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Edit Mapping (within 24 h)</button></div>';
+  } else if (canT2) {
+    editHTML = '<div style="margin-top:8px;font-size:10px;color:#92400e;background:#fff8e1;border:1px solid #f59e0b;border-radius:6px;padding:8px">Mapping locked after 24 h. Contact the State Team to request a correction.</div>';
+  }
+
+  var frozenHTML =
+    '<div id="rs-mapping-frozen" style="margin:12px 16px 0;background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 12px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    + '<div style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.04em">Mapping Session &mdash; Saved</div>'
+    + '<div style="font-size:10px;color:#16a34a">' + fmtTs + '</div></div>'
+    + (rows || '<div style="font-size:11px;color:#9ca3af">No mapping details recorded</div>')
+    + editHTML
+    + '</div>';
+
+  var rsBody = document.getElementById('rs-body');
+  if (!rsBody) return;
+
+  // Find the editable mapping container (holds #rs-mapdate)
+  var mapdateEl = document.getElementById('rs-mapdate');
+  if (mapdateEl) {
+    // Walk up to find the section-level container (has the "Mapping Session" label)
+    var mapContainer = mapdateEl.closest
+      ? mapdateEl.closest('div[style*="margin:12px 16px"]') || mapdateEl.parentElement.parentElement.parentElement
+      : mapdateEl.parentElement.parentElement.parentElement;
+    // Find the mapping save button container right after
+    var mapSaveBtnEl = document.getElementById('rs-map-submit-btn');
+    var mapSaveDiv   = mapSaveBtnEl
+      ? (mapSaveBtnEl.closest ? mapSaveBtnEl.closest('div[style*="margin:10px 16px"]') : mapSaveBtnEl.parentElement) || mapSaveBtnEl.parentElement
+      : null;
+    if (mapContainer && mapContainer.parentElement) {
+      var tmp = document.createElement('div');
+      mapContainer.parentElement.insertBefore(tmp, mapContainer);
+      tmp.outerHTML = frozenHTML;
+      mapContainer.remove();
+      if (mapSaveDiv) mapSaveDiv.remove();
+    }
+  } else {
+    // Already frozen - refresh in place
+    var existing = document.getElementById('rs-mapping-frozen');
+    if (existing) {
+      var tmp2 = document.createElement('div');
+      existing.parentElement.insertBefore(tmp2, existing);
+      tmp2.outerHTML = frozenHTML;
+      existing.remove();
+    }
+  }
+}
+
+function rsUnfreezeMapping() {
+  var t1Input = document.getElementById('map-t1-reason');
+  if (t1Input) {
+    var reason = t1Input.value.trim();
+    if (!reason && currentRole !== 'state') { alert('Please enter a reason for the correction.'); return; }
+  }
+  window._rs_frozen = false;
+  window._rs_lastMapSaved = null;
+  openRehabSession(selectedCase);
 }
 
 async function submitRehabSession() {

@@ -1230,7 +1230,7 @@ let currentScreen = 'login';
 let selectedCase = null;
 let screenHistory = [];
 
-const MENTOR_SURGEONS = ["Dr. Sunil N. Dutt", "Dr. Ramesh K. Kaulgud", "Dr. Vasanthi Anand", "Dr. Bharathi M.B.", "Dr. Shanthi M.B.", "Dr. Shankar B. Medikeri", "Dr. P.S. Pradeep Kumar", "Dr. Lakshmi Shantharam", "Dr. B.Y. Praveen Kumar", "Dr. Dathathri H A", "Dr. Sumit Kumar Gaur", "Dr. Rohith Udaya Prasad"];
+const MENTOR_SURGEONS = ["Dr. Sunil N. Dutt", "Dr. Ramesh K. Kaulgud", "Dr. Vasanthi Anand", "Dr. Bharathi M.B.", "Dr. Shanthi M.B.", "Dr. Shankar B. Medikeri", "Dr. P.S. Pradeep Kumar", "Dr. Lakshmi Shantharam", "Dr. B.Y. Praveen Kumar", "Dr. Dathathri H A", "Dr. Sumit Kumar Gaur", "Dr. Rohith Udaya Prasad", "Dr. Suja Sreedharan"];
 const REHAB_CENTRES = ["AIISH Bengaluru", "AIISH Mysuru", "NIMHANS Bengaluru", "KSAD Dharwad", "SDM Dharwad", "Samspanda Mandya", "MIMS Mandya Rehab", "JSS Hospital Mysuru", "KMC Manipal Rehab", "Kasturba Hospital Udupi", "BIMS Audiology Center, Belagavi", "Dr.S.R.Chandrasekhar Institute of Speech and Hearing", "Sri Sathya Sai Sarala Memorial Hospital", "Manasa Cochlear Implant and ENT Center, Bengaluru",
   "KAHER Belagavi",
   "Vani Pradan Kendra, Bengaluru",
@@ -6124,23 +6124,21 @@ function openRehabSession(cas) {
     +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="rs-issue-other"> Others</label>'
     +'<input class="field-input" id="rs-issues" placeholder="Details / notes on flagged issues" style="margin-top:2px">'
     +'</div></div>'
-    +'<div style="margin-top:14px">'
-    +'<div id="rs-avt-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
-    +'<button onclick="submitAVTAndMapping()" style="width:100%;padding:14px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit" id="rs-avt-submit-btn">💾 Save Session Log →</button>'
-    +'</div>'
     +'</div>';
 
     // Save button 1 - AVT attendance table (below table, blue)
-  // Error div for AVT save (button moved to combined save at bottom)
   var saveBtnHTML =
     '<div style="margin:10px 16px 0">'
     +'<div id="rs-avt-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
+    +'<button onclick="submitAVTLog()" style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-avt-submit-btn">💾 Save AVT Attendance Log →</button>'
     +'</div>';
 
-  // Separate mapping save button removed — single combined save button at bottom
-  var mappingSaveBtnHTML = '';
+  var mappingSaveBtnHTML =
+    '<div style="margin:10px 16px 24px">'
+    +'<div id="rs-map-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:8px;display:none;"></div>'
+    +'<button onclick="submitMappingSession()" style="width:100%;padding:13px;background:#065f46;color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="rs-map-submit-btn">💾 Save Mapping Session →</button>'
+    +'</div>';
 
-  // Notes/Issues moved into mappingHTML below — submitHTML is now empty
   var submitHTML = '';
 
   var commonHTML =

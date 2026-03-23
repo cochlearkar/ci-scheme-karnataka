@@ -1232,7 +1232,8 @@ const MENTOR_SURGEONS = ["Dr. Sunil N. Dutt", "Dr. Ramesh K. Kaulgud", "Dr. Vasa
 const REHAB_CENTRES = ["AIISH Bengaluru", "AIISH Mysuru", "NIMHANS Bengaluru", "KSAD Dharwad", "SDM Dharwad", "Samspanda Mandya", "MIMS Mandya Rehab", "JSS Hospital Mysuru", "KMC Manipal Rehab", "Kasturba Hospital Udupi", "BIMS Audiology Center, Belagavi", "Dr.S.R.Chandrasekhar Institute of Speech and Hearing", "Sri Sathya Sai Sarala Memorial Hospital", "Manasa Cochlear Implant and ENT Center, Bengaluru",
   "KAHER Belagavi",
   "Vani Pradan Kendra, Bengaluru",
-  "JSS ISH, Dharwad"];
+  "JSS ISH, Dharwad",
+  "Kasturba Medical College, Attavara Mangaluru"];
 
 const ROLE_META = {
   hospital: { label: 'Hospital', chip: 'chip-hospital', color: '#0a3d2e', icon: '🏥',
@@ -1242,7 +1243,8 @@ const ROLE_META = {
     orgLabel: 'Institute', orgOptions: ["AIISH Bengaluru", "AIISH Mysuru", "NIMHANS Bengaluru", "KSAD Dharwad", "SDM Dharwad", "Samspanda Mandya", "MIMS Mandya Rehab", "JSS Hospital Mysuru", "KMC Manipal Rehab", "Kasturba Hospital Udupi", "BIMS Audiology Center, Belagavi", "Dr.S.R.Chandrasekhar Institute of Speech and Hearing", "Sri Sathya Sai Sarala Memorial Hospital", "Manasa Cochlear Implant and ENT Center, Bengaluru",
       "KAHER Belagavi",
   "Vani Pradan Kendra, Bengaluru",
-  "JSS ISH, Dharwad"],
+  "JSS ISH, Dharwad",
+      "Kasturba Medical College, Attavara Mangaluru"],
     yearLabel: 'Enrolment year' },
   district: { label: 'District Officer', chip: 'chip-district', color: '#8a5a0a', icon: '📍',
     orgLabel: 'District', orgOptions: ["BAGALKOTE", "BALLARI", "BANGALORE - RURAL", "BANGALORE EAST", "BANGALORE NORTH", "BANGALORE SOUTH", "BANGALORE WEST", "BELAGAVI", "BENGALURU", "BENGALURU RURAL", "BIDAR", "CHAMARAJANAGARA", "CHIKKABALLAPURA", "CHIKKAMAGALURU", "CHITRADURGA", "DAKSHINA KANNADA", "DAVANAGERE", "DHARWAR", "GADAG", "HASSAN", "HAVERI", "KALABURAGI", "KODAGU", "KOLAR", "KOPPAL", "MANDYA", "MYSORE", "MYSURU", "RAICHUR", "RAMANAGARA", "SHIVAMOGGA", "TUMAKURU", "UDUPI", "UTTARA KANNADA", "VIJAYANAGAR", "VIJAYAPURA", "YADGIR"],
@@ -4453,7 +4455,7 @@ function buildHospitalForm(cas) {
         <select class="field-input" id="f-rehabcentre">
           <option value="">Select institute...</option>
           ${REHAB_CENTRES.map(o=>`<option>${o}</option>`).join('')}
-        <option>KAHER Belagavi</option><option>Vani Pradan Kendra, Bengaluru</option><option>JSS ISH, Dharwad</option></select>
+        <option>KAHER Belagavi</option><option>Vani Pradan Kendra, Bengaluru</option><option>JSS ISH, Dharwad</option><option>Kasturba Medical College, Attavara Mangaluru</option></select>
       </div>
       <div class="field">
         <div class="field-label">Residential district of child</div>

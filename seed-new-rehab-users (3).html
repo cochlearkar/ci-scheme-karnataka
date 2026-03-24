@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seed New Rehab Users — Shravan Sanjeevini</title>
+
+<!-- Firebase SDK (same version as main app) -->
+<script type="module">
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, doc, setDoc }              from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+// ── Same config as the main app ──────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI",
+  authDomain:        "shravan-sanjeevini.firebaseapp.com",
+  projectId:         "shravan-sanjeevini",
+  storageBucket:     "shravan-sanjeevini.firebasestorage.app",
+  messagingSenderId: "130742586600",
+  appId:             "1:130742586600:web:1618bb56710c6fbbcc8d5d"
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ── New rehab centres to create ──────────────────────────────────────
+// username → used as   username@shravan.app  for Firebase Auth
+// unit     → must exactly match the name in REHAB_CENTRES in the app
+const NEW_REHAB_USERS = [
+  {
+    username:  "msmc.narayana",
+    password:  "Shravan@2025",          // temporary — user is forced to change on first login
+    unit:      "MSMC Narayana Hrudayalaya, Bengaluru",
+    district:  "BENGALURU",
+    zone:      "South"
+  },
+  {
+    username:  "deic.chikkaballapur",
+    password:  "Shravan@2025",
+    unit:      "DEIC, Chikkaballapur",
+    district:  "CHIKKABALLAPURA",
+    zone:      "East"
+  }
+];
+
+// ── Status log helper ────────────────────────────────────────────────
+function log(msg, colour) {
+  const el = document.getElementById('log');
+  const row = document.createElement('div');
+  row.style.cssText = 'padding:6px 10px;border-radius:6px;margin-bottom:6px;font-size:13px;font-family:monospace;background:' + (colour||'#f1f5f9') + ';color:#1e293b';
+  row.textContent = msg;
+  el.appendChild(row);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── Create one user ──────────────────────────────────────────────────
+async function createRehabUser(u) {
+  const email = u.username + "@shravan.app";
+  log("⏳ Creating Auth account for " + email + " …", "#fef9c3");
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, u.password);
+    log("✅ Auth account created: " + email + "  (uid: " + cred.user.uid + ")", "#dcfce7");
+
+    const profile = {
+      username:           u.username,
+      role:               "rehab",
+      unit:               u.unit,
+      district:           u.district || "",
+      zone:               u.zone     || "",
+      status:             "active",
+      mustChangePassword: true,      // forces password change on first login
+      isDemo:             false,
+      createdAt:          new Date().toISOString(),
+      createdBy:          "seed-script"
+    };
+
+    await setDoc(doc(db, "users", cred.user.uid), profile);
+    log("✅ Firestore profile saved  →  unit: "" + u.unit + """, "#dcfce7");
+    log("─────────────────────────────────────────────────────────────────────", "#e2e8f0");
+    return { ok: true };
+  } catch(e) {
+    if (e.code === "auth/email-already-in-use") {
+      log("⚠️  Auth account already exists for " + email + " — skipping Auth step (Firestore profile may still need creating)", "#fef3c7");
+      return { ok: false, alreadyExists: true };
+    }
+    log("❌ ERROR for " + email + ": " + e.message, "#fee2e2");
+    return { ok: false, error: e.message };
+  }
+}
+
+// ── Run all on button click ──────────────────────────────────────────
+window.runSeed = async function() {
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('run-btn').textContent = "Running…";
+  log("=== Seed started at " + new Date().toLocaleString() + " ===", "#e0e7ff");
+
+  let ok = 0, skip = 0, fail = 0;
+  for (const u of NEW_REHAB_USERS) {
+    const r = await createRehabUser(u);
+    if (r.ok)              ok++;
+    else if (r.alreadyExists) skip++;
+    else                   fail++;
+  }
+
+  log("=== Done.  Created: " + ok + "  Skipped (already exist): " + skip + "  Errors: " + fail + " ===", "#e0e7ff");
+  document.getElementById('run-btn').textContent = fail > 0 ? "❌ Finished with errors — see log" : "✅ Finished";
+};
+</script>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0a3d2e; min-height: 100vh;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.card {
+  background: #fff; border-radius: 16px; padding: 28px;
+  width: 100%; max-width: 560px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.4);
+}
+h1 { font-size: 18px; font-weight: 700; color: #0a3d2e; margin-bottom: 4px; }
+.sub { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+.users-preview {
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 10px; padding: 14px; margin-bottom: 20px;
+}
+.users-preview h3 { font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+.user-row {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 10px 12px; margin-bottom: 8px;
+}
+.user-row:last-child { margin-bottom: 0; }
+.user-name { font-size: 13px; font-weight: 600; color: #0f172a; }
+.user-email { font-size: 11px; color: #64748b; margin-top: 2px; }
+.user-meta { font-size: 11px; color: #0a3d2e; margin-top: 4px; font-weight: 500; }
+.warn {
+  background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px;
+  padding: 10px 14px; font-size: 12px; color: #92400e;
+  margin-bottom: 20px; line-height: 1.6;
+}
+.warn strong { font-weight: 700; }
+#run-btn {
+  width: 100%; padding: 14px;
+  background: #0a3d2e; color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  margin-bottom: 16px; font-family: inherit;
+  transition: opacity .15s;
+}
+#run-btn:disabled { opacity: .5; cursor: not-allowed; }
+#log {
+  background: #0f172a; border-radius: 10px;
+  padding: 14px; min-height: 80px; max-height: 300px;
+  overflow-y: auto; font-size: 12px;
+}
+.empty-log { color: #475569; font-family: monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🌱 Seed New Rehab Centre Logins</h1>
+  <p class="sub">Shravan Sanjeevini — creates Firebase Auth accounts + Firestore user profiles</p>
+
+  <div class="users-preview">
+    <h3>Users to be created</h3>
+    <div class="user-row">
+      <div class="user-name">MSMC Narayana Hrudayalaya, Bengaluru</div>
+      <div class="user-email">Username: msmc.narayana &nbsp;·&nbsp; msmc.narayana@shravan.app</div>
+      <div class="user-meta">Role: Rehab &nbsp;·&nbsp; Temp password: Shravan@2025</div>
+    </div>
+    <div class="user-row">
+      <div class="user-name">DEIC, Chikkaballapur</div>
+      <div class="user-email">Username: deic.chikkaballapur &nbsp;·&nbsp; deic.chikkaballapur@shravan.app</div>
+      <div class="user-meta">Role: Rehab &nbsp;·&nbsp; Temp password: Shravan@2025</div>
+    </div>
+  </div>
+
+  <div class="warn">
+    <strong>⚠️ Before clicking Run:</strong><br>
+    Both users will be created with temporary password <strong>Shravan@2025</strong>.<br>
+    The <strong>mustChangePassword</strong> flag is set to <code>true</code> — on first login the app will prompt them to set a new password.<br>
+    Share <strong>username + Shravan@2025</strong> with each centre. Do <em>not</em> share this file.
+  </div>
+
+  <button id="run-btn" onclick="runSeed()">▶ Run Seed — Create Both Users</button>
+
+  <div id="log">
+    <div class="empty-log">Log will appear here after you click Run…</div>
+  </div>
+</div>
+</body>
+</html>

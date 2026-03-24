@@ -1979,11 +1979,13 @@ function filterCasesByUser(cases) {
     return cases;
   }
   if (currentUser.role === 'hospital') {
-    const u = (currentUser.unit||'').toLowerCase();
+    // Normalize spaces in both unit and hospital before matching
+    const normalize = s => (s||'').toLowerCase().replace(/\s+/g,' ').trim();
+    const u = normalize(currentUser.unit);
     // Progressive match — try shorter keys until we find cases
     for (let len = Math.min(u.length, 20); len >= 6; len -= 2) {
       const key = u.substring(0, len);
-      const matches = cases.filter(c => c.hospital && c.hospital.toLowerCase().includes(key));
+      const matches = cases.filter(c => normalize(c.hospital).includes(key));
       if (matches.length > 0) return matches;
     }
     return [];

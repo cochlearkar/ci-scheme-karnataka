@@ -2922,12 +2922,68 @@ function openQEScreen(cas, quarterNum) {
     + isdRow('Cognition',            'cogn')
     + isdRow('Social Communication', 'social')
     +'</tbody></table></div>'
-    // ACSLS input — closed immediately after its own rows
+    // ACSLS structured 4-domain table (replaces free-text inputs)
     +'<div id="lang-acsls-table" style="display:'+(saved.langTool==='ACSLS'?'block':'none')+'">'
-    + editRow('ACSLS Score',         inp('f-acsls',      pv(saved.acslsScore), 'e.g. Level 4 or 12/20'))
-    + editRow('ACSLS — Auditory',   inp('f-acsls-aud',  pv(saved.acslsAud),   'Auditory subscale score'))
-    + editRow('ACSLS — Verbal',     inp('f-acsls-ver',  pv(saved.acslsVer),   'Verbal subscale score'))
-    + editRow('ACSLS — Notes',      inp('f-acsls-note', pv(saved.acslsNote),  'Any remarks'))
+    +(function(){
+        var acslsDomains = [
+          { key: 'auditory',  label: 'Auditory Skills',      icon: '👂' },
+          { key: 'verbal',    label: 'Verbal Communication', icon: '🗣️' },
+          { key: 'language',  label: 'Language Skills',      icon: '📝' },
+          { key: 'social',    label: 'Social Communication', icon: '🤝' }
+        ];
+        var saved_acsls = (saved && saved.acslsTable) || {};
+        var html = '';
+        html += '<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin:8px 0 6px;font-size:10px;color:#92400e;line-height:1.5">'
+              + '<strong>ACSLS — Auditory Communication Scale for Language &amp; Speech</strong><br>'
+              + 'Rate each domain 0–5. Total score auto-calculates out of 20.'
+              + '</div>';
+        html += '<table style="width:100%;border-collapse:collapse;margin-bottom:4px">';
+        html += '<thead><tr style="background:#92400e">'
+              + '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#fff;text-align:left;border-radius:0">Domain</th>'
+              + '<th style="padding:7px 6px;font-size:10px;font-weight:700;color:#fff;text-align:center;width:72px">Score (0–5)</th>'
+              + '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#fff;text-align:left">Remarks</th>'
+              + '</tr></thead><tbody>';
+        acslsDomains.forEach(function(d, i){
+          var sv = saved_acsls[d.key] || {};
+          var scoreVal = (sv.score !== undefined && sv.score !== '') ? sv.score : '';
+          var remarkVal = sv.remark || '';
+          var bgRow = (i % 2 === 0) ? '#fffbeb' : '#fef9ee';
+          html += '<tr style="background:' + bgRow + ';border-bottom:1px solid #fde68a">'
+                + '<td style="padding:8px 8px 4px;font-size:12px;font-weight:600;color:#374151;vertical-align:top">'
+                +   '<span style="margin-right:4px">' + d.icon + '</span>' + d.label
+                + '</td>'
+                + '<td style="padding:6px 4px;text-align:center;vertical-align:top">'
+                +   '<select id="acsls-score-' + d.key + '" onchange="acslsRecalc()" style="width:56px;border:1.5px solid #fbbf24;border-radius:6px;padding:4px 2px;font-size:14px;font-weight:700;color:#92400e;text-align:center;background:#fff;-webkit-appearance:none;appearance:none;font-family:inherit">'
+                +     (function(){
+                          var opts = '';
+                          for(var v=0;v<=5;v++){
+                            var sel = (String(scoreVal)===String(v)) ? ' selected' : '';
+                            opts += '<option value="'+v+'"'+sel+'>'+v+'</option>';
+                          }
+                          return opts;
+                        })()
+                +   '</select>'
+                + '</td>'
+                + '<td style="padding:6px 8px 4px;vertical-align:top">'
+                +   '<input id="acsls-remark-' + d.key + '" type="text" value="' + remarkVal.replace(/"/g,'&quot;') + '" placeholder="Optional remarks…" style="width:100%;border:1px solid #fde68a;border-radius:5px;padding:5px 7px;font-size:11px;color:#374151;background:#fff;font-family:inherit;outline:none">'
+                + '</td>'
+                + '</tr>';
+        });
+        html += '</tbody></table>';
+        // Totals row
+        html += '<div id="acsls-totals-row" style="background:#92400e;border-radius:0 0 8px 8px;padding:8px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+              + '<span style="color:#fef3c7;font-size:11px;font-weight:600">Total:</span>'
+              + '<span id="acsls-total-score" style="color:#fff;font-size:20px;font-weight:800;min-width:28px;text-align:center">0</span>'
+              + '<span style="color:#fef3c7;font-size:11px">/ 20</span>'
+              + '<div style="width:1px;height:20px;background:rgba(255,255,255,0.3)"></div>'
+              + '<span style="color:#fef3c7;font-size:11px;font-weight:600">Percentage:</span>'
+              + '<span id="acsls-total-pct" style="color:#fbbf24;font-size:16px;font-weight:700">0%</span>'
+              + '<div style="width:1px;height:20px;background:rgba(255,255,255,0.3)"></div>'
+              + '<span style="color:#fef3c7;font-size:11px;font-weight:600">Grade:</span>'
+              + '<span id="acsls-total-grade" style="color:#fbbf24;font-size:14px;font-weight:800;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,0.15)">—</span>'
+              + '</div>';
+        return html;
+      })()
     +'</div>'
     // REELS section — sibling of ACSLS, not nested inside it
     +'<div id="lang-reels-table" style="display:'+(saved.langTool==='REELS'?'block':'none')+'">'
@@ -3046,10 +3102,19 @@ async function submitQEForm(quarterNum, isDraft) {
     langDateCompleted: g('lang-done'),
     langResult: '', // replaced by ISD/ACSLS/REELS domains
     langTool: (document.querySelector('input[name="lang-tool"]:checked')||{}).value||'ISD',
-    acslsScore: g('f-acsls'),
-    acslsAud:   g('f-acsls-aud'),
-    acslsVer:   g('f-acsls-ver'),
-    acslsNote:  g('f-acsls-note'),
+    acslsTable: (function(){
+      var domains=['auditory','verbal','language','social'];
+      var out={};
+      domains.forEach(function(d){
+        var sel=document.getElementById('acsls-score-'+d);
+        var rem=document.getElementById('acsls-remark-'+d);
+        out[d]={score:sel?parseInt(sel.value)||0:0, remark:rem?rem.value.trim():''};
+      });
+      return out;
+    })(),
+    acslsTotal: (function(){var t=document.getElementById('acsls-total-score');return t?parseInt(t.textContent)||0:0;})(),
+    acslsPercent: (function(){var t=document.getElementById('acsls-total-pct');return t?t.textContent:'0%';})(),
+    acslsGrade: (function(){var t=document.getElementById('acsls-total-grade');return t?t.textContent:'—';})(),
     reels: (function(){
       var out={};
       ['receptive','expressive'].forEach(function(key){
@@ -6508,6 +6573,29 @@ function rsTableAtt(rowIdx, val) {
   if (totEl) totEl.textContent = total + ' / ' + possible + ' attended';
 }
 
+function acslsRecalc() {
+  var domains = ['auditory','verbal','language','social'];
+  var total = 0;
+  domains.forEach(function(d){
+    var el = document.getElementById('acsls-score-' + d);
+    if (el) total += parseInt(el.value) || 0;
+  });
+  var pct = Math.round((total / 20) * 100);
+  var grade;
+  if (pct >= 90) grade = 'A+';
+  else if (pct >= 80) grade = 'A';
+  else if (pct >= 70) grade = 'B';
+  else if (pct >= 60) grade = 'C';
+  else if (pct >= 50) grade = 'D';
+  else grade = 'E';
+  var ts = document.getElementById('acsls-total-score');
+  var tp = document.getElementById('acsls-total-pct');
+  var tg = document.getElementById('acsls-total-grade');
+  if (ts) ts.textContent = total;
+  if (tp) tp.textContent = pct + '%';
+  if (tg) tg.textContent = grade;
+}
+
 function rsLangTool(val) {
   var isd   = document.getElementById('lang-isd-table');
   var acsls = document.getElementById('lang-acsls-table');
@@ -6515,6 +6603,7 @@ function rsLangTool(val) {
   if (isd)   isd.style.display   = val === 'ISD'   ? 'block' : 'none';
   if (acsls) acsls.style.display = val === 'ACSLS' ? 'block' : 'none';
   if (reels) reels.style.display = val === 'REELS' ? 'block' : 'none';
+  if (val === 'ACSLS') acslsRecalc();
 }
 
 // Q4 section visibility

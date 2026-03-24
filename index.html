@@ -2919,13 +2919,14 @@ function openQEScreen(cas, quarterNum) {
     + isdRow('Cognition',            'cogn')
     + isdRow('Social Communication', 'social')
     +'</tbody></table></div>'
-    // ACSLS input
+    // ACSLS input — closed immediately after its own rows
     +'<div id="lang-acsls-table" style="display:'+(saved.langTool==='ACSLS'?'block':'none')+'">'
-    + editRow('ACSLS Score', inp('f-acsls', pv(saved.acslsScore), 'e.g. Level 4 or 12/20'))
-    + editRow('ACSLS — Auditory', inp('f-acsls-aud', pv(saved.acslsAud), 'Auditory subscale score'))
-    + editRow('ACSLS — Verbal',   inp('f-acsls-ver', pv(saved.acslsVer), 'Verbal subscale score'))
-    + editRow('ACSLS — Notes',    inp('f-acsls-note', pv(saved.acslsNote), 'Any remarks'))
-    // REELS section
+    + editRow('ACSLS Score',         inp('f-acsls',      pv(saved.acslsScore), 'e.g. Level 4 or 12/20'))
+    + editRow('ACSLS — Auditory',   inp('f-acsls-aud',  pv(saved.acslsAud),   'Auditory subscale score'))
+    + editRow('ACSLS — Verbal',     inp('f-acsls-ver',  pv(saved.acslsVer),   'Verbal subscale score'))
+    + editRow('ACSLS — Notes',      inp('f-acsls-note', pv(saved.acslsNote),  'Any remarks'))
+    +'</div>'
+    // REELS section — sibling of ACSLS, not nested inside it
     +'<div id="lang-reels-table" style="display:'+(saved.langTool==='REELS'?'block':'none')+'">'
     +'<div style="overflow-x:auto;margin-top:2px"><table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">'
     +'<thead><tr style="background:#ede9fe">'

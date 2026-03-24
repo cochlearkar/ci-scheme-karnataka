@@ -2638,15 +2638,8 @@ function openQEScreen(cas, quarterNum) {
   var soStr = (cas.switchOn || cas.switchOnDate || '').substring(0, 10);
   var today = new Date().toISOString().substring(0, 10);
 
-  if (!quarterNum) {
-    quarterNum = 1;
-    if (soStr && !isNaN(new Date(soStr))) {
-      for (var q = 8; q >= 1; q--) {
-        if (new Date(soStr).getTime() + q*91.31*24*3600*1000 <= Date.now() + 14*24*3600*1000) {
-          quarterNum = q; break;
-        }
-      }
-    }
+  if (quarterNum === undefined || quarterNum === null) {
+    quarterNum = 0; // Default to Baseline
   }
 
   var qRomans   = ['Baseline','I','II','III','IV'];
@@ -2775,23 +2768,32 @@ function openQEScreen(cas, quarterNum) {
         +'display:'+(pv(saved.intraopYN)==='yes'?'block':'none')+'">')
     +'</div></div>';
 
-  // ── Quarter selector ──────────────────────────────────────────────────────
+  // -- Quarter selector with sequential locking
   var qSelector =
     '<div style="padding:10px 16px;background:#f8fafc;border-top:1px solid var(--border);'
     +'border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-    +'<span style="font-size:11px;font-weight:700;color:#374151;flex-shrink:0">Quarter:</span>'
+    +'<span style="font-size:11px;font-weight:700;color:#374151;flex-shrink:0">Evaluation:</span>'
     + qRomans.map(function(ql, i) {
         var qn = i;
         var active = qn === quarterNum;
-        var done   = cas['_evalQ'+qn] ? ' \u2713' : '';
-        return '<div onclick="openQEScreen(selectedCase,'+qn+')" '
-          +'style="'+(active?'background:var(--blue);color:#fff':'background:#e8f0fe;color:#1e3a5f')+';'
-          +'padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">'
-          +ql+done+'</div>';
+        var done   = cas['_evalQ'+qn] ? ' ✓' : '';
+        var locked = false;
+        for (var prev = 0; prev < qn; prev++) {
+          if (!cas['_evalQ'+prev]) { locked = true; break; }
+        }
+        if (active) locked = false;
+        var bg  = active ? 'var(--blue)' : locked ? '#e5e7eb' : '#e8f0fe';
+        var clr = active ? '#fff' : locked ? '#9ca3af' : '#1e3a5f';
+        var cur = locked ? 'not-allowed' : 'pointer';
+        var oc  = locked ? '' : 'onclick="openQEScreen(selectedCase,'+qn+')"';
+        return '<div '+oc+' style="background:'+bg+';color:'+clr+';padding:4px 10px;border-radius:20px;'
+          +'font-size:11px;font-weight:700;cursor:'+cur+';white-space:nowrap'+(locked?';opacity:.6':'')+'">'
+          +ql+done+(locked?' 🔒':'')+'</div>';
       }).join('')
     +'<span style="font-size:10px;color:var(--text-light);margin-left:2px">'
-    +qOrd+' \u2014 '+(quarterNum*3)+' months \u00b7 Scheduled: '+schedDisplay+'</span>'
-    +'</div>';
+    +(quarterNum===0 ? '0 — Baseline' : 'Quarter '+quarterNum+' — end of '+(quarterNum*3)+' months')
+    +' · Scheduled: '+schedDisplay+'</span>'
++'</div>';
 
   // ── Evaluation table row builder ──────────────────────────────────────────
   function er(label, doneId, resultId, savedDone, savedResult, ph) {
@@ -2799,7 +2801,7 @@ function openQEScreen(cas, quarterNum) {
       +'<td style="padding:7px 8px;font-size:11px;font-weight:600;color:#374151;background:#f8fafc;min-width:130px">'+label+'</td>'
       +'<td style="padding:7px 8px;font-size:11px;color:#64748b;white-space:nowrap">'+schedDisplay+'</td>'
       +'<td style="padding:4px 6px;white-space:nowrap">'
-      +'<input id="qe-'+doneId+'" type="date" value="'+pv(savedDone||today)+'" '
+      +'<input id="qe-'+doneId+'" type="date" value="'+pv(savedDone)+'" '
       +'style="font-size:11px;border:none;background:transparent;color:#111;font-family:inherit;outline:none;padding:2px 0;width:110px">'
       +'</td>'
       +'<td style="padding:4px 8px">'
@@ -2848,7 +2850,7 @@ function openQEScreen(cas, quarterNum) {
     +'<div style="background:#1e3a5f;padding:9px 14px;text-align:center">'
     +'<div style="color:#fff;font-size:13px;font-weight:700">Cochlear Implant Scheme, Karnataka</div>'
     +'<div style="color:rgba(255,255,255,.75);font-size:11px;margin-top:1px">'
-    +'Rehabilitation Quarterly Update Form \u2014 Quarter '+qLabel+' ('+qOrd+' \u2014 '+(quarterNum*3)+' months)</div>'
+    +(quarterNum===0 ? 'Rehabilitation Evaluation Form — Baseline' : 'Rehabilitation Quarterly Update Form — Quarter '+quarterNum+' (end of '+(quarterNum*3)+' months)')+'</div>'
     +'</div>'
 
     // Post Implant Rehab info
@@ -2873,7 +2875,7 @@ function openQEScreen(cas, quarterNum) {
     // Section 2: Speech and Language Evaluation (ACSLS or ISD — user selects)
     +'<div style="padding:0 16px">'
     + sec('\ud83d\udde3\ufe0f 2. Speech and Language Evaluation')
-    + editRow('Evaluation date', inp('lang-done', pv(saved.langDateCompleted||today), '', 'date'))
+    + editRow('Evaluation date <span style="color:#dc2626">*</span>', '<input id="qe-lang-done" type="date" value="'+pv(saved.langDateCompleted)+'" required style="border:none;background:transparent;font-size:13px;color:#111;text-align:right;width:100%;font-family:inherit;outline:none;padding:0">')
     // Tool selector
     +'<div style="margin:8px 0 10px;background:var(--amber-light);border:1px solid #FAC775;border-radius:8px;padding:8px 12px">'
     +'<div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:6px">Select evaluation tool used</div>'
@@ -2884,11 +2886,14 @@ function openQEScreen(cas, quarterNum) {
     +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:600">'
     +'<input type="radio" name="lang-tool" value="ACSLS" '+(saved.langTool==='ACSLS'?'checked':'')+' onchange="rsLangTool(this.value)" style="accent-color:var(--amber)"> ACSLS'
     +'</label>'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:600">'
+    +'<input type="radio" name="lang-tool" value="REELS" '+(saved.langTool==='REELS'?'checked':'')+' onchange="rsLangTool(this.value)" style="accent-color:#7c3aed"> REELS'
+    +'</label>'
     +'</div>'
-    +'<div style="font-size:10px;color:var(--amber);margin-top:4px">ISD = Indian Scale of Development &nbsp;|&nbsp; ACSLS = Auditory Communication Scale for Language & Speech</div>'
+    +'<div style="font-size:10px;color:var(--amber);margin-top:4px">ISD = Indian Scale of Development &nbsp;|&nbsp; ACSLS = Auditory Communication Scale for Language & Speech &nbsp;|&nbsp; REELS = Receptive-Expressive Emergent Language Scale</div>'
     +'</div>'
     // ISD table
-    +'<div id="lang-isd-table" style="overflow-x:auto;margin-top:2px;display:'+(saved.langTool==='ACSLS'?'none':'block')+'">'
+    +'<div id="lang-isd-table" style="overflow-x:auto;margin-top:2px;display:'+(saved.langTool==='ACSLS'||saved.langTool==='REELS'?'none':'block')+'">'
     +'<table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">'
     +'<thead><tr style="background:#e8f0fe">'
     +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#1e3a5f;text-align:left;min-width:160px">ISD Domain</th>'
@@ -2907,11 +2912,26 @@ function openQEScreen(cas, quarterNum) {
     + editRow('ACSLS — Auditory', inp('f-acsls-aud', pv(saved.acslsAud), 'Auditory subscale score'))
     + editRow('ACSLS — Verbal',   inp('f-acsls-ver', pv(saved.acslsVer), 'Verbal subscale score'))
     + editRow('ACSLS — Notes',    inp('f-acsls-note', pv(saved.acslsNote), 'Any remarks'))
+    // REELS section
+    +'<div id="lang-reels-table" style="display:'+(saved.langTool==='REELS'?'block':'none')+'">'
+    +'<div style="overflow-x:auto;margin-top:2px"><table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">'
+    +'<thead><tr style="background:#ede9fe">'
+    +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#4c1d95;text-align:left;min-width:160px">REELS Domain</th>'
+    +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#4c1d95;text-align:left" colspan="3">Age Range (From → To)</th>'
+    +'</tr></thead><tbody>'
+    +(function(){
+        function rNf(id,val,ph){return '<input id="qe-reels-'+id+'" type="number" min="0" max="120" value="'+(val||'')+'" placeholder="'+ph+'" style="width:36px;border:1px solid var(--border);border-radius:4px;padding:3px 4px;font-size:12px;font-family:inherit;text-align:center">';}
+        function rRow(label,key){var sv=(saved.reels&&saved.reels[key])||{};return '<tr style="border-bottom:1px solid var(--border)"><td style="padding:7px 8px;font-size:11px;font-weight:600;color:#374151;background:#f5f3ff">'+label+'</td><td colspan="3" style="padding:5px 8px"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:11px;color:#64748b;font-weight:600">From:</span>'+rNf(key+'-fy',sv.fromY,'Y')+'<span style="font-size:11px;color:#64748b">yr</span>'+rNf(key+'-fm',sv.fromM,'M')+'<span style="font-size:11px;color:#64748b">mo</span><span style="font-size:16px;color:#9ca3af;margin:0 4px">→</span><span style="font-size:11px;color:#64748b;font-weight:600">To:</span>'+rNf(key+'-ty',sv.toY,'Y')+'<span style="font-size:11px;color:#64748b">yr</span>'+rNf(key+'-tm',sv.toM,'M')+'<span style="font-size:11px;color:#64748b">mo</span></div></td></tr>';}
+        return rRow('Receptive Language','receptive')+rRow('Expressive Language','expressive');
+      })()
+    +'</tbody></table></div>'
+    +'</div>'
     +'</div>'
     +'</div>'
 
-    // Closing fields
-    +'<div class="form-section" style="padding:0 16px">'
+    // Section 3: Progress & Administrative
+    +'<div style="padding:0 16px">'
+    + sec('📋 3. Progress & Administrative')
     + editRow('Video session (3 min) taken',   yesno('video-taken','yes',saved.videoTaken))
     + editRow('Number of maps',                inp('num-maps', pv(saved.numMaps||'1'), '', 'number'))
     + editRow('Issues if any',                 inp('issues', pv(saved.issues), 'NIL or describe'))
@@ -2957,6 +2977,14 @@ async function submitQEForm(quarterNum, isDraft) {
   if (isDemo()) { alert('Demo account — submissions disabled.'); return; }
   var cas = selectedCase;
   var btn = document.getElementById('qe-submit-btn');
+  // Mandatory evaluation date check
+  var evalDateEl = document.getElementById('qe-lang-done');
+  if (evalDateEl && !evalDateEl.value && !isDraft) {
+    var errEl2 = document.getElementById('qe-error');
+    if (errEl2) { errEl2.textContent = 'Evaluation date is required in the Speech & Language section.'; errEl2.style.display = 'block'; }
+    if (evalDateEl) evalDateEl.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
   var errEl = document.getElementById('qe-error');
   errEl.style.display = 'none';
 
@@ -2992,7 +3020,20 @@ async function submitQEForm(quarterNum, isDraft) {
     spiResult: g('spi-result'),
     maisScore: g('mais'),
     langDateCompleted: g('lang-done'),
-    langResult: '', // replaced by ISD domains
+    langResult: '', // replaced by ISD/ACSLS/REELS domains
+    langTool: (document.querySelector('input[name="lang-tool"]:checked')||{}).value||'ISD',
+    acslsScore: g('f-acsls'),
+    acslsAud:   g('f-acsls-aud'),
+    acslsVer:   g('f-acsls-ver'),
+    acslsNote:  g('f-acsls-note'),
+    reels: (function(){
+      var out={};
+      ['receptive','expressive'].forEach(function(key){
+        function n(sfx){var el=document.getElementById('qe-reels-'+key+'-'+sfx);return el?el.value||'':'';}  
+        out[key]={fromY:n('fy'),fromM:n('fm'),toY:n('ty'),toM:n('tm')};
+      });
+      return out;
+    })(),
     parentGuidance: r('parent-guidance'),
     intraopYN: r('intraop-yn'),
     intraopDetail: g('intraop-detail'),
@@ -6427,9 +6468,10 @@ function rsTableAtt(rowIdx, val) {
 function rsLangTool(val) {
   var isd   = document.getElementById('lang-isd-table');
   var acsls = document.getElementById('lang-acsls-table');
-  if (!isd || !acsls) return;
-  isd.style.display   = val === 'ISD'   ? 'block' : 'none';
-  acsls.style.display = val === 'ACSLS' ? 'block' : 'none';
+  var reels = document.getElementById('lang-reels-table');
+  if (isd)   isd.style.display   = val === 'ISD'   ? 'block' : 'none';
+  if (acsls) acsls.style.display = val === 'ACSLS' ? 'block' : 'none';
+  if (reels) reels.style.display = val === 'REELS' ? 'block' : 'none';
 }
 
 // Q4 section visibility

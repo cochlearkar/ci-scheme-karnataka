@@ -2495,6 +2495,8 @@ function openAVTEvalList() {
   var cases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
     var soStr = c.switchOn || c.switchOnDate || '';
     if (!soStr || isNaN(new Date(soStr))) return false;
+    // Include if Baseline not done
+    if (!c['_evalQ0']) return true;
     var soD = new Date(soStr);
     for (var q = 1; q <= 8; q++) {
       var dueTs = soD.getTime() + q * DAYS91;
@@ -2515,16 +2517,20 @@ function openAVTEvalList() {
     var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
     var soD   = new Date(soStr);
     var nm    = isDemo() ? maskName(c.name) : (c.name||'\u2014');
-    // Find next due quarter
-    var nextQ = 1;
-    for (var q = 1; q <= 8; q++) {
-      var dueTs = soD.getTime() + q * 91.31*24*3600*1000;
-      if (dueTs <= Date.now() + 14*24*3600*1000 && !c['_evalQ'+q]) { nextQ = q; break; }
+    // Find next due quarter — Baseline (0) first if not done
+    var nextQ = 0;
+    if (c['_evalQ0']) {
+      nextQ = 1;
+      for (var q = 1; q <= 8; q++) {
+        var dueTs = soD.getTime() + q * 91.31*24*3600*1000;
+        if (dueTs <= Date.now() + 14*24*3600*1000 && !c['_evalQ'+q]) { nextQ = q; break; }
+      }
     }
     var dueDate  = new Date(soD.getTime() + nextQ*91.31*24*3600*1000).toISOString().substring(0,10);
     var overdue  = new Date(dueDate) < new Date();
     var qRomans  = ['I','II','III','IV','V','VI','VII','VIII'];
-    var qLabel   = qRomans[nextQ-1]||String(nextQ);
+    var qLabel   = nextQ === 0 ? 'Baseline' : (qRomans[nextQ-1]||String(nextQ));
+    var dueDate  = nextQ === 0 ? soStr : new Date(soD.getTime() + nextQ*91.31*24*3600*1000).toISOString().substring(0,10);
 
     return '<div class="avt-eval-row" data-id="'+c.id+'" data-q="'+nextQ+'" '
       +'style="background:#fff;border-bottom:1px solid #f1f5f9;padding:10px 14px;cursor:pointer;'
@@ -2863,25 +2869,32 @@ function openQEScreen(cas, quarterNum) {
     +'</div>'
 
     // Section 1: Audiological Evaluation
+    +'<div style="margin:10px 16px 0;border:1.5px solid #bfdbfe;border-radius:10px;overflow:hidden">'
+    +'<div style="background:#1e3a5f;padding:8px 14px">'
+    +'<div style="color:#fff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">1. Audiological Evaluation</div>'
+    +'</div>'
     +'<div style="padding:0 16px">'
-    + sec('\ud83e\udd7a 1. Audiological Evaluation')
     + evalTableHeader()
     + er('Aided Audiogram',   'aud-done','aud-result',  saved.audDateCompleted, saved.audResult,  'e.g. Upper border of speech spectrum')
     + er('Speech Perception', 'spi-done','spi-result',  saved.spiDateCompleted, saved.spiResult,  'e.g. 20/25 Open set')
     + er((parseInt(cas.age||99)<=36?'IT-MAIS (/40)':'MAIS (/40)'), 'mais-done','mais', saved.maisDateCompleted, saved.maisScore, 'e.g. 40/40')
     +'</tbody></table></div>'
     +'</div>'
+    +'</div>'
 
-    // Section 2: Speech and Language Evaluation (ACSLS or ISD — user selects)
+    // Section 2: Speech and Language Evaluation
+    +'<div style="margin:10px 16px 0;border:1.5px solid #fde68a;border-radius:10px;overflow:hidden">'
+    +'<div style="background:#92400e;padding:8px 14px">'
+    +'<div style="color:#fff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">2. Speech and Language Evaluation</div>'
+    +'</div>'
     +'<div style="padding:0 16px">'
-    + sec('\ud83d\udde3\ufe0f 2. Speech and Language Evaluation')
     + editRow('Evaluation date <span style="color:#dc2626">*</span>', '<input id="qe-lang-done" type="date" value="'+pv(saved.langDateCompleted)+'" required style="border:none;background:transparent;font-size:13px;color:#111;text-align:right;width:100%;font-family:inherit;outline:none;padding:0">')
     // Tool selector
     +'<div style="margin:8px 0 10px;background:var(--amber-light);border:1px solid #FAC775;border-radius:8px;padding:8px 12px">'
     +'<div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:6px">Select evaluation tool used</div>'
     +'<div style="display:flex;gap:10px">'
     +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:600">'
-    +'<input type="radio" name="lang-tool" value="ISD" id="lt-isd" '+(saved.langTool==='ACSLS'?'':'checked')+' onchange="rsLangTool(this.value)" style="accent-color:var(--blue)"> ISD'
+    +'<input type="radio" name="lang-tool" value="ISD" id="lt-isd" '+((!saved.langTool||saved.langTool==='ISD')?'checked':'')+' onchange="rsLangTool(this.value)" style="accent-color:var(--blue)"> ISD'
     +'</label>'
     +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:600">'
     +'<input type="radio" name="lang-tool" value="ACSLS" '+(saved.langTool==='ACSLS'?'checked':'')+' onchange="rsLangTool(this.value)" style="accent-color:var(--amber)"> ACSLS'
@@ -2930,8 +2943,11 @@ function openQEScreen(cas, quarterNum) {
     +'</div>'
 
     // Section 3: Progress & Administrative
+    +'<div style="margin:10px 16px 0;border:1.5px solid #bbf7d0;border-radius:10px;overflow:hidden">'
+    +'<div style="background:#065f46;padding:8px 14px">'
+    +'<div style="color:#fff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">3. Progress & Administrative</div>'
+    +'</div>'
     +'<div style="padding:0 16px">'
-    + sec('📋 3. Progress & Administrative')
     + editRow('Video session (3 min) taken',   yesno('video-taken','yes',saved.videoTaken))
     + editRow('Number of maps',                inp('num-maps', pv(saved.numMaps||'1'), '', 'number'))
     + editRow('Issues if any',                 inp('issues', pv(saved.issues), 'NIL or describe'))
@@ -2940,8 +2956,12 @@ function openQEScreen(cas, quarterNum) {
     + editRow('Monthly reports submitted',     yesno('monthly-rep','yes',saved.monthlyReports))
     + editRow('AV Therapy Completed',          yesno('avt-complete','no',saved.avtCompleted))
     +'</div>'
-    +'<div class="form-section" style="padding:0 16px">'
-    + sec('\u270f Signatures')
+    +'</div>'
+    +'<div style="margin:10px 16px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+    +'<div style="background:#374151;padding:8px 14px">'
+    +'<div style="color:#fff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">✏ Signatures</div>'
+    +'</div>'
+    +'<div style="padding:0 16px">'
     + editRow('Therapist name / Under the Supervision of', inp('therapist', pv(saved.therapist), 'Full name / Supervisor name'))
     + editRow('Mapping Audiologist',   inp('audiologist',   pv(saved.audiologist),   'Full name (if mapping done this quarter)'))
     + editRow('Supervisor',            inp('supervisor',    pv(saved.supervisor),    'Full name'))
@@ -6021,13 +6041,32 @@ function openRehabSession(cas) {
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
     +QTRS.map(function(q){
       var active = q.id === curQtr.id;
-      return '<div onclick="rsSelectQtr('+q.id+',this)" '
-        +'style="padding:10px 8px;border-radius:10px;text-align:center;cursor:pointer;'
-        +'background:'+(active?'var(--blue)':'var(--gray)')+';'
-        +'color:'+(active?'#fff':'var(--text)')+';'
-        +'border:2px solid '+(active?'var(--blue)':'transparent')+';'
-        +'font-weight:'+(active?'700':'500')+'">'
-        +'<div style="font-size:12px;font-weight:'+(active?'800':'600')+'">'+q.label+'</div>'
+      // Lock a quarter if the immediately preceding quarter has no saved log
+      // Q2 needs Q1, Q4 needs Q3, Q5 needs Q4
+      var prevNeeded = (q.id === 2) ? 1 : (q.id === 4) ? 3 : (q.id === 5) ? 4 : 0;
+      var locked = prevNeeded > 0 && !(
+        cas && cas._rehabSessionsLogged >= ((prevNeeded) * 26)
+      ) && !(
+        // also unlocked if there's a saved submission for the prev quarter
+        window._rs_lastSaved && window._rs_lastSaved.quarterNum === prevNeeded
+      );
+      // Simpler rule: locked if no sessions logged for prior quarter
+      // Use _rehabSessionsLogged as proxy: Q1 needs >=0 sessions (always open),
+      // Q2 needs Q1 to have been saved (>0 sessions), Q4 needs Q3 done, Q5 needs Q4 done
+      var sessLogged = (cas && _rehabSess(cas) !== null) ? _rehabSess(cas) : 0;
+      locked = false;
+      if (q.id === 2 && sessLogged < 1)  locked = true;  // Q2 needs at least 1 session in Q1
+      if (q.id === 4 && sessLogged < 53)  locked = true;  // Q4 needs Q3 done (>52 sessions)
+      if (q.id === 5 && sessLogged < 79)  locked = true;  // Q5 needs Q4 done (>78 sessions)
+      if (active) locked = false;
+      var bg  = active ? 'var(--blue)' : locked ? '#e5e7eb' : 'var(--gray)';
+      var clr = active ? '#fff' : locked ? '#9ca3af' : 'var(--text)';
+      var oc  = locked ? '' : 'onclick="rsSelectQtr('+q.id+',this)"';
+      return '<div '+oc+' style="padding:10px 8px;border-radius:10px;text-align:center;'
+        +'background:'+bg+';color:'+clr+';'
+        +'border:2px solid '+(active?'var(--blue)':locked?'#d1d5db':'transparent')+';'
+        +'font-weight:'+(active?'700':'500')+';cursor:'+(locked?'not-allowed':'pointer')+(locked?';opacity:.55':'')+'">'  
+        +'<div style="font-size:12px;font-weight:'+(active?'800':'600')+'">'+q.label+(locked?' 🔒':'')+'</div>'
         +'<div style="font-size:10px;margin-top:2px;opacity:'+(active?'1':'.6')+'">Sessions '+q.start+'\u2013'+(q.start+q.rows-1)+'</div>'
         +'</div>';
     }).join('')

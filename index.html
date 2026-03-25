@@ -4085,13 +4085,13 @@ function caseCardHTML(c) {
 
 
 // Helper: single stat box for the cases banner
-function _bStat(n, label, textClr, bgClr, borderClr, onclick) {
-  var cur = onclick ? 'pointer' : 'default';
-  var oc  = onclick ? ' onclick="'+onclick+'"' : '';
-  var hov = onclick ? ' onmousedown="this.style.opacity=.8" onmouseup="this.style.opacity=1"' : '';
-  return '<div'+oc+hov+' style="background:'+bgClr+';border:0.5px solid '+borderClr+';border-radius:10px;padding:10px;text-align:center;cursor:'+cur+(onclick?';transition:opacity .15s':'')+'">' +
+function _bStat(n, label, textClr, bgClr, borderClr, filterVal) {
+  var clickable = !!filterVal;
+  var dataAttr  = filterVal ? ' data-bstat-filter="'+filterVal+'"' : '';
+  var cur = clickable ? 'pointer' : 'default';
+  return '<div'+dataAttr+' style="background:'+bgClr+';border:0.5px solid '+borderClr+';border-radius:10px;padding:10px;text-align:center;cursor:'+cur+(clickable?';transition:opacity .15s':'')+'">' +
          '<div style="font-size:22px;font-weight:700;color:'+textClr+'">'+n+'</div>' +
-         '<div style="font-size:10px;color:'+textClr+';margin-top:2px;font-weight:600">'+label+(onclick?' →':'')+'</div>' +
+         '<div style="font-size:10px;color:'+textClr+';margin-top:2px;font-weight:600">'+label+(clickable?' →':'')+'</div>' +
          '</div>';
 }
 
@@ -4347,17 +4347,32 @@ function renderCaseList() {
       } else if (activeStatusFilter === 'Needs update') {
         bannerHTML =
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
-          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2', "applyFilter(\'Needs update\',null)") +
-          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)', "applyFilter(\'Updated\',null)") +
+          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2', 'Needs update') +
+          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)', 'Updated') +
           '</div>';
       } else {
         bannerHTML =
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
-          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2', "applyFilter(\'Needs update\',null)") +
-          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)', "applyFilter(\'Updated\',null)") +
+          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2', 'Needs update') +
+          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)', 'Updated') +
           '</div>';
       }
       banner.innerHTML = bannerHTML;
+      // Delegated click for stat cards
+      banner.onclick = function(e) {
+        var card = e.target.closest('[data-bstat-filter]');
+        if (!card) return;
+        var f = card.getAttribute('data-bstat-filter');
+        if (!f) return;
+        card.style.opacity = '.75';
+        setTimeout(function(){ card.style.opacity = '1'; }, 150);
+        activeStatusFilter = f;
+        applyAllFilters();
+        // Sync chip highlight
+        document.querySelectorAll('.filter-chip').forEach(function(c){
+          c.classList.toggle('active', c.textContent.trim() === f);
+        });
+      };
     } else {
       banner.style.display = 'none';
     }
@@ -4664,7 +4679,7 @@ function buildHospitalForm(cas) {
         <select class="field-input" id="f-rehabcentre">
           <option value="">Select institute...</option>
           ${REHAB_CENTRES.map(o=>`<option>${o}</option>`).join('')}
-        <option>KAHER Belagavi</option><option>Vani Pradan Kendra, Bengaluru</option><option>JSS ISH, Dharwad</option><option>Kasturba Medical College, Attavara Mangaluru</option><option>BLDE Deemed University's AVT Centre, Vijayapura</option></select>
+        </select>
       </div>
       <div class="field">
         <div class="field-label">Residential district of child</div>

@@ -2632,6 +2632,51 @@ function openAVTEvalList() {
     var q   = parseInt(row.getAttribute('data-q'), 10);
     var cas = SAMPLE_CASES.find(function(x){ return String(x.id) === String(id); });
     if (!cas) return;
+
+    // If baseline (Q0) not done, show informative popup before opening
+    if (!cas['_evalQ0']) {
+      // Build inline popup over the overlay
+      var existingPop = document.getElementById('baseline-popup');
+      if (existingPop) existingPop.remove();
+      var pop = document.createElement('div');
+      pop.id = 'baseline-popup';
+      pop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10001;display:flex;align-items:center;justify-content:center;padding:24px';
+      var nm = (cas.name || 'this child');
+      pop.innerHTML =
+        '<div style="background:#fff;border-radius:16px;padding:24px;max-width:340px;width:100%">'
+        + '<div style="font-size:22px;text-align:center;margin-bottom:12px">📋</div>'
+        + '<div style="font-size:15px;font-weight:700;color:#111;margin-bottom:8px;text-align:center">Baseline Evaluation Not Done</div>'
+        + '<div style="font-size:13px;color:#374151;line-height:1.6;margin-bottom:16px">'
+        + '<strong>Baseline evaluation</strong> is the assessment done <em>before surgery</em> — it records the child's hearing and speech status at the start of the programme.'
+        + '<br><br>It has <strong>not yet been filled</strong> for <strong>' + nm + '</strong>.'
+        + '<br><br>If the baseline was missed or is not applicable, you can proceed directly to <strong>Quarter I</strong> evaluation.'
+        + '</div>'
+        + '<div style="display:flex;flex-direction:column;gap:8px">'
+        + '<button id="bp-baseline" style="padding:12px;background:#5a3580;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Fill Baseline Evaluation</button>'
+        + '<button id="bp-q1" style="padding:12px;background:#f5f3ff;color:#5a3580;border:1.5px solid #c4b5fd;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Skip to Quarter I →</button>'
+        + '<button id="bp-cancel" style="padding:10px;background:transparent;color:#6b7280;border:none;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>'
+        + '</div>'
+        + '</div>';
+      document.body.appendChild(pop);
+
+      document.getElementById('bp-baseline').addEventListener('click', function() {
+        pop.remove();
+        document.getElementById('avt-eval-list-overlay').remove();
+        selectedCase = cas;
+        openQEScreen(cas, 0);
+      });
+      document.getElementById('bp-q1').addEventListener('click', function() {
+        pop.remove();
+        document.getElementById('avt-eval-list-overlay').remove();
+        selectedCase = cas;
+        openQEScreen(cas, 1);
+      });
+      document.getElementById('bp-cancel').addEventListener('click', function() {
+        pop.remove();
+      });
+      return;
+    }
+
     document.getElementById('avt-eval-list-overlay').remove();
     selectedCase = cas;
     openQEScreen(cas, q);
@@ -3979,9 +4024,15 @@ function applyAllFilters() {
 
 function applyFilter(f, el) {
   document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
+  // Also highlight the matching chip if called from banner card
+  document.querySelectorAll('.filter-chip').forEach(c => {
+    if (c.textContent.trim() === f) c.classList.add('active');
+  });
   activeStatusFilter = f;
   applyAllFilters();
+  // Navigate to cases screen if not already there
+  if (currentScreen !== 'cases') { buildCaseList(f === 'Needs update' ? 'hosp-pending' : f === 'Updated' ? 'hosp-updated' : 'all'); showScreen('cases'); }
 }
 
 function filterCases(q) {
@@ -4034,10 +4085,13 @@ function caseCardHTML(c) {
 
 
 // Helper: single stat box for the cases banner
-function _bStat(n, label, textClr, bgClr, borderClr) {
-  return '<div style="background:'+bgClr+';border:0.5px solid '+borderClr+';border-radius:10px;padding:10px;text-align:center">' +
+function _bStat(n, label, textClr, bgClr, borderClr, onclick) {
+  var cur = onclick ? 'pointer' : 'default';
+  var oc  = onclick ? ' onclick="'+onclick+'"' : '';
+  var hov = onclick ? ' onmousedown="this.style.opacity=.8" onmouseup="this.style.opacity=1"' : '';
+  return '<div'+oc+hov+' style="background:'+bgClr+';border:0.5px solid '+borderClr+';border-radius:10px;padding:10px;text-align:center;cursor:'+cur+(onclick?';transition:opacity .15s':'')+'">' +
          '<div style="font-size:22px;font-weight:700;color:'+textClr+'">'+n+'</div>' +
-         '<div style="font-size:10px;color:'+textClr+';margin-top:2px;font-weight:600">'+label+'</div>' +
+         '<div style="font-size:10px;color:'+textClr+';margin-top:2px;font-weight:600">'+label+(onclick?' →':'')+'</div>' +
          '</div>';
 }
 
@@ -4293,14 +4347,14 @@ function renderCaseList() {
       } else if (activeStatusFilter === 'Needs update') {
         bannerHTML =
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
-          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2') +
-          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)') +
+          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2', "applyFilter(\'Needs update\',null)") +
+          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)', "applyFilter(\'Updated\',null)") +
           '</div>';
       } else {
         bannerHTML =
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
-          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2') +
-          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)') +
+          _bStat(_pending, 'Pending Update', 'var(--red)',   'var(--red-light)',   '#f5c6c2', "applyFilter(\'Needs update\',null)") +
+          _bStat(_updated, 'Updated ✓',      'var(--green)', 'var(--green-light)', 'var(--green-border)', "applyFilter(\'Updated\',null)") +
           '</div>';
       }
       banner.innerHTML = bannerHTML;
@@ -6118,11 +6172,8 @@ function openRehabSession(cas) {
       var sessLogged = (cas && _rehabSess(cas) !== null) ? _rehabSess(cas) : 0;
       var qDone = function(n) {
         if (cas && cas['_avtQ'+n+'done']) return true;
-        if (n === 1) return sessLogged >= 1;
-        if (n === 2) return sessLogged >= 27;
-        if (n === 3) return sessLogged >= 53;
-        if (n === 4) return sessLogged >= 79;
-        return false;
+        // Proxy: each quarter = 26 sessions; Q(n) done when n*26 sessions logged
+        return sessLogged >= n * 26;
       };
       var locked = false;
       for (var need = 1; need < q.id; need++) {

@@ -6194,7 +6194,7 @@ function openRehabSession(cas) {
       for (var need = 1; need < q.id; need++) {
         if (!qDone(need)) { locked = true; break; }
       }
-      if (active) locked = false;
+      // NOTE: active quarter is NOT auto-unlocked — sequential rule always applies
       var bg  = active ? 'var(--blue)' : locked ? '#e5e7eb' : 'var(--gray)';
       var clr = active ? '#fff' : locked ? '#9ca3af' : 'var(--text)';
       var oc  = locked ? '' : 'onclick="rsSelectQtr('+q.id+',this)"';
@@ -10796,51 +10796,152 @@ async function submitCorrectionRequest(caseId, submissionType) {
 function openStateCorrection(cas) {
   var existing = document.getElementById('state-correction-overlay');
   if (existing) existing.remove();
-
   var ov = document.createElement('div');
   ov.id = 'state-correction-overlay';
   ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
-
+  var nm = isDemo() ? maskName(cas.name) : cas.name;
   ov.innerHTML =
     '<div style="background:#4a2a7a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
-    + '<div onclick="document.getElementById(\'state-correction-overlay\').remove()" '
-    + 'style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;'
-    + 'display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
-    + '<div><div style="color:#fff;font-weight:700;font-size:15px">&#128273; State Override — Direct Correction</div>'
-    + '<div style="color:rgba(255,255,255,.75);font-size:11px">'+(isDemo()?maskName(cas.name):cas.name)+' · Card: '+cas.id+'</div>'
-    + '</div></div>'
-    + '<div style="flex:1;overflow-y:auto;padding:16px">'
-    + '<div style="background:#ede9fe;border:1px solid #c4b5fd;border-radius:10px;padding:12px 14px;margin-bottom:16px">'
-    + '<div style="font-size:12px;font-weight:700;color:#4c1d95;margin-bottom:4px">&#9679; State Team Override</div>'
-    + '<div style="font-size:11px;color:#5b21b6">This correction is applied immediately and permanently logged. Use only for verified errors.</div>'
-    + '</div>'
-    + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px">'
-    + '<div class="field"><div class="field-label">Field to correct <span class="req">*</span></div>'
-    + '<select class="field-input" id="sc-field">'
-    + '<option value="">Select field...</option>'
-    + '<option>Surgery Date (surgAdmit)</option><option>Switch-on Date (switchOn)</option>'
-    + '<option>Date of Birth (dob)</option><option>Patient Name (name)</option>'
-    + '<option>Mobile (mobile)</option><option>District (district)</option>'
-    + '<option>Hospital (hospital)</option><option>Implant Manufacturer (implantCompany)</option>'
-    + '<option>Implant Model (implantModel)</option><option>Serial Number (implantNumber)</option>'
-    + '<option>Speech Processor (speechProcessor)</option><option>Rehab Centre (rehabCentre)</option>'
-    + '<option>CI Surgeon (ciSurgeon)</option><option>Other (notes)</option>'
-    + '</select></div>'
-    + '<div class="field"><div class="field-label">Current value</div>'
-    + '<input class="field-input" id="sc-old-val" placeholder="Current value (for audit record)"></div>'
-    + '<div class="field"><div class="field-label">Correct value <span class="req">*</span></div>'
-    + '<input class="field-input" id="sc-new-val" placeholder="The correct value to apply"></div>'
-    + '<div class="field"><div class="field-label">Reason / authority <span class="req">*</span></div>'
-    + '<textarea class="field-input" id="sc-reason" rows="3" placeholder="e.g. Verified from physical hospital records on DD/MM/YYYY by [name]"></textarea></div>'
-    + '</div>'
-    + '<div id="sc-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>'
-    + '<button onclick="applyStateOverride(\''+cas.id+'\')" '
-    + 'style="width:100%;padding:14px;background:#4a2a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">'
-    + '&#9999; Apply Override &#8594;</button>'
-    + '</div>';
-
+    +'<div onclick="document.getElementById(\'state-correction-overlay\').remove()" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
+    +'<div><div style="color:#fff;font-weight:700;font-size:15px">&#128273; State Override</div>'
+    +'<div style="color:rgba(255,255,255,.75);font-size:11px">'+nm+' \u00b7 Card: '+cas.id+'</div></div></div>'
+    +'<div style="display:flex;border-bottom:2px solid #e2e8f0;background:#fff;flex-shrink:0">'
+    +'<div id="sc-tab-correct" onclick="scSwitchTab(\'correct\')" style="flex:1;padding:12px;text-align:center;font-size:13px;font-weight:700;color:#4a2a7a;border-bottom:3px solid #4a2a7a;cursor:pointer">&#9999; Correct a Field</div>'
+    +'<div id="sc-tab-delete"  onclick="scSwitchTab(\'delete\')"  style="flex:1;padding:12px;text-align:center;font-size:13px;font-weight:600;color:#6b7280;border-bottom:3px solid transparent;cursor:pointer">&#128465; Delete Role Data</div>'
+    +'</div>'
+    +'<div style="flex:1;overflow-y:auto;padding:16px">'
+    +'<div id="sc-panel-correct">'
+    +'<div style="background:#ede9fe;border:1px solid #c4b5fd;border-radius:10px;padding:12px 14px;margin-bottom:16px">'
+    +'<div style="font-size:12px;font-weight:700;color:#4c1d95;margin-bottom:4px">&#9679; Direct Field Correction</div>'
+    +'<div style="font-size:11px;color:#5b21b6">Applied immediately and permanently logged. Use only for verified errors.</div>'
+    +'</div>'
+    +'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px">'
+    +'<div class="field"><div class="field-label">Field to correct <span class="req">*</span></div>'
+    +'<select class="field-input" id="sc-field">'
+    +'<option value="">Select field...</option>'
+    +'<option>Surgery Date (surgAdmit)</option><option>Switch-on Date (switchOn)</option>'
+    +'<option>Date of Birth (dob)</option><option>Patient Name (name)</option>'
+    +'<option>Mobile (mobile)</option><option>District (district)</option>'
+    +'<option>Hospital (hospital)</option><option>Implant Manufacturer (implantCompany)</option>'
+    +'<option>Implant Model (implantModel)</option><option>Serial Number (implantNumber)</option>'
+    +'<option>Speech Processor (speechProcessor)</option><option>Rehab Centre (rehabCentre)</option>'
+    +'<option>CI Surgeon (ciSurgeon)</option><option>Other (notes)</option>'
+    +'</select></div>'
+    +'<div class="field"><div class="field-label">Current value</div>'
+    +'<input class="field-input" id="sc-old-val" placeholder="Current value (for audit record)"></div>'
+    +'<div class="field"><div class="field-label">Correct value <span class="req">*</span></div>'
+    +'<input class="field-input" id="sc-new-val" placeholder="The correct value to apply"></div>'
+    +'<div class="field"><div class="field-label">Reason / authority <span class="req">*</span></div>'
+    +'<textarea class="field-input" id="sc-reason" rows="3" placeholder="e.g. Verified from physical records on DD/MM/YYYY by [name]"></textarea></div>'
+    +'</div>'
+    +'<div id="sc-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>'
+    +'<button onclick="applyStateOverride(\''+cas.id+'\')" style="width:100%;padding:14px;background:#4a2a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">&#9999; Apply Correction &#8594;</button>'
+    +'</div>'
+    +'<div id="sc-panel-delete" style="display:none">'
+    +'<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:12px 14px;margin-bottom:16px">'
+    +'<div style="font-size:12px;font-weight:700;color:#991b1b;margin-bottom:4px">&#9888;&#65039; Delete Submitted Role Data</div>'
+    +'<div style="font-size:11px;color:#b91c1c;line-height:1.6">Clears data submitted by the selected role for this case. Patient identity is retained. Action is logged permanently.</div>'
+    +'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
+    +'<div id="del-card-hospital" onclick="scSelectRole(\'hospital\')" style="border:2px solid #e2e8f0;border-radius:12px;padding:14px;cursor:pointer">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:20px">&#127973;</span>'
+    +'<div><div style="font-size:13px;font-weight:700;color:#111">Hospital Login Data</div>'
+    +'<div style="font-size:11px;color:#6b7280">Surgery details, device info, switch-on, mentor surgeon, rehab centre</div></div></div>'
+    +'<div style="font-size:10px;color:#9ca3af;background:#f9fafb;border-radius:6px;padding:6px 8px;line-height:1.7">'
+    +'Clears: surgAdmit \u00b7 surgDisch \u00b7 switchOn \u00b7 side \u00b7 mentorSurgeon \u00b7 rehabCentre \u00b7 implant details \u00b7 hospRemarks'
+    +'<br>Resets status to <strong>pending</strong> and unlocks the hospital form for re-entry.'
+    +'</div></div>'
+    +'<div id="del-card-rehab" onclick="scSelectRole(\'rehab\')" style="border:2px solid #e2e8f0;border-radius:12px;padding:14px;cursor:pointer">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:20px">&#127968;</span>'
+    +'<div><div style="font-size:13px;font-weight:700;color:#111">Rehab Institute Data</div>'
+    +'<div style="font-size:11px;color:#6b7280">AVT session count, attendance flags, quarter-done flags</div></div></div>'
+    +'<div style="font-size:10px;color:#9ca3af;background:#f9fafb;border-radius:6px;padding:6px 8px;line-height:1.7">'
+    +'Clears: sessions \u00b7 _avtQ1\u2013Q5done \u00b7 _attendanceFlag \u00b7 _lastRehabDate \u00b7 _rehabLastSubmit'
+    +'<br>Submission records in Firestore (audit trail) are <em>not</em> deleted.'
+    +'</div></div>'
+    +'<div id="del-card-district" onclick="scSelectRole(\'district\')" style="border:2px solid #e2e8f0;border-radius:12px;padding:14px;cursor:pointer">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:20px">&#128204;</span>'
+    +'<div><div style="font-size:13px;font-weight:700;color:#111">District Officer Data</div>'
+    +'<div style="font-size:11px;color:#6b7280">Follow-up logs, transfer records, district confirmations</div></div></div>'
+    +'<div style="font-size:10px;color:#9ca3af;background:#f9fafb;border-radius:6px;padding:6px 8px;line-height:1.7">'
+    +'Clears: _distConfirmed \u00b7 _distTransferredTo \u00b7 _distConfirmedAt \u00b7 _distPHC \u00b7 _distConfirmedDistrict'
+    +'</div></div>'
+    +'</div>'
+    +'<div class="field"><div class="field-label">Reason for deletion <span class="req">*</span></div>'
+    +'<textarea class="field-input" id="sc-del-reason" rows="3" placeholder="e.g. Wrong data entered by hospital on DD/MM/YYYY. Verified by [name]."></textarea></div>'
+    +'<div id="sc-del-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>'
+    +'<button onclick="applyRoleDataDelete(\''+cas.id+'\')" style="width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">&#128465; Delete Selected Role Data &#8594;</button>'
+    +'</div>'
+    +'</div>';
   document.body.appendChild(ov);
 }
+
+function scSwitchTab(tab) {
+  document.getElementById('sc-panel-correct').style.display = tab==='correct'?'block':'none';
+  document.getElementById('sc-panel-delete').style.display  = tab==='delete' ?'block':'none';
+  document.getElementById('sc-tab-correct').style.cssText = 'flex:1;padding:12px;text-align:center;font-size:13px;cursor:pointer;font-weight:'+(tab==='correct'?'700':'600')+';color:'+(tab==='correct'?'#4a2a7a':'#6b7280')+';border-bottom:3px solid '+(tab==='correct'?'#4a2a7a':'transparent');
+  document.getElementById('sc-tab-delete').style.cssText  = 'flex:1;padding:12px;text-align:center;font-size:13px;cursor:pointer;font-weight:'+(tab==='delete' ?'700':'600')+';color:'+(tab==='delete' ?'#dc2626':'#6b7280')+';border-bottom:3px solid '+(tab==='delete' ?'#dc2626':'transparent');
+}
+
+var _scSelectedRole = null;
+function scSelectRole(role) {
+  _scSelectedRole = role;
+  ['hospital','rehab','district'].forEach(function(r) {
+    var card = document.getElementById('del-card-'+r);
+    if (!card) return;
+    card.style.border      = r===role ? '2px solid #dc2626' : '2px solid #e2e8f0';
+    card.style.background  = r===role ? '#fef2f2' : '';
+  });
+}
+
+async function applyRoleDataDelete(caseId) {
+  var reason = (document.getElementById('sc-del-reason')||{}).value||'';
+  var errEl  = document.getElementById('sc-del-error');
+  if (errEl) errEl.style.display = 'none';
+  if (!_scSelectedRole) { if(errEl){errEl.textContent='Please select a role.';errEl.style.display='block';} return; }
+  if (!reason.trim())   { if(errEl){errEl.textContent='Please enter a reason.';errEl.style.display='block';} return; }
+  var roleLabel = {hospital:'Hospital',rehab:'Rehab Institute',district:'District Officer'}[_scSelectedRole]||_scSelectedRole;
+  if (!confirm('Delete all '+roleLabel+' data for this case?\n\nThis cannot be undone. The deletion will be logged with your name.')) return;
+  var now = new Date().toISOString();
+  var updates = { _lastModified: now };
+  if (_scSelectedRole === 'hospital') {
+    ['surgAdmit','surgDate','surgDisch','switchOn','side','mentorSurgeon','rehabCentre',
+     'manufacturer','model','serialNo','remarks','hospRemarks','hospSubmittedBy','hospSubmittedAt',
+     'implantCompany','implantModel','implantNumber','speechProcessor','ciSurgeon'].forEach(function(f){ updates[f]=''; });
+    updates.status='pending'; updates.hospSubmitted=false;
+    updates._hospDataDeletedBy=currentUser?currentUser.username:'state';
+    updates._hospDataDeletedAt=now; updates._hospDataDeleteReason=reason.trim();
+  } else if (_scSelectedRole === 'rehab') {
+    updates.sessions=0; updates._rehabSessionsLogged=0; updates._rehabLastSubmit='';
+    updates._lastRehabDate=''; updates._attendanceFlag=''; updates._consecAbsent=0;
+    updates._missedThisMonth=0; updates._avtCompleteFromRehab=false;
+    updates._rehabDataDeletedBy=currentUser?currentUser.username:'state';
+    updates._rehabDataDeletedAt=now; updates._rehabDataDeleteReason=reason.trim();
+    for (var qi=1;qi<=5;qi++) { updates['_avtQ'+qi+'done']=false; }
+  } else if (_scSelectedRole === 'district') {
+    updates._distConfirmed=false; updates._distTransferredTo=''; updates._distTransferredBy='';
+    updates._distTransferredAt=''; updates._distConfirmedAt=''; updates._distConfirmedDistrict=''; updates._distPHC='';
+    updates._distDataDeletedBy=currentUser?currentUser.username:'state';
+    updates._distDataDeletedAt=now; updates._distDataDeleteReason=reason.trim();
+  }
+  try {
+    var _add=window._fbFns.addDoc, _col=window._fbFns.collection, _doc=window._fbFns.doc, _upd=window._fbFns.updateDoc;
+    await _add(_col(window._fbDb,'amendments'),{caseId:String(caseId),field:'_roleDataDelete_'+_scSelectedRole,
+      fieldLabel:roleLabel+' data deletion',oldVal:'all '+roleLabel+' fields',newVal:'cleared',
+      reason:reason.trim(),tier:3,status:'applied',role:'state',
+      submittedBy:currentUser?currentUser.username:'unknown',unit:currentUser?currentUser.unit:'',timestamp:now});
+    await _upd(_doc(window._fbDb,'cases',String(caseId)),updates);
+    var idx=SAMPLE_CASES.findIndex(function(c){return String(c.id)===String(caseId);});
+    if(idx>-1) Object.assign(SAMPLE_CASES[idx],updates);
+    document.getElementById('state-correction-overlay').remove();
+    _scSelectedRole=null;
+    alert('\u2705 '+roleLabel+' data cleared for this case. The deletion has been logged.');
+    buildCaseList();
+  } catch(e) {
+    if(errEl){errEl.textContent='Error: '+e.message;errEl.style.display='block';}
+  }
+}
+
 
 async function applyStateOverride(caseId) {
   var fieldRaw = document.getElementById('sc-field').value.trim();

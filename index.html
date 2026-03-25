@@ -2912,7 +2912,8 @@ function openQEScreen(cas, quarterNum) {
     + sec('\ud83c\udfe5 Post Implant Rehabilitation')
     + editRow('AVT Start Date', '<span style="font-size:13px;color:#374151">'+(cas.avtStartDate ? fmtDate(cas.avtStartDate) : '<span style="color:var(--amber)">Not yet set (auto on first session)</span>')+'</span>')
     + editRow('Mapping Start Date', '<span style="font-size:13px;color:#374151">'+fmtDate(soStr||'')+'</span>')
-    + editRow('Speech Processor Details', inp('processor-detail', pv(cas.speechProcessor||saved.processorDetails), 'e.g. CP802'))
+    + editRow('Speech Processor Model', inp('processor-detail', pv(cas.speechProcessor||saved.processorDetails), 'e.g. CP802'))
+    + editRow('Speech Processor Serial No.', inp('processor-serial', pv(saved.processorSerial||cas.implantNumber||''), 'Serial number'))
     + editRow('Warranty Card Issued', yesno('warranty','yes',saved.warrantyIssued))
     +'</div>'
 
@@ -2924,7 +2925,27 @@ function openQEScreen(cas, quarterNum) {
     +'<div style="padding:0 16px">'
     + evalTableHeader()
     + er('Aided Audiogram',   'aud-done','aud-result',  saved.audDateCompleted, saved.audResult,  'e.g. Upper border of speech spectrum')
-    + er('Speech Perception', 'spi-done','spi-result',  saved.spiDateCompleted, saved.spiResult,  'e.g. 20/25 Open set')
+    + (function(){
+        var sdone = pv(saved.spiDateCompleted);
+        var sres  = pv(saved.spiResult);
+        var stype = pv(saved.spiTestType) || 'open';
+        return '<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:7px 8px;font-size:11px;font-weight:600;color:#374151;background:#f8fafc;min-width:130px">Speech Perception</td>'
+          +'<td style="padding:7px 8px;font-size:11px;color:#64748b;white-space:nowrap">'+schedDisplay+'</td>'
+          +'<td style="padding:4px 6px;white-space:nowrap">'
+          +'<input id="qe-spi-done" type="date" value="'+sdone+'" style="font-size:11px;border:none;background:transparent;color:#111;font-family:inherit;outline:none;padding:2px 0;width:110px">'
+          +'</td>'
+          +'<td style="padding:4px 8px">'
+          +'<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+          +'<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap">'
+          +'<input type="radio" name="spi-test-type" value="open"'+(stype==='open'?' checked':'')+' style="accent-color:var(--blue)"> Open</label>'
+          +'<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;white-space:nowrap">'
+          +'<input type="radio" name="spi-test-type" value="closed"'+(stype==='closed'?' checked':'')+' style="accent-color:var(--blue)"> Closed</label>'
+          +'<input id="qe-spi-result" value="'+sres+'" placeholder="e.g. 20/25" style="flex:1;min-width:60px;border:none;background:transparent;font-size:12px;color:#111;font-family:inherit;outline:none;padding:2px 0">'
+          +'</div>'
+          +'</td>'
+          +'</tr>';
+      })()
     + er((parseInt(cas.age||99)<=36?'IT-MAIS (/40)':'MAIS (/40)'), 'mais-done','mais', saved.maisDateCompleted, saved.maisScore, 'e.g. 40/40')
     +'</tbody></table></div>'
     +'</div>'
@@ -2951,7 +2972,7 @@ function openQEScreen(cas, quarterNum) {
     +'<input type="radio" name="lang-tool" value="REELS" '+(saved.langTool==='REELS'?'checked':'')+' onchange="rsLangTool(this.value)" style="accent-color:#7c3aed"> REELS'
     +'</label>'
     +'</div>'
-    +'<div style="font-size:10px;color:var(--amber);margin-top:4px">ISD = Indian Scale of Development &nbsp;|&nbsp; ACSLS = Auditory Communication Scale for Language & Speech &nbsp;|&nbsp; REELS = Receptive-Expressive Emergent Language Scale</div>'
+    +'<div style="font-size:10px;color:var(--amber);margin-top:4px">ISD = Integrated Scales of Development &nbsp;|&nbsp; ACSLS = Assessment Checklist for Speech and Language Evaluation &nbsp;|&nbsp; REELS = Receptive-Expressive Emergent Language Test</div>'
     +'</div>'
     // ISD table
     +'<div id="lang-isd-table" style="overflow-x:auto;margin-top:2px;display:'+(saved.langTool==='ACSLS'||saved.langTool==='REELS'?'none':'block')+'">'
@@ -2967,67 +2988,33 @@ function openQEScreen(cas, quarterNum) {
     + isdRow('Cognition',            'cogn')
     + isdRow('Social Communication', 'social')
     +'</tbody></table></div>'
-    // ACSLS structured 4-domain table (replaces free-text inputs)
+    // ACSLS — Age Range format (same style as REELS)
     +'<div id="lang-acsls-table" style="display:'+(saved.langTool==='ACSLS'?'block':'none')+'">'
     +(function(){
-        var acslsDomains = [
-          { key: 'auditory',  label: 'Auditory Skills',      icon: '👂' },
-          { key: 'verbal',    label: 'Verbal Communication', icon: '🗣️' },
-          { key: 'language',  label: 'Language Skills',      icon: '📝' },
-          { key: 'social',    label: 'Social Communication', icon: '🤝' }
-        ];
-        var saved_acsls = (saved && saved.acslsTable) || {};
-        var html = '';
-        html += '<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin:8px 0 6px;font-size:10px;color:#92400e;line-height:1.5">'
-              + '<strong>ACSLS — Auditory Communication Scale for Language &amp; Speech</strong><br>'
-              + 'Rate each domain 0–5. Total score auto-calculates out of 20.'
-              + '</div>';
-        html += '<table style="width:100%;border-collapse:collapse;margin-bottom:4px">';
-        html += '<thead><tr style="background:#92400e">'
-              + '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#fff;text-align:left;border-radius:0">Domain</th>'
-              + '<th style="padding:7px 6px;font-size:10px;font-weight:700;color:#fff;text-align:center;width:72px">Score (0–5)</th>'
-              + '<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#fff;text-align:left">Remarks</th>'
-              + '</tr></thead><tbody>';
-        acslsDomains.forEach(function(d, i){
-          var sv = saved_acsls[d.key] || {};
-          var scoreVal = (sv.score !== undefined && sv.score !== '') ? sv.score : '';
-          var remarkVal = sv.remark || '';
-          var bgRow = (i % 2 === 0) ? '#fffbeb' : '#fef9ee';
-          html += '<tr style="background:' + bgRow + ';border-bottom:1px solid #fde68a">'
-                + '<td style="padding:8px 8px 4px;font-size:12px;font-weight:600;color:#374151;vertical-align:top">'
-                +   '<span style="margin-right:4px">' + d.icon + '</span>' + d.label
-                + '</td>'
-                + '<td style="padding:6px 4px;text-align:center;vertical-align:top">'
-                +   '<select id="acsls-score-' + d.key + '" onchange="acslsRecalc()" style="width:56px;border:1.5px solid #fbbf24;border-radius:6px;padding:4px 2px;font-size:14px;font-weight:700;color:#92400e;text-align:center;background:#fff;-webkit-appearance:none;appearance:none;font-family:inherit">'
-                +     (function(){
-                          var opts = '';
-                          for(var v=0;v<=5;v++){
-                            var sel = (String(scoreVal)===String(v)) ? ' selected' : '';
-                            opts += '<option value="'+v+'"'+sel+'>'+v+'</option>';
-                          }
-                          return opts;
-                        })()
-                +   '</select>'
-                + '</td>'
-                + '<td style="padding:6px 8px 4px;vertical-align:top">'
-                +   '<input id="acsls-remark-' + d.key + '" type="text" value="' + remarkVal.replace(/"/g,'&quot;') + '" placeholder="Optional remarks…" style="width:100%;border:1px solid #fde68a;border-radius:5px;padding:5px 7px;font-size:11px;color:#374151;background:#fff;font-family:inherit;outline:none">'
-                + '</td>'
-                + '</tr>';
-        });
-        html += '</tbody></table>';
-        // Totals row
-        html += '<div id="acsls-totals-row" style="background:#92400e;border-radius:0 0 8px 8px;padding:8px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
-              + '<span style="color:#fef3c7;font-size:11px;font-weight:600">Total:</span>'
-              + '<span id="acsls-total-score" style="color:#fff;font-size:20px;font-weight:800;min-width:28px;text-align:center">0</span>'
-              + '<span style="color:#fef3c7;font-size:11px">/ 20</span>'
-              + '<div style="width:1px;height:20px;background:rgba(255,255,255,0.3)"></div>'
-              + '<span style="color:#fef3c7;font-size:11px;font-weight:600">Percentage:</span>'
-              + '<span id="acsls-total-pct" style="color:#fbbf24;font-size:16px;font-weight:700">0%</span>'
-              + '<div style="width:1px;height:20px;background:rgba(255,255,255,0.3)"></div>'
-              + '<span style="color:#fef3c7;font-size:11px;font-weight:600">Grade:</span>'
-              + '<span id="acsls-total-grade" style="color:#fbbf24;font-size:14px;font-weight:800;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,0.15)">—</span>'
-              + '</div>';
-        return html;
+        var saved_acsls = (saved && saved.acslsAgeRange) || {};
+        function aNf(id,val,ph){return '<input id="qe-acsls-'+id+'" type="number" min="0" max="120" value="'+(val||'')+'" placeholder="'+ph+'" style="width:36px;border:1px solid #fde68a;border-radius:4px;padding:3px 4px;font-size:12px;font-family:inherit;text-align:center">';}
+        function aRow(label,key){
+          var sv=(saved_acsls[key])||{};
+          return '<tr style="border-bottom:1px solid var(--border)">'
+            +'<td style="padding:7px 8px;font-size:11px;font-weight:600;color:#374151;background:#fffbeb">'+label+'</td>'
+            +'<td colspan="3" style="padding:5px 8px"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+            +'<span style="font-size:11px;color:#64748b;font-weight:600">From:</span>'
+            +aNf(key+'-fy',sv.fromY,'Y')+'<span style="font-size:11px;color:#64748b">yr</span>'
+            +aNf(key+'-fm',sv.fromM,'M')+'<span style="font-size:11px;color:#64748b">mo</span>'
+            +'<span style="font-size:16px;color:#9ca3af;margin:0 4px">→</span>'
+            +'<span style="font-size:11px;color:#64748b;font-weight:600">To:</span>'
+            +aNf(key+'-ty',sv.toY,'Y')+'<span style="font-size:11px;color:#64748b">yr</span>'
+            +aNf(key+'-tm',sv.toM,'M')+'<span style="font-size:11px;color:#64748b">mo</span>'
+            +'</div></td></tr>';
+        }
+        return '<div style="overflow-x:auto;margin-top:2px"><table style="width:100%;border-collapse:collapse;border-top:1px solid var(--border)">'
+          +'<thead><tr style="background:#fef3c7">'
+          +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#92400e;text-align:left;min-width:160px">ACSLS Domain</th>'
+          +'<th style="padding:7px 8px;font-size:10px;font-weight:700;color:#92400e;text-align:left" colspan="3">Age Range (From → To)</th>'
+          +'</tr></thead><tbody>'
+          +aRow('Receptive Language','receptive')
+          +aRow('Expressive Language','expressive')
+          +'</tbody></table></div>';
       })()
     +'</div>'
     // REELS section — sibling of ACSLS, not nested inside it
@@ -3068,6 +3055,7 @@ function openQEScreen(cas, quarterNum) {
     +'</div>'
     +'<div style="padding:0 16px">'
     + editRow('Therapist name / Under the Supervision of', inp('therapist', pv(saved.therapist), 'Full name / Supervisor name'))
+    + editRow('Therapist RCI Registration No.', inp('therapist-rci', pv(saved.therapistRci), 'e.g. A12345'))
     + editRow('Mapping Audiologist',   inp('audiologist',   pv(saved.audiologist),   'Full name (if mapping done this quarter)'))
     + editRow('Supervisor',            inp('supervisor',    pv(saved.supervisor),    'Full name'))
     + editRow('Date',                  inp('sig-date',      pv(saved.evalDate||today), '', 'date'))
@@ -3138,28 +3126,25 @@ async function submitQEForm(quarterNum, isDraft) {
     warrantyIssued: r('warranty'),
     intraopIssues: g('intraop'),
     processorDetails: g('processor-detail'),
+    processorSerial: g('processor-serial'),
     avtCompleted: r('avt-complete'),
     audDateCompleted: g('aud-done'),
     audResult: g('aud-result'),
     spiDateCompleted: g('spi-done'),
     spiResult: g('spi-result'),
+    spiTestType: (document.querySelector('input[name="spi-test-type"]:checked')||{}).value||'open',
     maisScore: g('mais'),
     langDateCompleted: g('lang-done'),
     langResult: '', // replaced by ISD/ACSLS/REELS domains
     langTool: (document.querySelector('input[name="lang-tool"]:checked')||{}).value||'ISD',
-    acslsTable: (function(){
-      var domains=['auditory','verbal','language','social'];
+    acslsAgeRange: (function(){
       var out={};
-      domains.forEach(function(d){
-        var sel=document.getElementById('acsls-score-'+d);
-        var rem=document.getElementById('acsls-remark-'+d);
-        out[d]={score:sel?parseInt(sel.value)||0:0, remark:rem?rem.value.trim():''};
+      ['receptive','expressive'].forEach(function(key){
+        function n(sfx){var el=document.getElementById('qe-acsls-'+key+'-'+sfx);return el?el.value||'':'';}
+        out[key]={fromY:n('fy'),fromM:n('fm'),toY:n('ty'),toM:n('tm')};
       });
       return out;
     })(),
-    acslsTotal: (function(){var t=document.getElementById('acsls-total-score');return t?parseInt(t.textContent)||0:0;})(),
-    acslsPercent: (function(){var t=document.getElementById('acsls-total-pct');return t?t.textContent:'0%';})(),
-    acslsGrade: (function(){var t=document.getElementById('acsls-total-grade');return t?t.textContent:'—';})(),
     reels: (function(){
       var out={};
       ['receptive','expressive'].forEach(function(key){
@@ -3187,6 +3172,7 @@ async function submitQEForm(quarterNum, isDraft) {
     monthlyReports: r('monthly-rep'),
     supervisor: g('supervisor'),
     therapist:         g('therapist'),
+    therapistRci:      g('therapist-rci'),
     audiologist:       g('audiologist'),
     // Form B — mapping
     mapDates: g('map-dates'),
@@ -6359,8 +6345,10 @@ function openRehabSession(cas) {
 
   var commonHTML =
     '<div style="margin:10px 16px 0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">'
-    +'<div class="field" style="margin:0"><div class="field-label">Therapist Name / Under the Supervision of</div>'
+    +'<div class="field" style="margin-bottom:10px"><div class="field-label">Therapist Name / Under the Supervision of</div>'
     +'<input class="field-input" id="rs-therapist" placeholder="Therapist name / Supervisor name"></div>'
+    +'<div class="field" style="margin:0"><div class="field-label">Therapist RCI Registration No.</div>'
+    +'<input class="field-input" id="rs-therapist-rci" placeholder="e.g. A12345"></div>'
     +'</div>';
 
   window._rs_sessStart   = sessStart;
@@ -6640,28 +6628,6 @@ function rsTableAtt(rowIdx, val) {
   if (totEl) totEl.textContent = total + ' / ' + possible + ' attended';
 }
 
-function acslsRecalc() {
-  var domains = ['auditory','verbal','language','social'];
-  var total = 0;
-  domains.forEach(function(d){
-    var el = document.getElementById('acsls-score-' + d);
-    if (el) total += parseInt(el.value) || 0;
-  });
-  var pct = Math.round((total / 20) * 100);
-  var grade;
-  if (pct >= 90) grade = 'A+';
-  else if (pct >= 80) grade = 'A';
-  else if (pct >= 70) grade = 'B';
-  else if (pct >= 60) grade = 'C';
-  else if (pct >= 50) grade = 'D';
-  else grade = 'E';
-  var ts = document.getElementById('acsls-total-score');
-  var tp = document.getElementById('acsls-total-pct');
-  var tg = document.getElementById('acsls-total-grade');
-  if (ts) ts.textContent = total;
-  if (tp) tp.textContent = pct + '%';
-  if (tg) tg.textContent = grade;
-}
 
 function rsLangTool(val) {
   var isd   = document.getElementById('lang-isd-table');
@@ -6670,7 +6636,6 @@ function rsLangTool(val) {
   if (isd)   isd.style.display   = val === 'ISD'   ? 'block' : 'none';
   if (acsls) acsls.style.display = val === 'ACSLS' ? 'block' : 'none';
   if (reels) reels.style.display = val === 'REELS' ? 'block' : 'none';
-  if (val === 'ACSLS') acslsRecalc();
 }
 
 // Q4 section visibility
@@ -7156,9 +7121,11 @@ async function rsRequestCorrection() {
 function rsRestoreFormFromEntry(entry) {
   if (!entry) return;
 
-  // ── 1. Therapist name ──────────────────────────────────────────
+  // ── 1. Therapist name + RCI ───────────────────────────────────
   var therapistEl = document.getElementById('rs-therapist');
   if (therapistEl && entry.therapist) therapistEl.value = entry.therapist;
+  var rciEl = document.getElementById('rs-therapist-rci');
+  if (rciEl && entry.therapistRci) rciEl.value = entry.therapistRci;
 
   // ── 2. Quarter selector — highlight the saved quarter ─────────
   if (entry.quarterNum) {
@@ -7701,7 +7668,7 @@ async function submitAVTLog() {
     caseDistrict: selectedCase.district || '', caseHospital: selectedCase.hospital || '',
     rehabCentre:   currentUser ? currentUser.unit : '',
     submittedBy:   currentUser ? currentUser.username : '',
-    therapist: therapist.trim(), month: monthStr, dateFrom: firstDate, dateTo: lastDate,
+    therapist: therapist.trim(), therapistRci: ((document.getElementById('rs-therapist-rci')||{}).value||'').trim(), month: monthStr, dateFrom: firstDate, dateTo: lastDate,
     slots: slots, totalRows: slots.length, presentCount: presentCount,
     absentCount: absentCount, attendancePct: attendancePct,
     notes:         (document.getElementById('rs-notes')          || {}).value || '',

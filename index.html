@@ -6116,17 +6116,15 @@ function openRehabSession(cas) {
       // We use _avtQ1done … _avtQ5done flags set when a quarter's AVT log is submitted,
       // falling back to session count as a proxy if flags are not yet present.
       var sessLogged = (cas && _rehabSess(cas) !== null) ? _rehabSess(cas) : 0;
-      function qDone(n) {
-        // Check explicit flag first, then session count proxy
+      var qDone = function(n) {
         if (cas && cas['_avtQ'+n+'done']) return true;
         if (n === 1) return sessLogged >= 1;
         if (n === 2) return sessLogged >= 27;
         if (n === 3) return sessLogged >= 53;
         if (n === 4) return sessLogged >= 79;
         return false;
-      }
+      };
       var locked = false;
-      // Each quarter is locked unless all prior quarters are done
       for (var need = 1; need < q.id; need++) {
         if (!qDone(need)) { locked = true; break; }
       }

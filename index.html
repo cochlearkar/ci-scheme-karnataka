@@ -2924,7 +2924,33 @@ function openQEScreen(cas, quarterNum) {
     +'</div>'
     +'<div style="padding:0 16px">'
     + evalTableHeader()
-    + er('Aided Audiogram',   'aud-done','aud-result',  saved.audDateCompleted, saved.audResult,  'e.g. Upper border of speech spectrum')
+    + (function(){
+        var adone = pv(saved.audDateCompleted);
+        var ares  = pv(saved.audResult);
+        var audOpts = [
+          '',
+          'Aided thresholds < 25 dB HL',
+          'Aided thresholds in the upper border of speech spectrum',
+          'Aided thresholds in the lower border of speech spectrum',
+          'Aided thresholds are partially out of the speech spectrum',
+          'Aided thresholds are out of speech spectrum'
+        ];
+        var optHtml = audOpts.map(function(o){
+          return '<option value="'+o+'"'+(ares===o?' selected':'')+'>'+(o||'Select result...')+'</option>';
+        }).join('');
+        return '<tr style="border-bottom:1px solid var(--border)">'
+          +'<td style="padding:7px 8px;font-size:11px;font-weight:600;color:#374151;background:#f8fafc;min-width:130px">Aided Audiogram</td>'
+          +'<td style="padding:7px 8px;font-size:11px;color:#64748b;white-space:nowrap">'+schedDisplay+'</td>'
+          +'<td style="padding:4px 6px;white-space:nowrap">'
+          +'<input id="qe-aud-done" type="date" value="'+adone+'" style="font-size:11px;border:none;background:transparent;color:#111;font-family:inherit;outline:none;padding:2px 0;width:110px">'
+          +'</td>'
+          +'<td style="padding:4px 8px">'
+          +'<select id="qe-aud-result" style="width:100%;border:none;background:transparent;font-size:11px;color:#111;font-family:inherit;outline:none;padding:2px 0;-webkit-appearance:auto">'
+          +optHtml
+          +'</select>'
+          +'</td>'
+          +'</tr>';
+      })()
     + (function(){
         var sdone = pv(saved.spiDateCompleted);
         var sres  = pv(saved.spiResult);

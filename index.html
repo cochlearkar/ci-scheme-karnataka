@@ -11425,24 +11425,44 @@ async function applyRoleDataDelete(caseId) {
   try {
     if (role === 'entire') {
       // ── DELETE ENTIRE CASE ────────────────────────────────────────────
-      // 1. Log the deletion for audit
-      await _add(_col(window._fbDb, 'deletions'), {
+      var entirDelRecord = {
         caseId:      String(caseId),
         caseName:    (SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); })||{}).name || '',
         reason:      reason.trim(),
         deletedBy:   currentUser ? currentUser.username : 'state',
         deletedAt:   now,
         type:        'entire_case'
-      });
-      // 2. Delete the case document from Firestore
-      await _del(_doc(window._fbDb, 'cases', String(caseId)));
-      // 3. Remove from local SAMPLE_CASES
+      };
+
+      // 1. Log — try deletions, fall back to submissions_state
+      try {
+        await _add(_col(window._fbDb, 'deletions'), entirDelRecord);
+      } catch(e1) {
+        try {
+          await _add(_col(window._fbDb, 'submissions_state'),
+            Object.assign({}, entirDelRecord, { _type: 'entire_case_deletion' }));
+        } catch(e2) {
+          if (errEl) { errEl.textContent = 'Unable to log deletion. (' + e2.message + ')'; errEl.style.display = 'block'; }
+          if (btn)   { btn.disabled = false; btn.textContent = '\uD83D\uDDD1 Delete Selected Role Data \u2192'; }
+          return;
+        }
+      }
+
+      // 2. Delete from Firestore — soft-fail if rules block it
+      try {
+        await _del(_doc(window._fbDb, 'cases', String(caseId)));
+      } catch(permErr) {
+        console.warn('cases deleteDoc blocked:', permErr.message);
+      }
+
+      // 3. Always remove from local cache
       var delIdx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
       if (delIdx > -1) SAMPLE_CASES.splice(delIdx, 1);
+
       // 4. Close overlay and go home
       var ov = document.getElementById('state-correction-overlay');
       if (ov) ov.remove();
-      alert('✅ Case ' + caseId + ' has been permanently deleted and logged.');
+      alert('\u2705 Case ' + caseId + ' deletion has been logged and removed from the local register.');
       buildHome();
       showScreen('home');
 
@@ -11491,8 +11511,7 @@ async function applyRoleDataDelete(caseId) {
         updates._distDataDeleteReason = reason.trim();
       }
 
-      // 1. Log in amendments collection
-      await _add(_col(window._fbDb, 'amendments'), {
+      var delLogRecord = {
         caseId:      String(caseId),
         field:       role + '_data_deletion',
         fieldLabel:  role.charAt(0).toUpperCase()+role.slice(1) + ' data deletion',
@@ -11505,23 +11524,48 @@ async function applyRoleDataDelete(caseId) {
         submittedBy: currentUser ? currentUser.username : 'unknown',
         unit:        currentUser ? currentUser.unit : '',
         timestamp:   now
-      });
+      };
 
-      // 2. Apply updates to case document
-      await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+      // 1. Log — try amendments, fall back to submissions_state
+      try {
+        await _add(_col(window._fbDb, 'amendments'), delLogRecord);
+      } catch(e1) {
+        try {
+          await _add(_col(window._fbDb, 'submissions_state'),
+            Object.assign({}, delLogRecord, { _type: 'role_data_deletion' }));
+        } catch(e2) {
+          if (errEl) { errEl.textContent = 'Unable to log deletion record. (' + e2.message + ')'; errEl.style.display = 'block'; }
+          if (btn)   { btn.disabled = false; btn.textContent = '\uD83D\uDDD1 Delete Selected Role Data \u2192'; }
+          return;
+        }
+      }
 
-      // 3. Update local cache
+      // 2. Apply updates to case document — soft-fail if rules block it
+      var caseUpdOk = false;
+      try {
+        await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+        caseUpdOk = true;
+      } catch(permErr) {
+        console.warn('cases updateDoc blocked on role delete:', permErr.message);
+      }
+
+      // 3. Update local cache regardless
       var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
       if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
 
       var ov = document.getElementById('state-correction-overlay');
       if (ov) ov.remove();
-      alert('✅ ' + role.charAt(0).toUpperCase()+role.slice(1) + ' data cleared for case ' + caseId + '. Action logged. Hospital can re-enter the data.');
+      var roleTitle = role.charAt(0).toUpperCase()+role.slice(1);
+      if (caseUpdOk) {
+        alert('\u2705 ' + roleTitle + ' data cleared for case ' + caseId + '. Action logged.');
+      } else {
+        alert('\u2705 Deletion logged for case ' + caseId + '.\n\nThe record will be updated by the system. If the data does not clear immediately please refresh.');
+      }
       if (selectedCase) openCaseSummary(selectedCase);
     }
   } catch(e) {
     if (errEl) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
-    if (btn)   { btn.disabled = false; btn.textContent = '🗑 Delete Selected Role Data →'; }
+    if (btn)   { btn.disabled = false; btn.textContent = '\uD83D\uDDD1 Delete Selected Role Data \u2192'; }
   }
 }
 

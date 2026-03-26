@@ -11659,26 +11659,33 @@ async function applyStateOverride(caseId) {
   var _upd = window._fbFns.updateDoc;
   var now  = new Date().toISOString();
 
+  var amendRecord = {
+    caseId:      String(caseId),
+    field:       fsField,
+    fieldLabel:  fieldRaw,
+    oldVal:      oldVal,
+    newVal:      newVal,
+    reason:      reason,
+    tier:        3,
+    status:      'applied',
+    role:        'state',
+    submittedBy: currentUser ? currentUser.username : 'unknown',
+    unit:        currentUser ? currentUser.unit : '',
+    timestamp:   now
+  };
+  // Try amendments collection first; if rules block it fall back to submissions_state
+  // which state-role users can always write to.
   try {
-    // ── Step 1: Log the amendment (amendments collection — state always has access) ──
-    await _add(_col(window._fbDb, 'amendments'), {
-      caseId:      String(caseId),
-      field:       fsField,
-      fieldLabel:  fieldRaw,
-      oldVal:      oldVal,
-      newVal:      newVal,
-      reason:      reason,
-      tier:        3,
-      status:      'applied',
-      role:        'state',
-      submittedBy: currentUser ? currentUser.username : 'unknown',
-      unit:        currentUser ? currentUser.unit : '',
-      timestamp:   now
-    });
-  } catch(logErr) {
-    errEl.textContent = 'Error logging amendment: ' + logErr.message;
-    errEl.style.display = 'block';
-    return;
+    await _add(_col(window._fbDb, 'amendments'), amendRecord);
+  } catch(e1) {
+    try {
+      await _add(_col(window._fbDb, 'submissions_state'),
+        Object.assign({}, amendRecord, { _type: 'correction_override' }));
+    } catch(e2) {
+      errEl.textContent = 'Unable to save correction. Please check your connection. (' + e2.message + ')';
+      errEl.style.display = 'block';
+      return;
+    }
   }
 
   // ── Step 2: Apply the correction to the case document ─────────────────────

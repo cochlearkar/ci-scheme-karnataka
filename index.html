@@ -835,8 +835,11 @@ body {
     <div class="role-chip" id="summary-chip"></div>
   </div>
   <div class="form-scroll" id="summary-body"></div>
-  <div class="bottom-bar" id="summary-action-bar" style="display:none">
-    <button class="btn-submit" id="summary-action-btn" onclick="summaryAction()">Update →</button>
+  <div class="bottom-bar" id="summary-action-bar" style="display:none;flex-direction:column;gap:0">
+    <div style="display:flex;gap:10px;width:100%">
+      <button class="btn-submit" id="summary-action-btn" onclick="summaryAction()">Update →</button>
+    </div>
+    <div id="summary-transfer-slot" style="width:100%;margin-top:6px;display:none"></div>
     <button class="btn-submit" id="summary-eval-btn" onclick="openQuarterlyEval(selectedCase)" style="display:none;margin-top:8px;background:var(--purple)">🎯 Quarterly Evaluation →</button>
     <button class="btn-submit" id="summary-amend-btn"
       style="display:none;margin-top:8px;font-size:13px">
@@ -3425,6 +3428,9 @@ function buildHome() {
     }
 
 
+    // Hospital does not get a transfer button — they only recommend
+    var hospSlot = document.getElementById('summary-transfer-slot');
+    if (hospSlot) hospSlot.style.display = 'none';
   } else if (currentRole === 'rehab') {
     // ── Backlog: cases where sessions logged < 80% of expected given months elapsed ──
     const rehabBacklog = allMyCases.filter(function(c) {
@@ -4569,6 +4575,9 @@ function buildForm(cas) {
     sub = 'Device & operative details';
     btn.textContent = cas ? 'Update record →' : 'Submit registration →';
     html = buildHospitalForm(cas);
+    // Hospital does not get a transfer button — they only recommend
+    var hospSlot = document.getElementById('summary-transfer-slot');
+    if (hospSlot) hospSlot.style.display = 'none';
   } else if (currentRole === 'rehab') {
     title = cas ? cas.name + ' — rehab session' : 'Rehab Session';
     sub = cas ? `${cas.phase} · ${cas.district}` : 'Select a case from the cases list';
@@ -6077,6 +6086,27 @@ async function confirmTransfer(caseId) {
   }
 }
 
+
+// ── Summary action bar: transfer slot helper ──────────────────────────────
+function _summaryTransferSlot(role) {
+  var slot = document.getElementById('summary-transfer-slot');
+  if (!slot) return;
+  var color  = role === 'state'    ? '#1a4a7a'
+             : role === 'district' ? 'var(--amber)'
+             : 'var(--blue)';
+  var border = role === 'state'    ? 'none'
+             : role === 'district' ? '1.5px solid var(--amber-mid)'
+             : '1.5px solid var(--blue)';
+  var bg     = role === 'state'    ? '#1a4a7a' : 'transparent';
+  var txtCol = role === 'state'    ? '#fff' : color;
+  slot.style.display = 'block';
+  slot.innerHTML = '<button onclick="openTransferRehabCentre(selectedCase)" '
+    + 'style="width:100%;padding:11px;background:' + bg + ';border:' + border + ';color:' + txtCol + ';'
+    + 'border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'
+    + '🔄 Transfer to Another Rehab Centre'
+    + '</button>';
+}
+
 function openCaseSummary(cas) {
   selectedCase = cas;
   const meta = ROLE_META[currentRole];
@@ -6114,6 +6144,9 @@ function openCaseSummary(cas) {
       btn.className = 'btn-submit hospital';
       btn.onclick = function(){ openHospitalUpdate(selectedCase); };
     }
+    // Hospital does not get a transfer button — they only recommend
+    var hospSlot = document.getElementById('summary-transfer-slot');
+    if (hospSlot) hospSlot.style.display = 'none';
   } else if (currentRole === 'rehab') {
     var _rw = cas._rehabLastSubmit && withinCorrectionWindow(cas._rehabLastSubmit);
     if (cas._rehabLastSubmit && !_rw) {
@@ -6136,29 +6169,17 @@ function openCaseSummary(cas) {
       btn.className   = 'btn-submit rehab';
     }
     // Rehab centre can transfer this case to another centre
-    var rTransBtn = document.createElement('button');
-    rTransBtn.textContent   = '🔄 Transfer to Another Rehab Centre';
-    rTransBtn.style.cssText = 'width:100%;margin-top:8px;padding:11px;background:transparent;border:1.5px solid var(--blue);color:var(--blue);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
-    rTransBtn.onclick = function(){ openTransferRehabCentre(selectedCase); };
-    bar.appendChild(rTransBtn);
+    _summaryTransferSlot('rehab');
   } else if (currentRole === 'district') {
     btn.textContent = '📍 Log Follow-up →';
     btn.className = 'btn-submit district';
     // District officer can transfer case to new rehab centre based on field visit
-    var dTransBtn = document.createElement('button');
-    dTransBtn.textContent   = '🔄 Transfer to Another Rehab Centre';
-    dTransBtn.style.cssText = 'width:100%;margin-top:8px;padding:11px;background:transparent;border:1.5px solid var(--amber-mid);color:var(--amber);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
-    dTransBtn.onclick = function(){ openTransferRehabCentre(selectedCase); };
-    bar.appendChild(dTransBtn);
+    _summaryTransferSlot('district');
   } else if (currentRole === 'state') {
     btn.textContent = '✏️ Update Claim Details →';
     btn.className = 'btn-submit state';
     // Transfer button for state team
-    var stTransBtn = document.createElement('button');
-    stTransBtn.textContent   = '🏫 Transfer Rehab Centre';
-    stTransBtn.style.cssText = 'width:100%;margin-top:8px;padding:12px;background:#1a4a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
-    stTransBtn.onclick = function(){ openTransferRehabCentre(selectedCase); };
-    bar.appendChild(stTransBtn);
+    _summaryTransferSlot('state');
     var scBtn = document.getElementById('summary-amend-btn');
     if (scBtn) {
       scBtn.style.display = 'block';
@@ -6175,6 +6196,8 @@ function openCaseSummary(cas) {
   if (evalBtn2) evalBtn2.style.display = (currentRole === 'rehab') ? 'block' : 'none';
   const amendBtn = document.getElementById('summary-amend-btn');
   if (amendBtn) { amendBtn.style.display = 'none'; amendBtn.style.background = ''; amendBtn.style.color = ''; }
+  // Clear transfer slot unless a role above has filled it
+  // (slot is only shown if _summaryTransferSlot() was called above)
   document.getElementById('summary-action-bar').style.display = 'block';
   showScreen('casesummary');
 }
@@ -6186,6 +6209,9 @@ function summaryAction() {
   const cas = selectedCase;
   if (currentRole === 'hospital') {
     openHospitalUpdate(cas);
+    // Hospital does not get a transfer button — they only recommend
+    var hospSlot = document.getElementById('summary-transfer-slot');
+    if (hospSlot) hospSlot.style.display = 'none';
   } else if (currentRole === 'rehab') {
     // Show history first
     document.getElementById('rs-title').textContent = cas.name || 'AVT Sessions';
@@ -11417,6 +11443,9 @@ function openCaseFromList(caseId) {
   selectedCase = cas;
   if (currentRole === 'hospital') {
     openHospitalUpdate(cas);
+    // Hospital does not get a transfer button — they only recommend
+    var hospSlot = document.getElementById('summary-transfer-slot');
+    if (hospSlot) hospSlot.style.display = 'none';
   } else if (currentRole === 'rehab') {
     // Show history first — rehab users see saved data immediately
     // They can tap "New Entry" to open the form

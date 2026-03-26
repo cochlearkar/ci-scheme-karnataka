@@ -6128,6 +6128,12 @@ function openCaseSummary(cas) {
   const btn = document.getElementById('summary-action-btn');
   bar.style.display = 'flex';
 
+  // Reset all secondary buttons/slots before role branches fill them
+  var _slot = document.getElementById('summary-transfer-slot');
+  if (_slot) { _slot.style.display = 'none'; _slot.innerHTML = ''; }
+  var _amend = document.getElementById('summary-amend-btn');
+  if (_amend) { _amend.style.display = 'none'; _amend.style.background = ''; _amend.style.color = ''; _amend.textContent = 'Amend / Correct'; }
+
   if (currentRole === 'hospital') {
     if (isHospitalUpdated(cas)) {
       // Show Amend if within 24hr window, else Correction Request
@@ -6194,10 +6200,7 @@ function openCaseSummary(cas) {
   if (extraBtn) extraBtn.style.display = (currentRole === 'district') ? 'block' : 'none';
   const evalBtn2 = document.getElementById('summary-eval-btn');
   if (evalBtn2) evalBtn2.style.display = (currentRole === 'rehab') ? 'block' : 'none';
-  const amendBtn = document.getElementById('summary-amend-btn');
-  if (amendBtn) { amendBtn.style.display = 'none'; amendBtn.style.background = ''; amendBtn.style.color = ''; }
-  // Clear transfer slot unless a role above has filled it
-  // (slot is only shown if _summaryTransferSlot() was called above)
+  // NOTE: amendBtn is NOT reset here — each role branch above manages it explicitly
   document.getElementById('summary-action-bar').style.display = 'block';
   showScreen('casesummary');
 }
@@ -6693,17 +6696,39 @@ function openRehabSession(cas) {
           return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
         });
 
-        // Prefer the entry matching the auto-detected quarter;
-        // fall back to the most recent entry across all quarters.
-        var matchingQtr = allAvtDocs.find(function(d) { return d.quarterNum === qNum; });
-        var existingAVT = matchingQtr || allAvtDocs[0];
+        // ── Split: own centre vs other centres ──────────────────────────
+        var _myUnit   = (window.currentUser && window.currentUser.unit) || '';
+        var _myDocs   = allAvtDocs.filter(function(d){ return (d.rehabCentre||'') === _myUnit; });
+        var _otherDocs= allAvtDocs.filter(function(d){ return (d.rehabCentre||'') !== _myUnit; });
+
+        // If previous centre data exists but none of mine — show info banner + blank form
+        if (!_myDocs.length && _otherDocs.length) {
+          var _prevCtrs = _otherDocs
+            .map(function(d){ return d.rehabCentre || 'Previous centre'; })
+            .filter(function(v,i,a){ return a.indexOf(v)===i; });
+          rsBody.innerHTML =
+            '<div style="margin:0 0 14px;background:#fff8e1;border:1.5px solid #f59e0b;border-radius:10px;padding:12px 14px">'
+            +'<div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:4px">&#128203; Previous Centre Records Available</div>'
+            +'<div style="font-size:11px;color:#78350f;line-height:1.6">'
+            +'This child previously attended: <strong>'+_prevCtrs.join(', ')+'</strong>.<br>'
+            +'Their records are in <strong>All Logs</strong> (read-only). Use the form below for your centre’s sessions.'
+            +'</div>'
+            +'<button onclick="openRehabHistory(selectedCase)" style="margin-top:8px;padding:7px 14px;background:#92400e;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">&#128203; View Previous Records</button>'
+            +'</div>'
+            + fullFormHTML;
+          return;
+        }
+
+        // Prefill only from MY centre's submissions
+        var matchingQtr = _myDocs.find(function(d){ return d.quarterNum === qNum; });
+        var existingAVT = matchingQtr || _myDocs[0] || null;
+        if (!existingAVT) { rsBody.innerHTML = fullFormHTML; return; }
 
         window._rs_lastSaved = existingAVT;
 
         // Sync quarter globals before rendering form
         if (existingAVT.quarterNum) {
           window._rs_curQtrId = existingAVT.quarterNum;
-          // Find the matching quarter definition and update sessStart/slotCount
           var savedQtr = (window._rs_qtrs || []).find(function(q){ return q.id === existingAVT.quarterNum; });
           if (savedQtr) {
             window._rs_slotCount   = savedQtr.rows;
@@ -6712,12 +6737,11 @@ function openRehabSession(cas) {
           if (existingAVT.sessStart) window._rs_sessStart = existingAVT.sessStart;
         }
 
-        // Render the original form (preserves original header/design), then populate with saved data.
+        // Render form and prefill with MY centre's saved data only
         rsBody.innerHTML = fullFormHTML;
         rsRestoreFormFromEntry(existingAVT);
-        // Now populate every field with the saved data
         rsRestoreFormFromEntry(existingAVT);
-        return; // done — form is showing with data pre-filled
+        return;
       }
     } catch(e) { console.error('AVT pre-load failed:', e); rsBody.innerHTML = '<div style="padding:20px 16px;background:#fee2e2;margin:12px 16px;border-radius:8px;font-size:12px;color:#991b1b">⚠️ Could not load saved session data: ' + e.message + '<br>Please check your internet connection and reload.</div>' + fullFormHTML; return; }
 

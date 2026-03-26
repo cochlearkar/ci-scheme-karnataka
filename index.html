@@ -1654,6 +1654,26 @@ function buildPatientCard(cas, role) {
       ${cas.diagnosis ? cf('Diagnosis', cas.diagnosis) : ''}
       ${c('Hosp. Type', cas.hospType)}
 
+      ${sec('Rehab Centre Journey')}
+      ${(function(){
+        var hist = cas.rehabCentreHistory || [];
+        var cur  = cas.rehabCentre || '';
+        if (!cur && !hist.length) return c('Rehab Centre', '—');
+        if (hist.length > 1) {
+          var rows = hist.map(function(h,i){
+            var isCur = (h.centre===cur)||(i===hist.length-1);
+            return '<div class="pic-cell" style="grid-column:span 2"><span class="info-label">'
+              +(isCur?'▶ Current':'Previous')+'</span><span class="info-val" style="font-size:11px;display:flex;align-items:center;gap:6px">'
+              +h.centre
+              +'<span style="font-size:9px;color:var(--text-light)">from '+( h.from||'—')+'</span>'
+              +(isCur?'<span style="background:var(--blue-mid);color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">CURRENT</span>':'')
+              +'</span></div>';
+          }).join('');
+          return rows;
+        }
+        return c('Rehab Centre', cur || (hist[0]&&hist[0].centre) || '—');
+      })()}
+
       ${sec('Surgery (2001GP)')}
       ${cf('SAST Ref', cas.surgRefNo)}
       ${c('Admission', cas.surgAdmit)}
@@ -1994,8 +2014,14 @@ function filterCasesByUser(cases) {
   if (currentUser.role === 'rehab') {
     const unit = (currentUser.unit || '').toLowerCase().trim();
     return cases.filter(c => {
-      const rec = (c.rehabCentre || '').toLowerCase().trim();
-      return rec && rec === unit;
+      // Match current centre
+      const cur = (c.rehabCentre || '').toLowerCase().trim();
+      if (cur && cur === unit) return true;
+      // Match any historical centre (transfer journey)
+      const hist = c.rehabCentreHistory || [];
+      return hist.some(function(h) {
+        return (h.centre || '').toLowerCase().trim() === unit;
+      });
     });
   }
   if (currentUser.role === 'district') {
@@ -5896,6 +5922,157 @@ function buildReportCardHTML(c) {
 // CASE SUMMARY — shown to all logins when tapping a case
 // ══════════════════════════════════════════════════════════════
 
+
+// ══════════════════════════════════════════════════════════════
+// TRANSFER REHAB CENTRE — state/hospital can move a case
+// ══════════════════════════════════════════════════════════════
+function openTransferRehabCentre(cas) {
+  if (!cas) return;
+  var cur = cas.rehabCentre || 'Not assigned';
+  var hist = cas.rehabCentreHistory || [];
+
+  // Build centre options
+  var opts = REHAB_CENTRES.map(function(r) {
+    return '<option value="'+r+'"'+(r===cur?' selected':'')+'>'+r+'</option>';
+  }).join('');
+
+  // Build history display
+  var histHTML = '';
+  if (hist.length > 0) {
+    histHTML = '<div style="margin-bottom:12px">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-bottom:6px">Transfer History</div>'
+      + hist.map(function(h,i){
+          var isCur = (h.centre===cur)||(i===hist.length-1);
+          return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:'+(isCur?'var(--blue-light)':'var(--gray)')+';border-radius:8px;margin-bottom:4px">'
+            +'<div style="width:7px;height:7px;border-radius:50%;background:'+(isCur?'var(--blue-mid)':'#9ca3af')+'"></div>'
+            +'<div style="flex:1"><div style="font-size:12px;font-weight:'+(isCur?'700':'400')+';color:var(--text)">'+h.centre+'</div>'
+            +'<div style="font-size:10px;color:var(--text-light)">From '+( h.from||'—')+(h.addedBy?' · '+h.addedBy:'')+'</div></div>'
+            +(isCur?'<span style="font-size:9px;background:var(--blue-mid);color:#fff;padding:1px 7px;border-radius:8px;font-weight:700">Current</span>':'')
+            +'</div>';
+        }).join('')
+      +'</div>';
+  }
+
+  var today = new Date().toISOString().split('T')[0];
+  var modal = document.createElement('div');
+  modal.id = 'transfer-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:420px;padding:24px 20px 40px;max-height:85vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    +'<div style="font-size:16px;font-weight:700;color:var(--text)">Transfer Rehab Centre</div>'
+    +'<span onclick="document.getElementById(\'transfer-modal\').remove()" style="font-size:22px;cursor:pointer;color:var(--text-light)">×</span>'
+    +'</div>'
+    +'<div style="background:var(--blue-light);border:0.5px solid #93c5fd;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--blue)">'
+    +'<strong>'+cas.name+'</strong> · Card: '+cas.id+'<br>'
+    +'Current centre: <strong>'+cur+'</strong>'
+    +'</div>'
+    + histHTML
+    +'<div style="margin-bottom:12px">'
+    +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">New Rehab Centre <span style="color:var(--red)">*</span></div>'
+    +'<select id="tr-new-centre" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;background:#fff">'
+    +'<option value="">Select new centre...</option>'+opts+'</select>'
+    +'</div>'
+    +'<div style="margin-bottom:12px">'
+    +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">Transfer Date <span style="color:var(--red)">*</span></div>'
+    +'<input type="date" id="tr-date" value="'+today+'" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit">'
+    +'</div>'
+    +'<div style="margin-bottom:16px">'
+    +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">Reason for transfer</div>'
+    +'<select id="tr-reason" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;background:#fff">'
+    +'<option value="">Select reason...</option>'
+    +'<option>Family relocated to another district</option>'
+    +'<option>Closer centre available</option>'
+    +'<option>Family preference</option>'
+    +'<option>Quality of services</option>'
+    +'<option>Centre closed / not operational</option>'
+    +'<option>Other</option>'
+    +'</select>'
+    +'<input id="tr-reason-other" placeholder="Specify reason..." style="display:none;width:100%;margin-top:6px;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit">'
+    +'</div>'
+    +'<div id="tr-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:10px;display:none"></div>'
+    +'<button onclick="confirmTransfer(\''+cas.id+'\')" style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Confirm Transfer →</button>'
+    +'</div>';
+  document.body.appendChild(modal);
+
+  // Show other input when "Other" selected
+  document.getElementById('tr-reason').addEventListener('change', function() {
+    document.getElementById('tr-reason-other').style.display = this.value==='Other'?'block':'none';
+  });
+}
+
+async function confirmTransfer(caseId) {
+  var errEl   = document.getElementById('tr-error');
+  var newCen  = document.getElementById('tr-new-centre').value.trim();
+  var trDate  = document.getElementById('tr-date').value.trim();
+  var reason  = document.getElementById('tr-reason').value;
+  var reasonO = document.getElementById('tr-reason-other').value.trim();
+  errEl.style.display = 'none';
+
+  if (!newCen)  { errEl.textContent='Please select the new rehab centre.'; errEl.style.display='block'; return; }
+  if (!trDate)  { errEl.textContent='Transfer date is required.';          errEl.style.display='block'; return; }
+
+  var cas = SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); });
+  if (!cas) return;
+
+  var curCentre = cas.rehabCentre || '';
+  if (newCen === curCentre) {
+    errEl.textContent = 'New centre is the same as the current centre. Please select a different centre.';
+    errEl.style.display = 'block'; return;
+  }
+
+  var now  = new Date().toISOString();
+  var hist = (cas.rehabCentreHistory || []).slice();
+
+  // Seed history with original centre if first transfer
+  if (hist.length === 0 && curCentre) {
+    hist.push({
+      centre:  curCentre,
+      from:    cas.surgAdmit || '',
+      addedBy: 'hospital',
+      addedAt: now,
+      reason:  'Initial assignment'
+    });
+  }
+  // Add new centre
+  hist.push({
+    centre:  newCen,
+    from:    trDate,
+    addedBy: currentUser ? currentUser.username : '',
+    addedAt: now,
+    reason:  reason === 'Other' ? (reasonO||'Other') : (reason||'')
+  });
+
+  try {
+    var _doc = window._fbFns.doc;
+    var _upd = window._fbFns.updateDoc;
+    await _upd(_doc(window._fbDb, 'cases', String(caseId)), {
+      rehabCentre:        newCen,
+      rehabCentreHistory: hist,
+      _lastModified:      now,
+      _transferredAt:     trDate,
+      _transferredBy:     currentUser ? currentUser.username : ''
+    });
+    // Update local cache
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
+    if (idx > -1) {
+      SAMPLE_CASES[idx].rehabCentre        = newCen;
+      SAMPLE_CASES[idx].rehabCentreHistory = hist;
+    }
+    if (cas) {
+      cas.rehabCentre        = newCen;
+      cas.rehabCentreHistory = hist;
+    }
+    document.getElementById('transfer-modal').remove();
+    alert('✅ Transfer recorded. '+cas.name+' is now assigned to '+newCen);
+    // Refresh the summary view
+    if (selectedCase) openCaseSummary(selectedCase);
+  } catch(e) {
+    errEl.textContent = 'Error saving transfer: '+e.message;
+    errEl.style.display = 'block';
+  }
+}
+
 function openCaseSummary(cas) {
   selectedCase = cas;
   const meta = ROLE_META[currentRole];
@@ -5933,6 +6110,17 @@ function openCaseSummary(cas) {
       btn.className = 'btn-submit hospital';
       btn.onclick = function(){ openHospitalUpdate(selectedCase); };
     }
+    // Transfer button always available for hospital
+    var hospTransBtn = document.getElementById('summary-amend-btn');
+    if (hospTransBtn && !isHospitalUpdated(cas)) {
+      // keep amend btn hidden if not yet submitted
+    } else {
+      var tBtn = document.createElement('button');
+      tBtn.textContent    = '🏫 Transfer Rehab Centre';
+      tBtn.style.cssText  = 'width:100%;margin-top:8px;padding:12px;background:#1a4a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+      tBtn.onclick = function(){ openTransferRehabCentre(selectedCase); };
+      bar.appendChild(tBtn);
+    }
   } else if (currentRole === 'rehab') {
     var _rw = cas._rehabLastSubmit && withinCorrectionWindow(cas._rehabLastSubmit);
     if (cas._rehabLastSubmit && !_rw) {
@@ -5960,6 +6148,12 @@ function openCaseSummary(cas) {
   } else if (currentRole === 'state') {
     btn.textContent = '✏️ Update Claim Details →';
     btn.className = 'btn-submit state';
+    // Transfer button for state team
+    var stTransBtn = document.createElement('button');
+    stTransBtn.textContent   = '🏫 Transfer Rehab Centre';
+    stTransBtn.style.cssText = 'width:100%;margin-top:8px;padding:12px;background:#1a4a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+    stTransBtn.onclick = function(){ openTransferRehabCentre(selectedCase); };
+    bar.appendChild(stTransBtn);
     var scBtn = document.getElementById('summary-amend-btn');
     if (scBtn) {
       scBtn.style.display = 'block';
@@ -6074,7 +6268,38 @@ function buildSummaryHTML(c) {
     +'</div></div>'
     +row('Village / Taluk',[c.village,c.taluk].filter(Boolean).join(' · '))
     +row('District',c.district,true)+row('Residential District',c.resDistrict||c.resDist)
-    +row('Pincode',c.pincode)+row('Zone',c.zone)+row('FY',c.fy)+row('Scheme',c.scheme)+'</div>'
+    +row('Pincode',c.pincode)+row('Zone',c.zone)+row('FY',c.fy)+row('Scheme',c.scheme)
+    // ── Rehab Centre Journey ──────────────────────────────────────
+    +(function(){
+      var hist = c.rehabCentreHistory || [];
+      var cur  = c.rehabCentre || '';
+      if (!cur && !hist.length) return '';
+      var out = '<div class="form-section"><div class="form-section-title" style="margin-top:4px">🏫 Rehab Centre Journey</div>';
+      if (hist.length > 1) {
+        out += '<div style="display:flex;flex-direction:column;gap:6px">';
+        hist.forEach(function(h,i){
+          var isCur = (h.centre===cur)||(i===hist.length-1);
+          out += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:'
+            +(isCur?'var(--blue-light)':'var(--gray)')+';border-radius:8px;border:0.5px solid '
+            +(isCur?'#93c5fd':'var(--border)')+'">'
+            +'<div style="width:8px;height:8px;border-radius:50%;background:'+(isCur?'var(--blue-mid)':'#9ca3af')+';flex-shrink:0"></div>'
+            +'<div style="flex:1;min-width:0">'
+            +'<div style="font-size:12px;font-weight:'+(isCur?'700':'500')+';color:var(--text)">'+ h.centre +'</div>'
+            +'<div style="font-size:10px;color:var(--text-light)">From: '+(h.from||'—')+(h.addedBy?' · Added by: '+h.addedBy:'')+'</div>'
+            +'</div>'
+            +(isCur
+              ? '<span style="font-size:9px;font-weight:700;background:var(--blue-mid);color:#fff;padding:2px 7px;border-radius:10px">CURRENT</span>'
+              : '<span style="font-size:9px;color:var(--text-light);background:var(--gray-mid);padding:2px 7px;border-radius:10px">Previous</span>')
+            +'</div>';
+        });
+        out += '</div>';
+      } else {
+        out += row('Rehab Centre', cur || (hist[0]&&hist[0].centre) || '—', true);
+      }
+      out += '</div>';
+      return out;
+    })()
+    +'</div>'
     
     +'</div>'
     +'</div>';
@@ -7401,11 +7626,24 @@ async function openRehabHistory(cas) {
       if (s.soundField)  mapInfo.push('Sound field: ' + s.soundField);
       if (s.deviceStatus) mapInfo.push('Device: ' + s.deviceStatus);
 
-      return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden">'
+      // Centre ownership: lock entries not from this login's centre
+      var myCentre     = (window.currentUser && window.currentUser.unit) || '';
+      var entryCentre  = s.rehabCentre || '';
+      var isOtherCentre = entryCentre && myCentre && entryCentre.toLowerCase().trim() !== myCentre.toLowerCase().trim();
+      var centreBadge  = entryCentre
+        ? ('<span style="background:' + (isOtherCentre?'#f3f4f6':'#dbeafe') + ';color:' + (isOtherCentre?'#374151':'#1a4a7a') + ';border:1px solid ' + (isOtherCentre?'#d1d5db':'#93c5fd') + ';border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;margin-left:6px">'
+          + (isOtherCentre ? '🔒 ' : '🏫 ') + entryCentre + '</span>')
+        : '';
+      var lockBanner = isOtherCentre
+        ? '<div style="background:#f9fafb;border-bottom:1px solid #e5e7eb;padding:6px 12px;font-size:11px;color:#6b7280">🔒 Read-only — entered by <strong>' + entryCentre + '</strong>. Your centre can view but not edit these records.</div>'
+        : '';
+
+      return '<div style="background:#fff;border:1px solid ' + (isOtherCentre?'#d1d5db':'var(--border)') + ';border-radius:10px;margin-bottom:12px;overflow:hidden">'
         // Card header
-        + '<div style="background:#EBF3FC;padding:8px 12px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:4px">'
-        + '<div><div style="font-size:12px;font-weight:700;color:#1a4a7a">Entry ' + (idx+1) + ' — ' + (s.entryId||'') + '</div>'
+        + '<div style="background:' + (isOtherCentre?'#f9fafb':'#EBF3FC') + ';padding:8px 12px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:4px">'
+        + '<div><div style="font-size:12px;font-weight:700;color:' + (isOtherCentre?'#374151':'#1a4a7a') + '">Entry ' + (idx+1) + ' — ' + (s.entryId||'') + centreBadge + '</div>'
         + '<div style="font-size:10px;color:#374151;margin-top:1px">Saved: ' + fmtTs(s.timestamp) + ' &nbsp;·&nbsp; By: ' + (s.submittedBy||'') + '</div>'
+        + lockBanner
         + (dateRange ? '<div style="font-size:10px;color:#6b7280">Dates: ' + dateRange + '</div>' : '')
         + '</div>'
         + '<div style="text-align:right">'
@@ -7435,6 +7673,28 @@ async function openRehabHistory(cas) {
     }
 
     var pageHTML = '<div style="padding:12px 16px 40px">';
+
+    // ── Transfer / centre journey banner ─────────────────────────────────
+    var myCentre    = (window.currentUser && window.currentUser.unit) || '';
+    var caseCentre  = cas.rehabCentre || '';
+    var centreHist  = cas.rehabCentreHistory || [];
+    var isCurrCentre = !caseCentre || !myCentre || caseCentre.toLowerCase().trim() === myCentre.toLowerCase().trim();
+    var wasPrevCentre = centreHist.some(function(h){ return (h.centre||'').toLowerCase().trim() === myCentre.toLowerCase().trim(); });
+
+    if (!isCurrCentre && wasPrevCentre) {
+      pageHTML += '<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:10px;padding:10px 14px;margin-bottom:10px">'
+        + '<div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:3px">⚠️ Child has transferred from your centre</div>'
+        + '<div style="font-size:11px;color:#78350f">Currently at: <strong>' + caseCentre + '</strong>. '
+        + 'Your earlier session records are shown below (read-only).</div>'
+        + '</div>';
+    } else if (isCurrCentre && centreHist.length > 1) {
+      var prevNames = centreHist.slice(0, -1).map(function(h){ return h.centre; }).join(', ');
+      pageHTML += '<div style="background:#e0f2fe;border:1px solid #7dd3fc;border-radius:10px;padding:10px 14px;margin-bottom:10px">'
+        + '<div style="font-size:12px;font-weight:700;color:#0369a1;margin-bottom:3px">ℹ️ Child transferred to your centre</div>'
+        + '<div style="font-size:11px;color:#0369a1">Previously at: <strong>' + prevNames + '</strong>. '
+        + 'Earlier records are shown below for reference.</div>'
+        + '</div>';
+    }
 
     // Summary banner
     pageHTML += '<div style="background:#EBF3FC;border:1px solid #B5D4F4;border-radius:10px;padding:10px 14px;margin-bottom:14px">'
@@ -8096,9 +8356,46 @@ async function submitRehabSession() {
   // New total session count — sessStart is first session of this quarter
   var newTotalSessions = (weekEntry.sessStart - 1) + weekEntry.presentCount;
 
+  // Build rehabCentreHistory — append this centre if not already current
+  var submittingCentre = currentUser ? currentUser.unit : '';
+  var existingCentre   = selectedCase.rehabCentre || '';
+  var existingHistory  = selectedCase.rehabCentreHistory || [];
+  var updatedHistory   = existingHistory.slice(); // copy
+
+  if (submittingCentre && submittingCentre !== existingCentre) {
+    // Centre has changed — record the transfer
+    var alreadyInHistory = updatedHistory.some(function(h) {
+      return (h.centre||'') === submittingCentre;
+    });
+    if (!alreadyInHistory) {
+      updatedHistory.push({
+        centre:     submittingCentre,
+        from:       lastDate || now.substring(0,10),
+        addedBy:    currentUser ? currentUser.username : '',
+        addedAt:    now
+      });
+    }
+  } else if (submittingCentre && updatedHistory.length === 0) {
+    // First ever submission — seed the history with the original centre
+    if (existingCentre && existingCentre !== submittingCentre) {
+      updatedHistory.push({
+        centre:  existingCentre,
+        from:    selectedCase.surgAdmit || '',
+        addedBy: 'hospital',
+        addedAt: now
+      });
+    }
+    updatedHistory.push({
+      centre:  submittingCentre,
+      from:    lastDate || now.substring(0,10),
+      addedBy: currentUser ? currentUser.username : '',
+      addedAt: now
+    });
+  }
+
   var caseUpdates = {
     sessions:              newTotalSessions,
-    _rehabSessionsLogged:  newTotalSessions,  // rehab-app only — used by infographic
+    _rehabSessionsLogged:  newTotalSessions,
     _rehabLastSubmit:      now,
     lastContact:           lastDate || selectedCase.lastContact,
     _lastRole:         'rehab',
@@ -8108,7 +8405,9 @@ async function submitRehabSession() {
     _missedThisMonth:  newMissed,
     _lastSessionMonth: monthStr,
     _attendanceFlag:   newFlag,
-    _monthAttendPct:   weekEntry.attendancePct
+    _monthAttendPct:   weekEntry.attendancePct,
+    rehabCentre:       submittingCentre || existingCentre,
+    rehabCentreHistory: updatedHistory
   };
 
   // Stage removed — AVT completion is declared separately via the AVT Complete button

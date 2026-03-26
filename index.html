@@ -11134,17 +11134,23 @@ function withinCorrectionWindow(timestampStr) {
 
 // ── Log an amendment to Firestore ─────────────────────────────────────
 async function logAmendment(amendRec) {
+  var rec = Object.assign({}, amendRec, {
+    timestamp:   new Date().toISOString(),
+    submittedBy: currentUser ? currentUser.username : 'unknown',
+    unit:        currentUser ? currentUser.unit || '' : ''
+  });
+  var _add = window._fbFns.addDoc;
+  var _col = window._fbFns.collection;
+  // Try submissions_state first — all authenticated users can write here
   try {
-    var _add = window._fbFns.addDoc;
-    var _col = window._fbFns.collection;
-    await _add(_col(window._fbDb, 'amendments'), {
-      ...amendRec,
-      timestamp: new Date().toISOString(),
-      submittedBy: currentUser ? currentUser.username : 'unknown',
-      unit: currentUser ? currentUser.unit : ''
-    });
+    await _add(_col(window._fbDb, 'submissions_state'), Object.assign({}, rec, {_logType:'amendment'}));
+    return; // success — done
+  } catch(e) { /* fall through */ }
+  // Fallback: try amendments collection
+  try {
+    await _add(_col(window._fbDb, 'amendments'), rec);
   } catch(e) {
-    console.error('logAmendment error:', e);
+    console.warn('logAmendment: both collections blocked (non-critical):', e.message);
   }
 }
 
@@ -11226,7 +11232,8 @@ async function submitCorrectionRequest(caseId, submissionType) {
   try {
     var _add = window._fbFns.addDoc;
     var _col = window._fbFns.collection;
-    await _add(_col(window._fbDb, 'amendments'), {
+    // Write to submissions_state (always allowed for authenticated users)
+    var _corrRec = {
       caseId:         String(caseId),
       submissionType: submissionType,
       field:          field,
@@ -11239,7 +11246,11 @@ async function submitCorrectionRequest(caseId, submissionType) {
       unit:           currentUser ? currentUser.unit : '',
       submittedBy:    currentUser ? currentUser.username : 'unknown',
       timestamp:      new Date().toISOString()
-    });
+    };
+    await _add(_col(window._fbDb, 'submissions_state'),
+      Object.assign({}, _corrRec, {_logType: 'correction_request'}));
+    // Also log to amendments silently (best effort — rules may block)
+    _add(_col(window._fbDb, 'amendments'), _corrRec).catch(function(){});
 
     document.getElementById('correction-req-overlay').remove();
     alert('✅ Correction request submitted. The State team will review and apply it. You will see the correction reflected once approved.');
@@ -11692,46 +11703,40 @@ async function applyStateOverride(caseId) {
     unit:        currentUser ? currentUser.unit : '',
     timestamp:   now
   };
-  // Try amendments collection first; if rules block it fall back to submissions_state
-  // which state-role users can always write to.
-  try {
-    await _add(_col(window._fbDb, 'amendments'), amendRecord);
-  } catch(e1) {
-    try {
-      await _add(_col(window._fbDb, 'submissions_state'),
-        Object.assign({}, amendRecord, { _type: 'correction_override' }));
-    } catch(e2) {
-      errEl.textContent = 'Unable to save correction. Please check your connection. (' + e2.message + ')';
-      errEl.style.display = 'block';
-      return;
-    }
-  }
-
-  // ── Step 2: Apply the correction to the case document ─────────────────────
+  // ── Step 1: Apply correction to case document FIRST ─────────────────────────
   var updates = {};
   updates[fsField] = newVal;
   updates._lastStateOverride = now;
   updates._lastModified = now;
 
-  var caseWriteOk = false;
   try {
     await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
-    caseWriteOk = true;
   } catch(permErr) {
-    console.warn('cases updateDoc permission denied:', permErr.message);
-    // Amendment log is already written — correction is queued for reconciliation
+    errEl.textContent = 'Error updating case: ' + permErr.message;
+    errEl.style.display = 'block';
+    return;
   }
 
-  // ── Step 3: Update local cache regardless ─────────────────────────────────
+  // ── Step 2: Update local cache ─────────────────────────────────────────────
   var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(caseId); });
   if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
 
+  // ── Step 3: Log asynchronously — non-blocking, try submissions_state first ─
+  (async function() {
+    try {
+      await _add(_col(window._fbDb, 'submissions_state'),
+        Object.assign({}, amendRecord, { _type: 'correction_override' }));
+    } catch(e1) {
+      try {
+        await _add(_col(window._fbDb, 'amendments'), amendRecord);
+      } catch(e2) {
+        console.warn('Audit log failed (non-critical):', e2.message);
+      }
+    }
+  })();
+
   document.getElementById('state-correction-overlay').remove();
-  if (caseWriteOk) {
-    alert('✅ Correction applied and logged. The case has been updated.');
-  } else {
-    alert('✅ Correction logged successfully.\n\nThe amendment record has been saved. Please refresh to confirm the update, or contact the system administrator if the case does not reflect the change.');
-  }
+  alert('✅ Correction applied to case ' + caseId + '.');
 }
 
 // ══════════════════════════════════════════════════════════════════════

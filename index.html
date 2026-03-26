@@ -11479,17 +11479,9 @@ function openCaseFromList(caseId) {
     var hospSlot = document.getElementById('summary-transfer-slot');
     if (hospSlot) hospSlot.style.display = 'none';
   } else if (currentRole === 'rehab') {
-    // Show history first — rehab users see saved data immediately
-    // They can tap "New Entry" to open the form
-    document.getElementById('rs-title').textContent = cas.name || 'AVT Sessions';
-    document.getElementById('rs-sub').textContent   = 'Loading…';
-    document.getElementById('rs-body').innerHTML    =
-      '<div style="padding:40px 16px;text-align:center">'
-      + '<div style="font-size:28px;margin-bottom:10px">⏳</div>'
-      + '<div style="font-size:13px;color:var(--text-light)">Loading session logs…</div>'
-      + '</div>';
-    showScreen('rehabsession');
-    openRehabHistory(cas);
+    // Open case summary first so the transfer button and case details are visible
+    // The "Log Rehab Session" button in the summary takes them to AVT logs
+    openCaseSummary(cas);
   } else if (currentRole === 'district') {
     openDistrictUnified(cas);
   } else {

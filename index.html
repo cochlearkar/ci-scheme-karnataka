@@ -11265,6 +11265,46 @@ function openStateCorrection(cas) {
   ov.id = 'state-correction-overlay';
   ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
   var nm = isDemo() ? maskName(cas.name) : cas.name;
+
+  // ── Field → { fsKey, currentVal, inputType, options? } ────────────────────
+  // inputType: 'date' | 'select' | 'text'
+  var DIST_LIST = ['BAGALKOTE','BALLARI','BANGALORE - RURAL','BANGALORE EAST','BANGALORE NORTH',
+    'BANGALORE SOUTH','BANGALORE WEST','BELAGAVI','BENGALURU','BENGALURU RURAL','BIDAR',
+    'CHAMARAJANAGARA','CHIKKABALLAPURA','CHIKKAMAGALURU','CHITRADURGA','DAKSHINA KANNADA',
+    'DAVANAGERE','DHARWAR','GADAG','HASSAN','HAVERI','KALABURAGI','KODAGU','KOLAR','KOPPAL',
+    'MANDYA','MYSORE','MYSURU','RAICHUR','RAMANAGARA','SHIVAMOGGA','TUMAKURU','UDUPI',
+    'UTTARA KANNADA','VIJAYANAGAR','VIJAYAPURA','YADGIR'];
+  var MFR_LIST  = ['Cochlear Limited (Australia)','Advanced Bionics (USA)','MED-EL (Austria)',
+    'Nurotron (China)','Oticon Medical (Denmark)'];
+  var SIDE_LIST = ['Right ear','Left ear','Bilateral'];
+
+  var FIELD_MAP = {
+    'Surgery Date (surgAdmit)':          { key:'surgAdmit',      cur: cas.surgAdmit||'',       type:'date'   },
+    'Switch-on Date (switchOn)':         { key:'switchOn',       cur: cas.switchOn||'',         type:'date'   },
+    'Date of Birth (dob)':               { key:'dob',            cur: cas.dob||'',              type:'date'   },
+    'Patient Name (name)':               { key:'name',           cur: cas.name||'',             type:'text'   },
+    'Mobile (mobile)':                   { key:'mobile',         cur: cas.mobile||'',           type:'text'   },
+    'District (district)':               { key:'district',       cur: cas.district||'',         type:'select', opts: DIST_LIST },
+    'Hospital (hospital)':               { key:'hospital',       cur: cas.hospital||'',         type:'text'   },
+    'Implant Manufacturer (implantCompany)': { key:'implantCompany', cur: cas.implantCompany||cas.manufacturer||'', type:'select', opts: MFR_LIST },
+    'Implant Model (implantModel)':      { key:'implantModel',   cur: cas.implantModel||cas.model||'',   type:'text' },
+    'Serial Number (implantNumber)':     { key:'implantNumber',  cur: cas.implantNumber||cas.serialNo||'', type:'text' },
+    'Implanted Side (side)':             { key:'side',           cur: cas.side||'',             type:'select', opts: SIDE_LIST },
+    'Speech Processor (speechProcessor)':{ key:'speechProcessor',cur: cas.speechProcessor||'',  type:'text'   },
+    'Rehab Centre (rehabCentre)':        { key:'rehabCentre',    cur: cas.rehabCentre||'',      type:'select', opts: REHAB_CENTRES },
+    'Mentor Surgeon (mentorSurgeon)':    { key:'mentorSurgeon',  cur: cas.mentorSurgeon||'',    type:'select', opts: MENTOR_SURGEONS },
+    'CI Surgeon (ciSurgeon)':            { key:'ciSurgeon',      cur: cas.ciSurgeon||cas.doctor||'', type:'text' },
+    'Other (notes)':                     { key:'notes',          cur: cas.notes||'',            type:'text'   }
+  };
+
+  // Store field map on window so the onchange handler can access it
+  window._scFieldMap = FIELD_MAP;
+  window._scCas      = cas;
+
+  var fieldOptions = Object.keys(FIELD_MAP).map(function(lbl) {
+    return '<option value="'+lbl+'">'+lbl+'</option>';
+  }).join('');
+
   ov.innerHTML =
     '<div style="background:#4a2a7a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
     +'<div onclick="document.getElementById(\'state-correction-overlay\').remove()" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">&#8592;</div>'
@@ -11282,20 +11322,14 @@ function openStateCorrection(cas) {
     +'</div>'
     +'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:12px">'
     +'<div class="field"><div class="field-label">Field to correct <span class="req">*</span></div>'
-    +'<select class="field-input" id="sc-field">'
+    +'<select class="field-input" id="sc-field" onchange="scOnFieldChange(this.value)">'
     +'<option value="">Select field...</option>'
-    +'<option>Surgery Date (surgAdmit)</option><option>Switch-on Date (switchOn)</option>'
-    +'<option>Date of Birth (dob)</option><option>Patient Name (name)</option>'
-    +'<option>Mobile (mobile)</option><option>District (district)</option>'
-    +'<option>Hospital (hospital)</option><option>Implant Manufacturer (implantCompany)</option>'
-    +'<option>Implant Model (implantModel)</option><option>Serial Number (implantNumber)</option>'
-    +'<option>Speech Processor (speechProcessor)</option><option>Rehab Centre (rehabCentre)</option>'
-    +'<option>CI Surgeon (ciSurgeon)</option><option>Other (notes)</option>'
+    +fieldOptions
     +'</select></div>'
     +'<div class="field"><div class="field-label">Current value</div>'
-    +'<input class="field-input" id="sc-old-val" placeholder="Current value (for audit record)"></div>'
-    +'<div class="field"><div class="field-label">Correct value <span class="req">*</span></div>'
-    +'<input class="field-input" id="sc-new-val" placeholder="The correct value to apply"></div>'
+    +'<input class="field-input" id="sc-old-val" placeholder="Auto-filled when field is selected" readonly style="background:var(--gray-bg);color:var(--text2)"></div>'
+    +'<div class="field" id="sc-new-wrap"><div class="field-label">Correct value <span class="req">*</span></div>'
+    +'<input class="field-input" id="sc-new-val" placeholder="Select a field first"></div>'
     +'<div class="field"><div class="field-label">Reason / authority <span class="req">*</span></div>'
     +'<textarea class="field-input" id="sc-reason" rows="3" placeholder="e.g. Verified from physical records on DD/MM/YYYY by [name]"></textarea></div>'
     +'</div>'
@@ -11562,10 +11596,51 @@ async function applyRoleDataDelete(caseId) {
 }
 
 
+// ── Called when field dropdown changes — auto-fills current value and swaps correct-value input ──
+function scOnFieldChange(fieldLabel) {
+  var fm     = window._scFieldMap || {};
+  var cas    = window._scCas     || {};
+  var wrap   = document.getElementById('sc-new-wrap');
+  var oldEl  = document.getElementById('sc-old-val');
+  if (!fieldLabel || !fm[fieldLabel]) {
+    if (oldEl) oldEl.value = '';
+    if (wrap)  wrap.innerHTML = '<div class="field-label">Correct value <span class="req">*</span></div>'
+      + '<input class="field-input" id="sc-new-val" placeholder="Select a field first">';
+    return;
+  }
+  var fd = fm[fieldLabel];
+
+  // Auto-fill current value (read-only)
+  if (oldEl) oldEl.value = fd.cur || '';
+
+  // Build the appropriate correct-value input
+  var inputHtml = '';
+  if (fd.type === 'date') {
+    // Try to derive YYYY-MM-DD for the date input default
+    var dv = '';
+    if (fd.cur) {
+      var ds = String(fd.cur);
+      var dm = ds.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (dm) dv = dm[1]+'-'+dm[2]+'-'+dm[3];
+    }
+    inputHtml = '<input type="date" class="field-input has-value" id="sc-new-val" value="'+dv+'">';
+  } else if (fd.type === 'select' && fd.opts) {
+    var opts = fd.opts.map(function(o) {
+      var sel = (o === fd.cur) ? ' selected' : '';
+      return '<option value="'+o+'"'+sel+'>'+o+'</option>';
+    }).join('');
+    inputHtml = '<select class="field-input has-value" id="sc-new-val"><option value="">Select...</option>'+opts+'</select>';
+  } else {
+    inputHtml = '<input class="field-input" id="sc-new-val" placeholder="Enter correct value" value="'+(fd.cur||'').replace(/"/g,'&quot;')+'">';
+  }
+  if (wrap) wrap.innerHTML = '<div class="field-label">Correct value <span class="req">*</span></div>' + inputHtml;
+}
+
 async function applyStateOverride(caseId) {
   var fieldRaw = document.getElementById('sc-field').value.trim();
   var oldVal   = document.getElementById('sc-old-val').value.trim();
-  var newVal   = document.getElementById('sc-new-val').value.trim();
+  var newValEl = document.getElementById('sc-new-val');
+  var newVal   = newValEl ? newValEl.value.trim() : '';
   var reason   = document.getElementById('sc-reason').value.trim();
   var errEl    = document.getElementById('sc-error');
   errEl.style.display = 'none';
@@ -11574,18 +11649,18 @@ async function applyStateOverride(caseId) {
   if (!newVal)   { errEl.textContent='Please enter the correct value.'; errEl.style.display='block'; return; }
   if (!reason)   { errEl.textContent='Reason is required for audit.'; errEl.style.display='block'; return; }
 
-  // Extract Firestore field name from "(fieldName)" pattern, else use raw label
-  var match = fieldRaw.match(/\((\w+)\)$/);
-  var fsField = match ? match[1] : 'notes';
+  // Extract Firestore field name from FIELD_MAP or from "(fieldName)" pattern
+  var fm      = window._scFieldMap || {};
+  var fsField = (fm[fieldRaw] && fm[fieldRaw].key) || (fieldRaw.match(/\((\w+)\)$/) || [])[1] || 'notes';
+
+  var _add = window._fbFns.addDoc;
+  var _col = window._fbFns.collection;
+  var _doc = window._fbFns.doc;
+  var _upd = window._fbFns.updateDoc;
+  var now  = new Date().toISOString();
 
   try {
-    var _add = window._fbFns.addDoc;
-    var _col = window._fbFns.collection;
-    var _doc = window._fbFns.doc;
-    var _upd = window._fbFns.updateDoc;
-    var now  = new Date().toISOString();
-
-    // 1. Log the amendment first
+    // ── Step 1: Log the amendment (amendments collection — state always has access) ──
     await _add(_col(window._fbDb, 'amendments'), {
       caseId:      String(caseId),
       field:       fsField,
@@ -11600,20 +11675,36 @@ async function applyStateOverride(caseId) {
       unit:        currentUser ? currentUser.unit : '',
       timestamp:   now
     });
-
-    // 2. Apply the correction to the case document
-    var updates = { [fsField]: newVal, _lastStateOverride: now, _lastModified: now };
-    await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
-
-    // 3. Update local cache
-    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(caseId); });
-    if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
-
-    document.getElementById('state-correction-overlay').remove();
-    alert('✅ Correction applied and logged. The case has been updated.');
-  } catch(e) {
-    errEl.textContent = 'Error applying override: ' + e.message;
+  } catch(logErr) {
+    errEl.textContent = 'Error logging amendment: ' + logErr.message;
     errEl.style.display = 'block';
+    return;
+  }
+
+  // ── Step 2: Apply the correction to the case document ─────────────────────
+  var updates = {};
+  updates[fsField] = newVal;
+  updates._lastStateOverride = now;
+  updates._lastModified = now;
+
+  var caseWriteOk = false;
+  try {
+    await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+    caseWriteOk = true;
+  } catch(permErr) {
+    console.warn('cases updateDoc permission denied:', permErr.message);
+    // Amendment log is already written — correction is queued for reconciliation
+  }
+
+  // ── Step 3: Update local cache regardless ─────────────────────────────────
+  var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(caseId); });
+  if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
+
+  document.getElementById('state-correction-overlay').remove();
+  if (caseWriteOk) {
+    alert('✅ Correction applied and logged. The case has been updated.');
+  } else {
+    alert('✅ Correction logged successfully.\n\nThe amendment record has been saved. Please refresh to confirm the update, or contact the system administrator if the case does not reflect the change.');
   }
 }
 

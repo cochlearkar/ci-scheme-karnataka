@@ -6333,6 +6333,17 @@ function buildSummaryHTML(c) {
       out += '</div>';
       return out;
     })()
+    // ── Transfer button — inline in summary body, always visible for relevant roles ─
+    +((['rehab','district','state'].indexOf(currentRole) > -1)
+      ? '<div style="padding:0 0 16px">'
+        + '<button onclick="openTransferRehabCentre(selectedCase)" '
+        + 'style="width:100%;padding:13px;background:#fff;border:2px solid var(--blue);color:var(--blue);'
+        + 'border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;'
+        + 'display:flex;align-items:center;justify-content:center;gap:8px">'
+        + '&#128260; Transfer to Another Rehab Centre'
+        + '</button>'
+        + '</div>'
+      : '')
     +'</div>'
     
     +'</div>'

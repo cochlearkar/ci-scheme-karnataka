@@ -18,7 +18,7 @@ import { getAuth, signInWithEmailAndPassword,
          updatePassword, reauthenticateWithCredential,
          EmailAuthProvider }                           from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
 import { getFirestore, collection, getDocs, getDoc,
-         doc, setDoc, updateDoc, addDoc,
+         doc, setDoc, updateDoc, addDoc, deleteDoc,
          query, where, orderBy,
          serverTimestamp }                             from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
@@ -42,7 +42,7 @@ window._fbDb   = _db;
 window._fbFns  = {
   signInWithEmailAndPassword, signOut, onAuthStateChanged,
   updatePassword, reauthenticateWithCredential, EmailAuthProvider,
-  collection, getDocs, getDoc, doc, setDoc, updateDoc, addDoc,
+  collection, getDocs, getDoc, doc, setDoc, updateDoc, addDoc, deleteDoc,
   query, where, orderBy, serverTimestamp
 };
 
@@ -11224,14 +11224,165 @@ function openStateCorrection(cas) {
     +'Clears: _distConfirmed \u00b7 _distTransferredTo \u00b7 _distConfirmedAt \u00b7 _distPHC \u00b7 _distConfirmedDistrict'
     +'</div></div>'
     +'</div>'
+    +'<div id="del-card-entire" onclick="scSelectRole(\'entire\')" style="border:2px solid #e2e8f0;border-radius:12px;padding:14px;cursor:pointer;background:#fff9f9">'
+    +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="font-size:20px">&#128465;&#65039;</span>'
+    +'<div><div style="font-size:13px;font-weight:700;color:#991b1b">Delete Entire Case (Duplicate)</div>'
+    +'<div style="font-size:11px;color:#6b7280">Permanently removes this case record from the programme register</div></div></div>'
+    +'<div style="font-size:10px;color:#991b1b;background:#fef2f2;border-radius:6px;padding:6px 8px;line-height:1.7;border:1px solid #fca5a5">'
+    +'&#9888; This is irreversible. Use only for confirmed duplicate entries. All Firestore data for this card number will be deleted.'
+    +'</div></div>'
+    +'</div>'
     +'<div class="field"><div class="field-label">Reason for deletion <span class="req">*</span></div>'
     +'<textarea class="field-input" id="sc-del-reason" rows="3" placeholder="e.g. Wrong data entered by hospital on DD/MM/YYYY. Verified by [name]."></textarea></div>'
+    +'<div id="sc-entire-warn" style="display:none;background:#7f1d1d;color:#fff;border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:8px;line-height:1.6">'
+    +'&#128721; You are about to <strong>permanently delete this entire case</strong> from the programme register. This cannot be undone. Patient name, SAST ref, all claims data and all session records on this card number will be removed.'
+    +'</div>'
     +'<div id="sc-del-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>'
     +'<button onclick="applyRoleDataDelete(\''+cas.id+'\')" style="width:100%;padding:14px;background:#dc2626;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">&#128465; Delete Selected Role Data &#8594;</button>'
     +'</div>'
     +'</div>';
   document.body.appendChild(ov);
 }
+
+// ══════════════════════════════════════════════════════════════
+// STATE: Delete role data OR entire case
+// ══════════════════════════════════════════════════════════════
+async function applyRoleDataDelete(caseId) {
+  var role    = _scSelectedRole;
+  var reason  = (document.getElementById('sc-del-reason')||{}).value;
+  var errEl   = document.getElementById('sc-del-error');
+  if (errEl) errEl.style.display = 'none';
+
+  if (!role) {
+    if (errEl) { errEl.textContent = 'Please select which data to delete.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!reason || !reason.trim()) {
+    if (errEl) { errEl.textContent = 'Reason is required for audit trail.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  // Extra confirm for entire case deletion
+  if (role === 'entire') {
+    var cas = SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); });
+    var caseName = cas ? cas.name : caseId;
+    if (!confirm('⚠️ PERMANENTLY DELETE entire case?\n\nPatient: ' + caseName + '\nCard No: ' + caseId + '\n\nThis CANNOT be undone. Are you absolutely sure?')) return;
+    if (!confirm('Second confirmation required.\n\nType YES in your mind and confirm to delete "' + caseName + '" (Card: ' + caseId + ') permanently.')) return;
+  }
+
+  var btn = document.querySelector('#sc-panel-delete button[onclick]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
+
+  var now = new Date().toISOString();
+  var _col = window._fbFns.collection;
+  var _add = window._fbFns.addDoc;
+  var _doc = window._fbFns.doc;
+  var _upd = window._fbFns.updateDoc;
+  var _del = window._fbFns.deleteDoc;
+
+  try {
+    if (role === 'entire') {
+      // ── DELETE ENTIRE CASE ────────────────────────────────────────────
+      // 1. Log the deletion for audit
+      await _add(_col(window._fbDb, 'deletions'), {
+        caseId:      String(caseId),
+        caseName:    (SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); })||{}).name || '',
+        reason:      reason.trim(),
+        deletedBy:   currentUser ? currentUser.username : 'state',
+        deletedAt:   now,
+        type:        'entire_case'
+      });
+      // 2. Delete the case document from Firestore
+      await _del(_doc(window._fbDb, 'cases', String(caseId)));
+      // 3. Remove from local SAMPLE_CASES
+      var delIdx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
+      if (delIdx > -1) SAMPLE_CASES.splice(delIdx, 1);
+      // 4. Close overlay and go home
+      var ov = document.getElementById('state-correction-overlay');
+      if (ov) ov.remove();
+      alert('✅ Case ' + caseId + ' has been permanently deleted and logged.');
+      buildHome();
+      showScreen('home');
+
+    } else {
+      // ── DELETE ROLE DATA (keep patient identity) ──────────────────────
+      var updates = { _lastModified: now };
+
+      if (role === 'hospital') {
+        // Clear all hospital-submitted fields, reset to pending
+        ['surgAdmit','surgDisch','surgDate','switchOn','side','mentorSurgeon',
+         'rehabCentre','manufacturer','model','serialNo','implantCompany',
+         'implantModel','implantNumber','speechProcessor','ciSurgeon',
+         'hospRemarks','remarks','dob','resDistrict','resDist'].forEach(function(f){
+          updates[f] = '';
+        });
+        updates.hospSubmitted    = false;
+        updates.status           = 'pending';
+        updates._hospSubmitAt    = '';
+        updates._hospSubmittedBy = '';
+        updates._hospDataDeletedBy     = currentUser ? currentUser.username : 'state';
+        updates._hospDataDeletedAt     = now;
+        updates._hospDataDeleteReason  = reason.trim();
+
+      } else if (role === 'rehab') {
+        // Clear rehab session tracking fields
+        ['sessions','_rehabSessionsLogged','_rehabLastSubmit','_lastRehabDate',
+         '_consecAbsent','_missedThisMonth','_lastSessionMonth','_attendanceFlag',
+         '_monthAttendPct','_avtQ1done','_avtQ2done','_avtQ3done','_avtQ4done','_avtQ5done',
+         'rehabCentre','rehabCentreHistory'].forEach(function(f){
+          updates[f] = '';
+        });
+        updates.sessions = 0;
+        updates._rehabDataDeletedBy    = currentUser ? currentUser.username : 'state';
+        updates._rehabDataDeletedAt    = now;
+        updates._rehabDataDeleteReason = reason.trim();
+
+      } else if (role === 'district') {
+        // Clear district follow-up fields
+        ['_distConfirmed','_distTransferredTo','_distConfirmedAt',
+         '_distPHC','_distConfirmedDistrict','_lastDistFollowup',
+         '_lastDistMonth','_lastMilestone','_deviceStatus','_deviceFlag'].forEach(function(f){
+          updates[f] = '';
+        });
+        updates._distDataDeletedBy    = currentUser ? currentUser.username : 'state';
+        updates._distDataDeletedAt    = now;
+        updates._distDataDeleteReason = reason.trim();
+      }
+
+      // 1. Log in amendments collection
+      await _add(_col(window._fbDb, 'amendments'), {
+        caseId:      String(caseId),
+        field:       role + '_data_deletion',
+        fieldLabel:  role.charAt(0).toUpperCase()+role.slice(1) + ' data deletion',
+        oldVal:      'role data cleared',
+        newVal:      '',
+        reason:      reason.trim(),
+        tier:        3,
+        status:      'applied',
+        role:        'state',
+        submittedBy: currentUser ? currentUser.username : 'unknown',
+        unit:        currentUser ? currentUser.unit : '',
+        timestamp:   now
+      });
+
+      // 2. Apply updates to case document
+      await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+
+      // 3. Update local cache
+      var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
+      if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
+
+      var ov = document.getElementById('state-correction-overlay');
+      if (ov) ov.remove();
+      alert('✅ ' + role.charAt(0).toUpperCase()+role.slice(1) + ' data cleared for case ' + caseId + '. Action logged. Hospital can re-enter the data.');
+      if (selectedCase) openCaseSummary(selectedCase);
+    }
+  } catch(e) {
+    if (errEl) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+    if (btn)   { btn.disabled = false; btn.textContent = '🗑 Delete Selected Role Data →'; }
+  }
+}
+
 
 function scSwitchTab(tab) {
   document.getElementById('sc-panel-correct').style.display = tab==='correct'?'block':'none';
@@ -11243,12 +11394,15 @@ function scSwitchTab(tab) {
 var _scSelectedRole = null;
 function scSelectRole(role) {
   _scSelectedRole = role;
-  ['hospital','rehab','district'].forEach(function(r) {
+  ['hospital','rehab','district','entire'].forEach(function(r) {
     var card = document.getElementById('del-card-'+r);
     if (!card) return;
-    card.style.border      = r===role ? '2px solid #dc2626' : '2px solid #e2e8f0';
-    card.style.background  = r===role ? '#fef2f2' : '';
+    card.style.border     = r===role ? '2px solid #dc2626' : '2px solid #e2e8f0';
+    card.style.background = r===role ? '#fef2f2' : (r==='entire'?'#fff9f9':'');
   });
+  // Show extra warning if deleting entire case
+  var warn = document.getElementById('sc-entire-warn');
+  if (warn) warn.style.display = role==='entire' ? 'block' : 'none';
 }
 
 async function applyRoleDataDelete(caseId) {

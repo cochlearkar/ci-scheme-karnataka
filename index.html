@@ -5930,6 +5930,8 @@ function openTransferRehabCentre(cas) {
   if (!cas) return;
   var cur = cas.rehabCentre || 'Not assigned';
   var hist = cas.rehabCentreHistory || [];
+  // Hospital only recommends — transfer done by rehab, district, state
+  var canTransfer = (currentRole === 'rehab' || currentRole === 'district' || currentRole === 'state');
 
   // Build centre options
   var opts = REHAB_CENTRES.map(function(r) {
@@ -5968,28 +5970,30 @@ function openTransferRehabCentre(cas) {
     +'Current centre: <strong>'+cur+'</strong>'
     +'</div>'
     + histHTML
-    +'<div style="margin-bottom:12px">'
-    +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">New Rehab Centre <span style="color:var(--red)">*</span></div>'
-    +'<select id="tr-new-centre" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;background:#fff">'
-    +'<option value="">Select new centre...</option>'+opts+'</select>'
-    +'</div>'
-    +'<div style="margin-bottom:12px">'
-    +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">Transfer Date <span style="color:var(--red)">*</span></div>'
-    +'<input type="date" id="tr-date" value="'+today+'" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit">'
-    +'</div>'
-    +'<div style="margin-bottom:16px">'
-    +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">Reason for transfer</div>'
-    +'<select id="tr-reason" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;background:#fff">'
-    +'<option value="">Select reason...</option>'
-    +'<option>Family relocated to another district</option>'
-    +'<option>Closer centre available</option>'
-    +'<option>Family preference</option>'
-    +'<option>Quality of services</option>'
-    +'<option>Centre closed / not operational</option>'
-    +'<option>Other</option>'
-    +'</select>'
-    +'<input id="tr-reason-other" placeholder="Specify reason..." style="display:none;width:100%;margin-top:6px;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit">'
-    +'</div>'
+    +(canTransfer
+      ? '<div style="margin-bottom:12px">'
+        +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">New Rehab Centre <span style="color:var(--red)">*</span></div>'
+        +'<select id="tr-new-centre" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;background:#fff">'
+        +'<option value="">Select new centre...</option>'+opts+'</select>'
+        +'</div>'
+        +'<div style="margin-bottom:12px">'
+        +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">Transfer Date <span style="color:var(--red)">*</span></div>'
+        +'<input type="date" id="tr-date" value="'+today+'" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit">'
+        +'</div>'
+        +'<div style="margin-bottom:16px">'
+        +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">Reason for transfer</div>'
+        +'<select id="tr-reason" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;background:#fff">'
+        +'<option value="">Select reason...</option>'
+        +'<option>Family relocated to another district</option>'
+        +'<option>Closer centre available</option>'
+        +'<option>Family preference</option>'
+        +'<option>Quality of services</option>'
+        +'<option>Centre closed / not operational</option>'
+        +'<option>Other</option>'
+        +'</select>'
+        +'<input id="tr-reason-other" placeholder="Specify reason..." style="display:none;width:100%;margin-top:6px;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit">'
+        +'</div>'
+      : '')
     +'<div id="tr-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:10px;display:none"></div>'
     +'<button onclick="confirmTransfer(\''+cas.id+'\')" style="width:100%;padding:13px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Confirm Transfer →</button>'
     +'</div>';
@@ -6110,17 +6114,6 @@ function openCaseSummary(cas) {
       btn.className = 'btn-submit hospital';
       btn.onclick = function(){ openHospitalUpdate(selectedCase); };
     }
-    // Transfer button always available for hospital
-    var hospTransBtn = document.getElementById('summary-amend-btn');
-    if (hospTransBtn && !isHospitalUpdated(cas)) {
-      // keep amend btn hidden if not yet submitted
-    } else {
-      var tBtn = document.createElement('button');
-      tBtn.textContent    = '🏫 Transfer Rehab Centre';
-      tBtn.style.cssText  = 'width:100%;margin-top:8px;padding:12px;background:#1a4a7a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
-      tBtn.onclick = function(){ openTransferRehabCentre(selectedCase); };
-      bar.appendChild(tBtn);
-    }
   } else if (currentRole === 'rehab') {
     var _rw = cas._rehabLastSubmit && withinCorrectionWindow(cas._rehabLastSubmit);
     if (cas._rehabLastSubmit && !_rw) {
@@ -6142,9 +6135,21 @@ function openCaseSummary(cas) {
       btn.textContent = '🎧 Log Rehab Session →';
       btn.className   = 'btn-submit rehab';
     }
+    // Rehab centre can transfer this case to another centre
+    var rTransBtn = document.createElement('button');
+    rTransBtn.textContent   = '🔄 Transfer to Another Rehab Centre';
+    rTransBtn.style.cssText = 'width:100%;margin-top:8px;padding:11px;background:transparent;border:1.5px solid var(--blue);color:var(--blue);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+    rTransBtn.onclick = function(){ openTransferRehabCentre(selectedCase); };
+    bar.appendChild(rTransBtn);
   } else if (currentRole === 'district') {
     btn.textContent = '📍 Log Follow-up →';
     btn.className = 'btn-submit district';
+    // District officer can transfer case to new rehab centre based on field visit
+    var dTransBtn = document.createElement('button');
+    dTransBtn.textContent   = '🔄 Transfer to Another Rehab Centre';
+    dTransBtn.style.cssText = 'width:100%;margin-top:8px;padding:11px;background:transparent;border:1.5px solid var(--amber-mid);color:var(--amber);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+    dTransBtn.onclick = function(){ openTransferRehabCentre(selectedCase); };
+    bar.appendChild(dTransBtn);
   } else if (currentRole === 'state') {
     btn.textContent = '✏️ Update Claim Details →';
     btn.className = 'btn-submit state';

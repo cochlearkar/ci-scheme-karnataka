@@ -3539,6 +3539,7 @@ function buildHome() {
     html += `<div class="action-card" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none" onclick="window.open('dashboard.html','_blank')"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">Dashboard</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Charts &amp; Trends</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#0a3d2e,#1a6b4a);border:none" onclick="window.open('reports.html','_blank')"><div class="action-icon" style="font-size:22px">📋</div><div class="action-title" style="color:#fff">Reports</div><div class="action-desc" style="color:rgba(255,255,255,.7)">District · Hospital · FY · At-risk</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#128C7E,#25D366);border:none;cursor:pointer" onclick="shareWhatsApp()"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">📤</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Share Daily Update on WhatsApp</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Tap to open WhatsApp with today's hospital summary pre-filled</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
+    html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#7f1d1d,#dc2626);border:none;cursor:pointer" onclick="buildDeleteCaseList();showScreen('cases')"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">🗑️</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Delete / Manage Cases</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Remove duplicate cases · Clear wrong hospital data</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">All guidelines · Rates · Checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
   }
   // ── AVT ATTENDANCE PANEL (all roles except state see their filtered view) ──
@@ -3926,6 +3927,107 @@ function buildStateUpdateSummary(cases) {
 // ══════════════════════════════════════════
 // CASE LIST
 // ══════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════
+// STATE: Delete / Manage case list
+// ══════════════════════════════════════════════════════════════
+function buildDeleteCaseList() {
+  // Reuse the cases screen but set it up for delete mode
+  _stateDeleteMode = true;
+  activeStatusFilter = 'All';
+
+  var meta = ROLE_META['state'];
+  document.getElementById('cases-title').textContent = '🗑️ Delete / Manage Cases';
+  document.getElementById('cases-sub').textContent   = 'Tap a case to delete data or the entire case';
+  var chip = document.getElementById('cases-chip');
+  chip.textContent = 'State Team';
+  chip.className   = 'role-chip chip-state';
+
+  // Filter row — show useful filters
+  var filterRow = document.getElementById('filter-row');
+  filterRow.innerHTML = ['All','Hospital Updated','Not Updated','Completed']
+    .map(function(f) {
+      return '<div class="filter-chip '+(f==='All'?'active':'')+'" onclick="applyDeleteFilter(\''+f+'\',this)">'+f+'</div>';
+    }).join('');
+
+  var banner = document.getElementById('hosp-status-banner');
+  if (banner) {
+    banner.style.display = 'block';
+    banner.innerHTML = '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#991b1b">'
+      + '⚠️ <strong>Danger zone.</strong> Deletion is permanent and logged. Use only for duplicate cases or incorrect data. '
+      + 'Tap any case → select Delete tab → choose what to remove.'
+      + '</div>';
+  }
+
+  filteredCases = SAMPLE_CASES.slice();
+  renderDeleteCaseList();
+}
+
+var _stateDeleteMode = false;
+
+function applyDeleteFilter(f, el) {
+  document.querySelectorAll('.filter-chip').forEach(function(c){ c.classList.remove('active'); });
+  el.classList.add('active');
+  var cases = SAMPLE_CASES.slice();
+  if      (f === 'Hospital Updated') cases = cases.filter(function(c){ return isHospitalUpdated(c); });
+  else if (f === 'Not Updated')      cases = cases.filter(function(c){ return !isHospitalUpdated(c); });
+  else if (f === 'Completed')        cases = cases.filter(function(c){ return c.status === 'paid'; });
+  filteredCases = cases;
+  renderDeleteCaseList();
+}
+
+function renderDeleteCaseList() {
+  document.getElementById('case-count').textContent =
+    'Showing ' + filteredCases.length + ' case' + (filteredCases.length!==1?'s':'');
+
+  // Group by FY
+  var byFY = {};
+  filteredCases.forEach(function(c) {
+    var fy = c.fy || 'Unknown FY';
+    if (!byFY[fy]) byFY[fy] = [];
+    byFY[fy].push(c);
+  });
+
+  var html2 = '';
+  Object.keys(byFY).sort().reverse().forEach(function(fy) {
+    var cases = byFY[fy];
+    var sid = 'dfy-' + fy.replace(/[^a-z0-9]/gi,'');
+    html2 += '<div class="fy-section">'
+      + '<div class="fy-header" onclick="toggleFYSection(\''+sid+'\')"><span>FY '+fy+'</span>'
+      + '<span class="fy-count">'+cases.length+' cases</span>'
+      + '<span class="fy-toggle" id="'+sid+'-icon">▼</span></div>'
+      + '<div class="fy-body" id="'+sid+'">'
+      + cases.map(function(c) {
+          var hospBadge = isHospitalUpdated(c)
+            ? '<span style="background:#dcfce7;color:#166534;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px">✓ Hosp updated</span>'
+            : '<span style="background:#fef9c3;color:#713f12;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px">⏳ Pending</span>';
+          return '<div style="background:#fff;border:0.5px solid #fca5a5;border-radius:10px;padding:11px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px">'
+            + '<div style="flex:1;min-width:0">'
+            + '<div style="font-size:13px;font-weight:600;color:var(--text)">' + c.name + hospBadge + '</div>'
+            + '<div style="font-size:11px;color:var(--text-light);margin-top:2px">'
+            + 'Card: ' + c.id + ' &nbsp;·&nbsp; ' + (c.hospital||'—') + ' &nbsp;·&nbsp; ' + (c.district||'—')
+            + '</div></div>'
+            + '<button onclick="openDeleteForCase(\''+c.id+'\')" '
+            + 'style="padding:7px 12px;background:#dc2626;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">'
+            + '🗑 Manage</button>'
+            + '</div>';
+        }).join('')
+      + '</div></div>';
+  });
+
+  document.getElementById('case-list').innerHTML = html2 || '<div style="text-align:center;color:var(--text-light);padding:32px">No cases found</div>';
+}
+
+function openDeleteForCase(caseId) {
+  var cas = SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); });
+  if (!cas) return;
+  selectedCase = cas;
+  _stateDeleteMode = false;
+  // Open state correction overlay directly on delete tab
+  openStateCorrection(cas);
+  setTimeout(function(){ scSwitchTab('delete'); }, 150);
+}
+
 function buildCaseList(filter = 'all') {
   const meta = ROLE_META[currentRole];
   const _unitLabel = (currentUser && currentUser.unit) ? currentUser.unit : meta.orgOptions[0];
@@ -6191,8 +6293,8 @@ function openCaseSummary(cas) {
     var scBtn = document.getElementById('summary-amend-btn');
     if (scBtn) {
       scBtn.style.display = 'block';
-      scBtn.textContent   = '🔑 State Override — Direct Correction';
-      scBtn.style.background = '#4a2a7a';
+      scBtn.textContent   = '🗑️ Delete / Correct Data';
+      scBtn.style.background = '#dc2626';
       scBtn.style.color   = '#fff';
       scBtn.onclick       = function(){ openStateCorrection(selectedCase); };
     }
@@ -11150,6 +11252,12 @@ async function submitCorrectionRequest(caseId, submissionType) {
 // ══════════════════════════════════════════════════════════════════════
 // STATE OVERRIDE (Tier 3)
 // ══════════════════════════════════════════════════════════════════════
+function openStateDeletion(cas) {
+  // Shortcut — opens state correction overlay directly on the Delete tab
+  openStateCorrection(cas);
+  setTimeout(function(){ scSwitchTab('delete'); }, 100);
+}
+
 function openStateCorrection(cas) {
   var existing = document.getElementById('state-correction-overlay');
   if (existing) existing.remove();
@@ -11629,6 +11737,13 @@ function openCaseFromList(caseId) {
   const cas = SAMPLE_CASES.find(x => String(x.id) === String(caseId));
   if (!cas) return;
   selectedCase = cas;
+  // State delete mode — go straight to delete overlay
+  if (_stateDeleteMode) {
+    _stateDeleteMode = false;
+    openStateCorrection(cas);
+    setTimeout(function(){ scSwitchTab('delete'); }, 150);
+    return;
+  }
   if (currentRole === 'hospital') {
     openHospitalUpdate(cas);
     // Hospital does not get a transfer button — they only recommend

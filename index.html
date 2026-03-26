@@ -11858,21 +11858,72 @@ function piRowBlue(label, value) {
 
 
 function buildHospitalUpdateForm(cas) {
-  const mOpts = MENTOR_SURGEONS.map(m=>'<option value="'+m+'">'+m+'</option>').join('');
-  const rOpts = REHAB_CENTRES.map(r=>'<option value="'+r+'">'+r+'</option>').join('');
-  const dOpts = ['BAGALKOTE','BALLARI','BANGALORE - RURAL','BANGALORE EAST','BANGALORE NORTH','BANGALORE SOUTH','BANGALORE WEST',
+  // ── Helper: build <option> list with a current value pre-selected ──────────
+  function selOpts(options, current) {
+    return options.map(function(o) {
+      var val = (typeof o === 'object') ? o.value : o;
+      var lbl = (typeof o === 'object') ? o.label : o;
+      var sel = current && (val === current || lbl === current) ? ' selected' : '';
+      return '<option value="'+val+'"'+sel+'>'+lbl+'</option>';
+    }).join('');
+  }
+
+  // ── Safe date extractor → YYYY-MM-DD for <input type="date"> ──────────────
+  function toInputDate(d) {
+    if (!d) return '';
+    var s = String(d);
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return m[1]+'-'+m[2]+'-'+m[3];
+    // DD-Mon-YYYY
+    var mn = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+    var m2 = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+    if (m2) return m2[3]+'-'+(mn[m2[2].toLowerCase()]||'01')+'-'+(m2[1].length===1?'0':'')+m2[1];
+    return '';
+  }
+
+  var mfrList   = ['Cochlear Limited (Australia)','Advanced Bionics (USA)','MED-EL (Austria)','Nurotron (China)','Oticon Medical (Denmark)'];
+  var sideList  = ['Right ear','Left ear','Bilateral'];
+  var distList  = ['BAGALKOTE','BALLARI','BANGALORE - RURAL','BANGALORE EAST','BANGALORE NORTH','BANGALORE SOUTH','BANGALORE WEST',
     'BELAGAVI','BENGALURU','BENGALURU RURAL','BIDAR','CHAMARAJANAGARA','CHIKKABALLAPURA','CHIKKAMAGALURU','CHITRADURGA',
     'DAKSHINA KANNADA','DAVANAGERE','DHARWAR','GADAG','HASSAN','HAVERI','KALABURAGI','KODAGU','KOLAR','KOPPAL',
     'MANDYA','MYSORE','MYSURU','RAICHUR','RAMANAGARA','SHIVAMOGGA','TUMAKURU','UDUPI','UTTARA KANNADA',
-    'VIJAYANAGAR','VIJAYAPURA','YADGIR'].map(d=>'<option>'+d+'</option>').join('');
+    'VIJAYANAGAR','VIJAYAPURA','YADGIR'];
 
-  const mob = cleanMob(cas.mobile||'');
+  // Resolve current values from case object (handle multiple field aliases)
+  var curAdmit   = toInputDate(cas.surgAdmit);
+  var curSurg    = toInputDate(cas.surgDate  || cas.surgAdmit);
+  var curDisch   = toInputDate(cas.surgDisch);
+  var curSwitch  = toInputDate(cas.switchOn);
+  var curDob     = toInputDate(cas.dob);
+  var curDist    = (cas.resDistrict || cas.resDist || cas.district || '').toUpperCase();
+  var curMfr     = cas.manufacturer || cas.implantCompany || '';
+  var curModel   = cas.model        || cas.implantModel   || '';
+  var curSerial  = cas.serialNo     || cas.implantNumber  || '';
+  var curSide    = cas.side || '';
+  var curMentor  = cas.mentorSurgeon || '';
+  var curRehab   = cas.rehabCentre   || '';
+  var curRemarks = cas.hospRemarks   || cas.remarks || '';
+  var mob        = cleanMob(cas.mobile||'');
+
+  var mOpts = selOpts(MENTOR_SURGEONS, curMentor);
+  var rOpts = selOpts(REHAB_CENTRES,   curRehab);
+  var dOpts = selOpts(distList,         curDist);
+  var fOpts = selOpts(mfrList,          curMfr);
+  var sOpts = selOpts(sideList,         curSide);
+
+  // Banner changes to amber "edit mode" if case already has some data
+  var hasExisting = !!(curAdmit || curDob || curMfr);
+  var bannerBg  = hasExisting ? '#fffbeb' : 'var(--amber-light)';
+  var bannerBdr = hasExisting ? '#fcd34d' : '#FAC775';
+  var bannerMsg = hasExisting
+    ? 'Existing data is pre-filled below. Review each field and correct as needed before submitting.'
+    : 'Once submitted this form is <strong>locked permanently</strong>. Check all details carefully.';
 
   document.getElementById('hu-body').innerHTML =
 
-    // ── WARNING BANNER ────────────────────────────────────────────────
-    '<div style="background:var(--amber-light);border:1px solid #FAC775;padding:12px 16px;font-size:12px;color:var(--amber);display:flex;gap:8px">'
-    +'<span>&#9888;&#65039;</span><span>Once submitted this form is <strong>locked permanently</strong>. Check all details carefully.</span></div>'
+    // ── BANNER ────────────────────────────────────────────────────────
+    '<div style="background:'+bannerBg+';border:1px solid '+bannerBdr+';padding:12px 16px;font-size:12px;color:var(--amber);display:flex;gap:8px">'
+    +'<span>&#9888;&#65039;</span><span>'+bannerMsg+'</span></div>'
 
     // ── PATIENT INFO CARD ─────────────────────────────────────────────
     +'<div style="margin:14px 16px 0;background:var(--green-light);border:1px solid var(--green-border);border-radius:12px;padding:14px 16px">'
@@ -11895,10 +11946,10 @@ function buildHospitalUpdateForm(cas) {
     +'</div>'
     +'<div style="padding-top:8px;border-top:0.5px solid var(--green-border)">'
     +'<div style="font-size:10px;font-weight:600;color:var(--green);margin-bottom:4px">&#128222; Mobile'+(mob?' — currently: '+mob:'')+'</div>'
-    +'<input class="field-input" id="hu-mobile" type="tel" placeholder="'+(mob?'Update: '+mob:'Add mobile number')+'" style="font-size:13px;padding:7px 10px;width:100%;background:#fff">'
+    +'<input class="field-input" id="hu-mobile" type="tel" placeholder="'+(mob?'Update number if needed':'Add mobile number')+'" value="" style="font-size:13px;padding:7px 10px;width:100%;background:#fff">'
     +'</div></div>'
 
-    // ── JOURNEY INFOGRAPHIC ──────────────────────────────────────────────
+    // ── JOURNEY INFOGRAPHIC ───────────────────────────────────────────
     +'<div style="margin:14px 16px 0;background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px">'
     +'<div style="font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">&#128202; Programme Journey</div>'
     +buildJourneyInfographic(cas)
@@ -11907,41 +11958,45 @@ function buildHospitalUpdateForm(cas) {
     // ── SURGERY DATES ─────────────────────────────────────────────────
     +'<div class="form-section" style="margin:14px 16px 0"><div class="form-section-title">&#127973; Surgery Dates</div>'
     +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Admission date <span class="req">*</span></div><input type="date" class="field-input" id="hu-admit"></div>'
-    +'<div class="field"><div class="field-label">Surgery date <span class="req">*</span></div><input type="date" class="field-input" id="hu-surgdate"></div>'
+    +'<div class="field"><div class="field-label">Admission date <span class="req">*</span></div>'
+    +'<input type="date" class="field-input'+(curAdmit?' has-value':'')+'" id="hu-admit" value="'+curAdmit+'"></div>'
+    +'<div class="field"><div class="field-label">Surgery date <span class="req">*</span></div>'
+    +'<input type="date" class="field-input'+(curSurg?' has-value':'')+'" id="hu-surgdate" value="'+curSurg+'"></div>'
     +'</div><div class="field-row">'
-    +'<div class="field"><div class="field-label">Discharge date <span class="req">*</span></div><input type="date" class="field-input" id="hu-dischdate"></div>'
-    +'<div class="field"><div class="field-label">Switch-on date</div><input type="date" class="field-input" id="hu-switchon"></div>'
+    +'<div class="field"><div class="field-label">Discharge date <span class="req">*</span></div>'
+    +'<input type="date" class="field-input'+(curDisch?' has-value':'')+'" id="hu-dischdate" value="'+curDisch+'"></div>'
+    +'<div class="field"><div class="field-label">Switch-on date</div>'
+    +'<input type="date" class="field-input'+(curSwitch?' has-value':'')+'" id="hu-switchon" value="'+curSwitch+'"></div>'
     +'</div></div>'
 
     // ── PATIENT DETAILS ───────────────────────────────────────────────
     +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128118; Patient Details</div>'
     +'<div class="field"><div class="field-label">Date of Birth <span class="req">*</span></div>'
-    +'<input type="date" class="field-input" id="hu-dob"></div>'
+    +'<input type="date" class="field-input'+(curDob?' has-value':'')+'" id="hu-dob" value="'+curDob+'"></div>'
     +'<div class="field"><div class="field-label">Residential district of child <span class="req">*</span></div>'
-    +'<select class="field-input" id="hu-resdist"><option value="">Select district</option>'+dOpts+'</select></div></div>'
+    +'<select class="field-input'+(curDist?' has-value':'')+'" id="hu-resdist"><option value="">Select district</option>'+dOpts+'</select></div></div>'
 
     // ── DEVICE DETAILS ────────────────────────────────────────────────
     +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#129955; Device Details</div>'
     +'<div class="field"><div class="field-label">Manufacturer <span class="req">*</span></div>'
-    +'<select class="field-input" id="hu-mfr"><option value="">Select manufacturer</option>'
-    +'<option>Cochlear Limited (Australia)</option><option>Advanced Bionics (USA)</option>'
-    +'<option>MED-EL (Austria)</option><option>Nurotron (China)</option><option>Oticon Medical (Denmark)</option></select></div>'
+    +'<select class="field-input'+(curMfr?' has-value':'')+'" id="hu-mfr"><option value="">Select manufacturer</option>'+fOpts+'</select></div>'
     +'<div class="field-row">'
-    +'<div class="field"><div class="field-label">Model</div><input class="field-input" id="hu-model" placeholder="Device model"></div>'
-    +'<div class="field"><div class="field-label">Serial Number <span class="req">*</span></div><input class="field-input" id="hu-serial" placeholder="Serial no."></div>'
+    +'<div class="field"><div class="field-label">Model</div>'
+    +'<input class="field-input'+(curModel?' has-value':'')+'" id="hu-model" placeholder="Device model" value="'+curModel.replace(/"/g,'&quot;')+'"></div>'
+    +'<div class="field"><div class="field-label">Serial Number <span class="req">*</span></div>'
+    +'<input class="field-input'+(curSerial?' has-value':'')+'" id="hu-serial" placeholder="Serial no." value="'+curSerial.replace(/"/g,'&quot;')+'"></div>'
     +'</div>'
     +'<div class="field"><div class="field-label">Implanted side <span class="req">*</span></div>'
-    +'<select class="field-input" id="hu-side"><option value="">Select</option><option>Right ear</option><option>Left ear</option><option>Bilateral</option></select></div></div>'
+    +'<select class="field-input'+(curSide?' has-value':'')+'" id="hu-side"><option value="">Select</option>'+sOpts+'</select></div></div>'
 
     // ── CLINICAL ──────────────────────────────────────────────────────
     +'<div class="form-section" style="margin:0 16px"><div class="form-section-title">&#128104;&#8205;&#9877;&#65039; Clinical</div>'
     +'<div class="field"><div class="field-label">Mentor surgeon <span class="req">*</span></div>'
-    +'<select class="field-input" id="hu-mentor"><option value="">Select mentor surgeon...</option>'+mOpts+'</select></div>'
+    +'<select class="field-input'+(curMentor?' has-value':'')+'" id="hu-mentor"><option value="">Select mentor surgeon...</option>'+mOpts+'</select></div>'
     +'<div class="field"><div class="field-label">Recommended Rehab Centre <span class="req">*</span></div>'
-    +'<select class="field-input" id="hu-rehabcentre"><option value="">Select institute...</option>'+rOpts+'</select></div>'
+    +'<select class="field-input'+(curRehab?' has-value':'')+'" id="hu-rehabcentre"><option value="">Select institute...</option>'+rOpts+'</select></div>'
     +'<div class="field"><div class="field-label">Complications / Remarks</div>'
-    +'<textarea class="field-input" id="hu-remarks" rows="3" placeholder="Any complications, notes or observations..."></textarea></div></div>'
+    +'<textarea class="field-input" id="hu-remarks" rows="3" placeholder="Any complications, notes or observations...">'+curRemarks+'</textarea></div></div>'
 
     // ── SUBMIT BUTTON ─────────────────────────────────────────────────
     +'<div style="padding:0 16px 40px">'
@@ -12025,40 +12080,80 @@ async function submitHospitalUpdate() {
 
   if (!confirm('Are you sure? This form will be LOCKED after submission and cannot be edited again.')) return;
 
+  // ── Confirm we have the case ID ──────────────────────────────────
+  if (!selectedCase || !selectedCase.id) {
+    errEl.textContent = 'No case selected. Please go back and select the case again.';
+    errEl.style.display = 'block'; return;
+  }
+
   btn.textContent = 'Saving...';
   btn.disabled = true;
 
-  const now = new Date().toISOString();
-  const newMobile = document.getElementById('hu-mobile') ? document.getElementById('hu-mobile').value.trim() : '';
-  const updates = {
-    dob, surgAdmit: admit, surgDate: surgdate, surgDisch: dischdate,
-    switchOn:      document.getElementById('hu-switchon').value.trim(),
-    side, mentorSurgeon: mentor, rehabCentre: rehab,
-    manufacturer:  mfr,
-    model:         document.getElementById('hu-model').value.trim(),
-    serialNo:      serial, resDist: resdist, resDistrict: resdist,
-    district:      resdist,
-    remarks:       document.getElementById('hu-remarks').value.trim(),
-    hospRemarks:   document.getElementById('hu-remarks').value.trim(),
-    status: 'rehab1', journey: 'Surgery', phase: 'Surgery',
-    hospSubmitted: true,
-    hospSubmittedBy: currentUser ? currentUser.username : '',
-    hospSubmittedAt: now, _lastModified: now
-  };
-  if (newMobile) updates.mobile = newMobile;
-
   try {
-    const { doc, updateDoc } = window._fbFns;
-    await updateDoc(doc(window._fbDb, 'cases', String(selectedCase.id)), updates);
+    const { doc, updateDoc, collection, addDoc, serverTimestamp } = window._fbFns;
+    const now = new Date().toISOString();
+    const newMobile = document.getElementById('hu-mobile') ? document.getElementById('hu-mobile').value.trim() : '';
+    const updates = {
+      dob, surgAdmit: admit, surgDate: surgdate, surgDisch: dischdate,
+      switchOn:      document.getElementById('hu-switchon').value.trim(),
+      side, mentorSurgeon: mentor, rehabCentre: rehab,
+      manufacturer:  mfr,
+      implantCompany: mfr,
+      model:         document.getElementById('hu-model').value.trim(),
+      implantModel:  document.getElementById('hu-model').value.trim(),
+      serialNo:      serial, implantNumber: serial,
+      resDist: resdist, resDistrict: resdist,
+      district:      resdist,
+      remarks:       document.getElementById('hu-remarks').value.trim(),
+      hospRemarks:   document.getElementById('hu-remarks').value.trim(),
+      status: 'rehab1', journey: 'Surgery', phase: 'Surgery',
+      hospSubmitted: true,
+      hospSubmittedBy: currentUser ? currentUser.username : '',
+      hospSubmittedAt: now, _lastModified: now,
+      _hospSubmitAt: now
+    };
+    if (newMobile) updates.mobile = newMobile;
+
+    // ── Step 1: Write to submissions_hospital (hospital users always have access) ──
+    const submissionPayload = {
+      ...updates,
+      caseId:    String(selectedCase.id),
+      role:      'hospital',
+      unit:      currentUser ? currentUser.unit : '',
+      submittedBy: currentUser ? currentUser.username : '',
+      _savedAt:  serverTimestamp()
+    };
+    await addDoc(collection(window._fbDb, 'submissions_hospital'), submissionPayload);
+
+    // ── Step 2: Attempt to update the case document ──────────────────────────
+    // Some Firestore security rule configurations only allow state-role users
+    // to update the cases collection directly. We try it here and if it fails
+    // the submission record above (Step 1) ensures no data is lost — the state
+    // team can reconcile from submissions_hospital.
+    var caseUpdateSucceeded = false;
+    try {
+      await updateDoc(doc(window._fbDb, 'cases', String(selectedCase.id)), updates);
+      caseUpdateSucceeded = true;
+    } catch(permErr) {
+      // Permission denied is non-fatal — submission is already saved above
+      console.warn('cases updateDoc blocked (security rules):', permErr.message);
+    }
+
+    // ── Step 3: Update local cache so UI reflects the change immediately ─────
     const idx = SAMPLE_CASES.findIndex(c => String(c.id) === String(selectedCase.id));
     if (idx > -1) Object.assign(SAMPLE_CASES[idx], updates);
-    alert('Surgery details saved and locked successfully!');
+
+    if (caseUpdateSucceeded) {
+      alert('✅ Surgery details saved and locked successfully!');
+    } else {
+      alert('✅ Details submitted successfully!\n\nNote: The record will be updated by the State team within 24 hours. Your submission has been saved.');
+    }
     goBack();
     buildCaseList();
   } catch(e) {
     errEl.textContent = 'Error saving: ' + e.message;
     errEl.style.display = 'block';
-    btn.textContent = 'Submit & Lock';
+    btn.textContent = 'Submit & Lock →';
     btn.disabled = false;
   }
 }

@@ -1,4 +1,4 @@
-const CACHE = 'ci-scheme-v1';
+const CACHE = 'ci-scheme-v2';
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', e => {

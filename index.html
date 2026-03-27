@@ -2177,13 +2177,15 @@ function openAVTLog() {
       + dist + (vill ? ' &middot; ' + vill : '') + ' &nbsp;&middot;&nbsp; Switch-on: ' + (soStr || '\u2014')
       + '</div>'
       // Progress bar + session count
-      + '<div style="display:flex;align-items:center;gap:8px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
       + '<div style="flex:1;height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden">'
       + '<div style="width:' + barPct + '%;height:100%;background:' + barColor + ';border-radius:3px"></div>'
       + '</div>'
       + '<span style="font-size:10px;color:' + barColor + ';font-weight:700;white-space:nowrap">' + actual + ' / ' + exp + ' sessions</span>'
       + '<div style="font-size:18px;color:#d1d5db">&#8250;</div>'
       + '</div>'
+      // Q-status strip
+      + qStatusStripHTML(c)
       + '</div>';
   }
 
@@ -2528,109 +2530,222 @@ function openAVTMissing() {
 // ══════════════════════════════════════════════════════════════════════════════
 // REHAB — MAPPING SESSION LIST
 // ══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// PROGRAMME QUARTER HELPERS
+// Q1 = days 0-90 after switch-on, Q2 = days 91-181, etc. (not calendar quarter)
+// ══════════════════════════════════════════════════════════════════════════════
+function progQuarterOf(switchOnStr, targetDate) {
+  if (!switchOnStr || isNaN(new Date(switchOnStr))) return null;
+  var soD  = new Date(switchOnStr);
+  var tD   = targetDate ? new Date(targetDate) : new Date();
+  var days = Math.floor((tD - soD) / 86400000);
+  if (days < 0) return null;
+  return Math.floor(days / 91) + 1;
+}
+
+function mappingsDoneForProgQ(cas, qNum) {
+  var soStr = cas.switchOn || cas.switchOnDate || '';
+  if (!soStr || !qNum) return 0;
+  var soD    = new Date(soStr);
+  var qStart = new Date(soD.getTime() + (qNum-1)*91*86400000);
+  var qEnd   = new Date(soD.getTime() +  qNum   *91*86400000);
+  return ((cas._mappingSessions)||[]).filter(function(m){
+    if (!m.date) return false;
+    var d = new Date(m.date);
+    return d >= qStart && d < qEnd;
+  }).length;
+}
+
+function getPendingMappingQuarters(cas) {
+  // Returns [{qNum, done, current}] for all quarters (past+current) with <3 sessions
+  var soStr = cas.switchOn || cas.switchOnDate || '';
+  if (!soStr || isNaN(new Date(soStr))) return [];
+  var soD    = new Date(soStr);
+  var now    = new Date();
+  var curQ   = progQuarterOf(soStr) || 1;
+  var result = [];
+  for (var q = 1; q <= Math.min(curQ, 8); q++) {
+    var qEndTs = soD.getTime() + q * 91 * 86400000;
+    var isCurrent = (q === curQ);
+    // Only include past quarters that are fully over, or the current quarter
+    if (!isCurrent && qEndTs > now.getTime()) continue;
+    var done = mappingsDoneForProgQ(cas, q);
+    if (done < 3) result.push({ qNum: q, done: done, needed: 3-done, current: isCurrent });
+  }
+  return result;
+}
+
+// Q-status strip shown on each case card (AVT · Map · Eval for current programme quarter)
+function qStatusStripHTML(c) {
+  var soStr = c.switchOn || c.switchOnDate || '';
+  if (!soStr) return '';
+  var curQ = progQuarterOf(soStr) || 1;
+  var avtDone  = !!(c['_avtQ'+curQ+'done']);
+  var mapDone  = mappingsDoneForProgQ(c, curQ);
+  var evalDone = !!(c['_evalQ'+curQ]);
+  function seg(label, done, detail) {
+    var bg = done ? '#dcfce7' : '#fff1f2';
+    var col = done ? '#166534' : '#991b1b';
+    var icon = done ? '✓' : '·';
+    return '<span style="background:'+bg+';color:'+col+';font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;margin-right:3px;white-space:nowrap">'+icon+' '+label+(detail?' '+detail:'')+'</span>';
+  }
+  var allDone = avtDone && mapDone>=3 && evalDone;
+  return '<div style="margin-top:5px;display:flex;align-items:center;flex-wrap:wrap;gap:2px">'
+    + seg('AVT', avtDone, '')
+    + seg('Map', mapDone>=3, mapDone+'/3')
+    + seg('Eval', evalDone, '')
+    + '<span style="font-size:9px;color:#6b7280;margin-left:3px">Q'+curQ+(allDone?' · ✓ All done':'')+' </span>'
+    + '</div>';
+}
+
 function openMappingList() {
-  var cases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
+  var allCases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
     return (c.switchOn||c.switchOnDate) &&
            (c.status==='rehab1'||c.status==='rehab2'||c.status==='paid');
   });
+
+  // Build flat list of (case + pending quarter) pairs
+  var pendingRows = [];
+  allCases.forEach(function(c) {
+    getPendingMappingQuarters(c).forEach(function(qInfo) {
+      pendingRows.push({ cas: c, qNum: qInfo.qNum, done: qInfo.done, current: !!qInfo.current });
+    });
+  });
+
   var existing = document.getElementById('mapping-list-overlay');
   if (existing) existing.remove();
   var ov = document.createElement('div');
   ov.id = 'mapping-list-overlay';
   ov.style.cssText = 'position:fixed;inset:0;background:#f0fdf9;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
 
-  function mappingCard(c) {
-    var nm = isDemo()?maskName(c.name):(c.name||'—');
-    var allM = (c._mappingSessions||[]);
-    var cnt = allM.length;
-    var lastDate = cnt>0 ? allM[allM.length-1].date : '';
-    var badge = cnt===0
-      ? '<span style="background:#fff8e1;color:#92400e;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:6px">No sessions yet</span>'
-      : '<span style="background:#dcfce7;color:#166534;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;margin-left:6px">'+cnt+' session'+(cnt!==1?'s':'')+'</span>';
-    return '<div class="map-case-row" data-id="'+c.id+'" '
-      +'style="background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px">'
+  function mappingCard(row) {
+    var c   = row.cas;
+    var nm  = isDemo() ? maskName(c.name) : (c.name||'—');
+    var isPast = !row.current;
+    var badgeBg  = row.done>=3 ? '#dcfce7' : (isPast ? '#fef2f2' : '#fff8e1');
+    var badgeCol = row.done>=3 ? '#166534' : (isPast ? '#991b1b' : '#92400e');
+    var badgeTxt = row.done>=3 ? '✓ 3/3 done' : row.done+'/3 '+(isPast?'⚠ past Q':'this Q');
+    var switchOnStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
+    var qRangeLabel = '';
+    if (switchOnStr && !isNaN(new Date(switchOnStr))) {
+      var soD    = new Date(switchOnStr);
+      var qStart = new Date(soD.getTime() + (row.qNum-1)*91*86400000);
+      var qEnd   = new Date(soD.getTime() +  row.qNum   *91*86400000 - 86400000);
+      qRangeLabel = qStart.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})
+        + ' – ' + qEnd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    }
+    return '<div class="map-case-row" data-id="'+c.id+'" data-q="'+row.qNum+'" '
+      +'style="background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 14px;cursor:pointer;'
+      +(isPast && row.done<3 ? 'border-left:3px solid #ef4444;' : '')
+      +'display:flex;align-items:center;gap:10px">'
       +'<div style="flex:1;min-width:0">'
       +'<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">'
-      +'<span style="font-size:13px;font-weight:700;color:#111">'+nm+'</span>'+badge+'</div>'
+      +'<span style="font-size:13px;font-weight:700;color:#111">'+nm+'</span>'
+      +'<span style="background:'+badgeBg+';color:'+badgeCol+';font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px">'+badgeTxt+'</span>'
+      +'<span style="background:#f0fdf4;color:#0d5c4a;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px">Prog Q'+row.qNum+'</span>'
+      +'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-top:5px">'
-      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Hospital:</span> '+(c.hospital||'—').substring(0,25)+'</div>'
+      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Switch-on:</span> '+(switchOnStr||'—')+'</div>'
+      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Period:</span> '+(qRangeLabel||'—')+'</div>'
+      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Hospital:</span> '+(c.hospital||'—').substring(0,22)+'</div>'
       +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">District:</span> '+(isDemo()?'***':(c.district||'—'))+'</div>'
-      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Switch-on:</span> '+((c.switchOn||c.switchOnDate||'').substring(0,10)||'—')+'</div>'
-      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Last mapping:</span> '+(lastDate||'—')+'</div>'
-      +'</div></div>'
+      +'</div>'
+      + qStatusStripHTML(c)
+      +'</div>'
       +'<div style="font-size:20px;color:#d1d5db">›</div></div>';
   }
 
-  function buildGrouped(cases) {
-    if (!cases.length) return '<div style="padding:48px 24px;text-align:center;color:#9ca3af;font-size:14px">No active cases</div>';
-    var hospMap={};
-    cases.forEach(function(c){
-      var h=c.hospital||'Unknown Hospital', fy=c.fy||'Unknown Year';
-      if(!hospMap[h]) hospMap[h]={};
-      if(!hospMap[h][fy]) hospMap[h][fy]=[];
-      hospMap[h][fy].push(c);
-    });
-    var out='';
-    Object.keys(hospMap).sort().forEach(function(hosp,hi){
-      var hCases=Object.values(hospMap[hosp]).reduce(function(a,b){return a.concat(b);},[]);
-      var hId='mh'+hi, inner='';
-      Object.keys(hospMap[hosp]).sort().forEach(function(fy,fi){
-        var fyCases=hospMap[hosp][fy], fyId=hId+'f'+fi;
-        inner+='<div style="background:#f9fafb;padding:7px 14px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="var e=document.getElementById(\''+fyId+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'">'
-          +'<span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase">FY '+fy+'</span>'
-          +'<span style="font-size:10px;color:#6b7280">'+fyCases.length+' case'+(fyCases.length!==1?'s':'')+'</span></div>'
-          +'<div id="'+fyId+'" style="display:none">'+fyCases.map(mappingCard).join('')+'</div>';
-      });
-      out+='<div style="margin:10px 12px 0;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb">'
-        +'<div style="background:#e0fdf4;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="var e=document.getElementById(\''+hId+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'">'
-        +'<div style="font-size:13px;font-weight:700;color:#0d5c4a">🏥 '+hosp+'</div>'
-        +'<div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#6b7280">'+hCases.length+' case'+(hCases.length!==1?'s':'')+'</span><span style="font-size:14px;color:#0d5c4a">⇔</span></div></div>'
-        +'<div id="'+hId+'" style="display:none">'+inner+'</div></div>';
-    });
-    out+='<div style="height:20px"></div>';
+  function buildList(rows) {
+    if (!rows.length) return '<div style="padding:48px 24px;text-align:center;color:#9ca3af">'
+      +'<div style="font-size:28px;margin-bottom:10px">✅</div>'
+      +'<div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px">All caught up!</div>'
+      +'<div style="font-size:12px">No pending mapping sessions for any case.</div></div>';
+
+    var overdueRows = rows.filter(function(r){ return !r.current && r.done<3; });
+    var currentRows = rows.filter(function(r){ return r.current || r.done>=3; });
+    var out = '';
+    if (overdueRows.length) {
+      out += '<div style="background:#fef2f2;border-left:3px solid #ef4444;margin:10px 12px 0;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;color:#991b1b">'
+        +'⚠ '+overdueRows.length+' past-quarter mapping session'+(overdueRows.length!==1?'s':'')+' still incomplete — tap to fill in</div>';
+      overdueRows.forEach(function(r){ out += mappingCard(r); });
+    }
+    if (currentRows.length) {
+      if (overdueRows.length) out += '<div style="margin:10px 12px 4px;font-size:10px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.06em">Current Quarter</div>';
+      currentRows.forEach(function(r){ out += mappingCard(r); });
+    }
+    out += '<div style="height:24px"></div>';
     return out;
   }
 
-  ov.innerHTML=
+  var pendingCount = pendingRows.filter(function(r){ return r.done<3; }).length;
+  ov.innerHTML =
     '<div style="background:#0d5c4a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
     +'<div id="map-list-back" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">←</div>'
     +'<div><div style="color:#fff;font-weight:700;font-size:15px">🎧 Mapping Sessions</div>'
-    +'<div style="color:rgba(255,255,255,.7);font-size:11px">'+cases.length+' active cases · continuous log</div></div></div>'
-    +'<div style="flex:1;overflow-y:auto">'+buildGrouped(cases)+'</div>';
+    +'<div style="color:rgba(255,255,255,.7);font-size:11px">'
+    +(pendingCount>0 ? pendingCount+' pending · ' : 'All done · ')
+    +allCases.length+' active cases · 3 per programme quarter</div></div></div>'
+    +(pendingCount>0
+      ? '<div style="background:#fef9c3;border-bottom:1px solid #fcd34d;padding:8px 16px;font-size:11px;color:#78350f;flex-shrink:0">📋 Showing all quarters (current + past) with incomplete sessions. Quarters follow each child\'s switch-on date, not calendar quarters.</div>'
+      : '')
+    +'<div id="map-list-scroll" style="flex:1;overflow-y:auto">'+buildList(pendingRows)+'</div>';
 
   document.body.appendChild(ov);
-  document.getElementById('map-list-back').addEventListener('click',function(){ document.getElementById('mapping-list-overlay').remove(); });
-  ov.querySelector('[style*="overflow-y:auto"]').addEventListener('click',function(e){
-    var row=e.target.closest('.map-case-row');
-    if(!row) return;
-    var cas=SAMPLE_CASES.find(function(x){return String(x.id)===String(row.getAttribute('data-id'));});
-    if(!cas) return;
+  document.getElementById('map-list-back').addEventListener('click', function(){ document.getElementById('mapping-list-overlay').remove(); });
+  document.getElementById('map-list-scroll').addEventListener('click', function(e){
+    var row = e.target.closest('.map-case-row');
+    if (!row) return;
+    var id  = row.getAttribute('data-id');
+    var qN  = parseInt(row.getAttribute('data-q')) || null;
+    var cas = SAMPLE_CASES.find(function(x){ return String(x.id)===String(id); });
+    if (!cas) return;
     document.getElementById('mapping-list-overlay').remove();
-    selectedCase=cas;
-    openMappingForm(cas);
+    selectedCase = cas;
+    openMappingForm(cas, qN);
   });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// REHAB — MAPPING SESSION FORM (continuous, no quarter limit)
+// REHAB — MAPPING SESSION FORM (programme-quarter aware)
+// progQ: the programme quarter number being logged (passed from mapping list)
 // ══════════════════════════════════════════════════════════════════════════════
-function openMappingForm(cas) {
+function openMappingForm(cas, progQ) {
   if (!cas) return;
   selectedCase = cas;
-  var today10    = new Date().toISOString().split('T')[0];
-  var allSess    = (cas._mappingSessions||[]);
-  var mapsDone   = allSess.length;
-  var sessNum    = mapsDone+1;
-  var myUnit     = (window.currentUser&&window.currentUser.unit)||'';
-  var mob        = cleanMob(cas.mobile||'');
+  var today10  = new Date().toISOString().split('T')[0];
+  var myUnit   = (window.currentUser&&window.currentUser.unit)||'';
+  var mob      = cleanMob(cas.mobile||'');
+  var soStr    = cas.switchOn || cas.switchOnDate || '';
+
+  // Determine which programme quarter we're logging
+  var targetQ  = progQ || progQuarterOf(soStr) || 1;
+  var allSess  = (cas._mappingSessions||[]);
+  var mapsDoneThisQ = mappingsDoneForProgQ(cas, targetQ);
+  var sessNum  = mapsDoneThisQ + 1;
+
+  // Q date range for context
+  var qRangeLabel = 'Programme Q'+targetQ;
+  if (soStr && !isNaN(new Date(soStr))) {
+    var soD    = new Date(soStr);
+    var qStart = new Date(soD.getTime() + (targetQ-1)*91*86400000);
+    var qEnd   = new Date(soD.getTime() +  targetQ   *91*86400000 - 86400000);
+    qRangeLabel = 'Q'+targetQ+' · '
+      + qStart.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})
+      + ' – ' + qEnd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  }
+  var isPastQ  = progQ && progQ < (progQuarterOf(soStr)||1);
+
+  // Store targeted quarter on window for submit to reference
+  window._mapTargetProgQ = targetQ;
 
   document.getElementById('rs-title').textContent = '🎧 Mapping — '+(cas.name||'');
-  document.getElementById('rs-sub').textContent   = 'Session '+sessNum+' · '+mapsDone+' done so far';
+  document.getElementById('rs-sub').textContent   = qRangeLabel+' · Session '+sessNum+'/3'+(isPastQ?' (backfilling past quarter)':'');
 
   // Patient info
   var infoHTML =
-    '<div style="margin:14px 16px 0;background:#e0fdf4;border:1px solid #6ee7b7;border-radius:12px;padding:12px 14px">'
-    +'<div style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Patient · Mapping Session '+sessNum+'</div>'
+    '<div style="margin:14px 16px 0;background:'+(isPastQ?'#fef9c3':'#e0fdf4')+';border:1px solid '+(isPastQ?'#fcd34d':'#6ee7b7')+';border-radius:12px;padding:12px 14px">'
+    +(isPastQ ? '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">⚠ Logging past quarter — '+qRangeLabel+'</div>' : '')
+    +'<div style="font-size:10px;font-weight:700;color:'+(isPastQ?'#78350f':'#065f46')+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Patient · '+qRangeLabel+' · Session '+sessNum+'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px">'
     +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Name</span><div style="color:#0a3d2e;font-weight:600">'+(cas.name||'—')+'</div></div>'
     +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Card</span><div style="color:#0a3d2e;font-weight:600">'+(cas.id||'—')+'</div></div>'
@@ -2756,9 +2871,11 @@ async function submitMappingForm() {
   var rec = {
     date:          date,
     sessionNum:    ((selectedCase._mappingSessions||[]).length)+1,
+    progQuarterNum: window._mapTargetProgQ || progQuarterOf(selectedCase.switchOn||selectedCase.switchOnDate) || 1,
     audiologist:   (document.getElementById('map-audiologist')||{}).value.trim()||'',
     atOwnCentre:   atOwn,
     mappingCentre: mapCtr,
+    mapCentreName: mapCtr,
     mapCount:      (document.getElementById('map-count')||{}).value||'',
     deviceStatus:  (document.getElementById('map-device')||{}).value||'',
     soundField:    getR('map-soundfield'),
@@ -2863,6 +2980,7 @@ function openAVTEvalList() {
       +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Due:</span> '+dueDate+'</div>'
       +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Sessions (app):</span> '+(_rehabSess(c)!==null?String(_rehabSess(c)):"\u2014")+'</div>'
       +'</div>'
+      + qStatusStripHTML(c)
       +'</div>'
       +'<div style="font-size:20px;color:#d1d5db">\u203a</div>'
       +'</div>';
@@ -3746,30 +3864,110 @@ function buildHome() {
     // ── Missing AVT (red + yellow flagged) ──
     const rehabMissing = allMyCases.filter(c => c._attendanceFlag === 'red' || c._attendanceFlag === 'yellow');
 
-    // Rehab quick actions — 2×2 grid
-    var activeCases = allMyCases.filter(function(c){return c.switchOn||c.switchOnDate;}).length;
+    // ── Pending mapping (programme-quarter aware) ──
+    var allActiveCases = allMyCases.filter(function(c){return c.switchOn||c.switchOnDate;});
+    var pendingMapCases = allActiveCases.filter(function(c) {
+      // Count cases where current programme quarter has <3 mapping sessions
+      var soStr = c.switchOn || c.switchOnDate || '';
+      if (!soStr || isNaN(new Date(soStr))) return false;
+      var soD = new Date(soStr);
+      var daysElapsed = Math.floor((Date.now() - soD) / 86400000);
+      if (daysElapsed < 0) return false;
+      var curQ = Math.floor(daysElapsed / 91) + 1;
+      // Check _mappingSessions for entries in this programme quarter
+      var qStart = new Date(soD.getTime() + (curQ-1)*91*86400000);
+      var qEnd   = new Date(soD.getTime() +  curQ   *91*86400000);
+      var done = ((c._mappingSessions)||[]).filter(function(m){
+        if(!m.date) return false;
+        var d=new Date(m.date);
+        return d>=qStart && d<qEnd;
+      }).length;
+      // Also count past quarters that are incomplete
+      for (var pq=1; pq<curQ; pq++) {
+        var pStart = new Date(soD.getTime() + (pq-1)*91*86400000);
+        var pEnd   = new Date(soD.getTime() +  pq   *91*86400000);
+        var pDone  = ((c._mappingSessions)||[]).filter(function(m){
+          if(!m.date) return false;
+          var d=new Date(m.date);
+          return d>=pStart && d<pEnd;
+        }).length;
+        if (pDone < 3) return true;
+      }
+      return done < 3;
+    });
+
+    // ── Total pending tasks count for the strip ──
+    var totalPending = rehabBacklog.length + pendingMapCases.length + dueEval.length;
+
+    // ── Pending tasks strip (shows only when there is work to do) ──
+    if (totalPending > 0) {
+      html += '<div style="background:#1a1612;border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:10px">'
+        + '<div style="font-size:16px">🔔</div>'
+        + '<div style="flex:1">'
+        + '<div style="font-size:12px;font-weight:700;color:#fff">' + totalPending + ' pending task' + (totalPending!==1?'s':'') + ' across your cases</div>'
+        + '<div style="font-size:10px;color:rgba(255,255,255,.6);margin-top:1px">'
+        + (rehabBacklog.length>0 ? rehabBacklog.length+' AVT backlog' : '')
+        + (rehabBacklog.length>0 && (pendingMapCases.length>0||dueEval.length>0) ? ' · ' : '')
+        + (pendingMapCases.length>0 ? pendingMapCases.length+' mapping pending' : '')
+        + (pendingMapCases.length>0 && dueEval.length>0 ? ' · ' : '')
+        + (dueEval.length>0 ? dueEval.length+' eval due' : '')
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }
+
+    // ── 2×2 tile grid — all four always visible with live counts ──
+    var activeCases = allActiveCases.length;
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">';
-    html += '<div style="background:var(--blue);border-radius:var(--radius);padding:14px;cursor:pointer;color:#fff" onclick="openAVTLog()">'
-      + '<div style="font-size:26px;margin-bottom:6px">📋</div>'
-      + '<div style="font-size:13px;font-weight:700">AVT Session Log</div>'
-      + '<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:3px">' + activeCases + ' active' + (rehabBacklog.length>0?' · '+rehabBacklog.length+' backlog':'') + '</div>'
+
+    // Tile 1 — AVT Session Log
+    html += '<div style="background:var(--blue);border-radius:var(--radius);padding:14px;cursor:pointer;color:#fff;display:flex;flex-direction:column;min-height:100px" onclick="openAVTLog()">'
+      + '<div style="font-size:24px;margin-bottom:6px">📋</div>'
+      + '<div style="font-size:12px;font-weight:700;line-height:1.3">AVT Session Log</div>'
+      + '<div style="margin-top:auto;padding-top:8px">'
+      + (rehabBacklog.length>0
+          ? '<span style="background:rgba(255,255,255,.25);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">' + rehabBacklog.length + ' backlog</span>'
+          : '<span style="font-size:10px;color:rgba(255,255,255,.65)">' + activeCases + ' active</span>')
+      + '</div>'
       + '</div>';
-    html += '<div style="background:#0d5c4a;border-radius:var(--radius);padding:14px;cursor:pointer;color:#fff" onclick="openMappingList()">'
-      + '<div style="font-size:26px;margin-bottom:6px">🎧</div>'
-      + '<div style="font-size:13px;font-weight:700">Mapping Sessions</div>'
-      + '<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:3px">Device programming</div>'
+
+    // Tile 2 — Mapping Sessions (live count from programme quarters)
+    var mapBadgeCount = pendingMapCases.length;
+    html += '<div style="background:#0d5c4a;border-radius:var(--radius);padding:14px;cursor:pointer;color:#fff;display:flex;flex-direction:column;min-height:100px" onclick="openMappingList()">'
+      + '<div style="font-size:24px;margin-bottom:6px">🎧</div>'
+      + '<div style="font-size:12px;font-weight:700;line-height:1.3">Mapping Sessions</div>'
+      + '<div style="margin-top:auto;padding-top:8px">'
+      + (mapBadgeCount>0
+          ? '<span style="background:rgba(255,255,255,.25);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">' + mapBadgeCount + ' case' + (mapBadgeCount!==1?'s':'') + ' pending</span>'
+          : '<span style="font-size:10px;color:rgba(255,255,255,.65)">All caught up</span>')
+      + '</div>'
       + '</div>';
-    html += '<div style="background:#5a3580;border-radius:var(--radius);padding:14px;cursor:pointer;color:#fff" onclick="openAVTEvalList()">'
-      + '<div style="font-size:26px;margin-bottom:6px">🎯</div>'
-      + '<div style="font-size:13px;font-weight:700">Quarterly Evaluation</div>'
-      + '<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:3px">' + (dueEval.length>0?dueEval.length+' due':'All up to date') + '</div>'
+
+    // Tile 3 — Quarterly Evaluation (always visible, with count)
+    html += '<div style="background:#5a3580;border-radius:var(--radius);padding:14px;cursor:pointer;color:#fff;display:flex;flex-direction:column;min-height:100px" onclick="openAVTEvalList()">'
+      + '<div style="font-size:24px;margin-bottom:6px">🎯</div>'
+      + '<div style="font-size:12px;font-weight:700;line-height:1.3">Quarterly Eval</div>'
+      + '<div style="margin-top:auto;padding-top:8px">'
+      + (dueEval.length>0
+          ? '<span style="background:rgba(255,255,255,.25);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">' + dueEval.length + ' due</span>'
+          : '<span style="font-size:10px;color:rgba(255,255,255,.65)">All up to date</span>')
+      + '</div>'
       + '</div>';
-    html += '<div style="background:' + (rehabMissing.length>0?'#8a2a2a':'#374151') + ';border-radius:var(--radius);padding:14px;cursor:pointer;color:#fff" onclick="' + (rehabMissing.length>0?'openAVTMissing()':'buildCaseList();showScreen(\'cases\')') + '">'
-      + '<div style="font-size:26px;margin-bottom:6px">' + (rehabMissing.length>0?'⚠️':'📂') + '</div>'
-      + '<div style="font-size:13px;font-weight:700">' + (rehabMissing.length>0?'AVT Alerts':'Browse Cases') + '</div>'
-      + '<div style="font-size:10px;color:rgba(255,255,255,.75);margin-top:3px">' + (rehabMissing.length>0?rehabMissing.length+' missing sessions':'All assigned cases') + '</div>'
+
+    // Tile 4 — AVT Alerts (always visible, turns red when there are alerts)
+    var hasAlerts = rehabMissing.length > 0;
+    html += '<div style="background:' + (hasAlerts?'#8a2a2a':'#374151') + ';border-radius:var(--radius);padding:14px;cursor:pointer;color:#fff;display:flex;flex-direction:column;min-height:100px" onclick="' + (hasAlerts?'openAVTMissing()':'buildCaseList();showScreen(\'cases\')') + '">'
+      + '<div style="font-size:24px;margin-bottom:6px">' + (hasAlerts?'⚠️':'📂') + '</div>'
+      + '<div style="font-size:12px;font-weight:700;line-height:1.3">' + (hasAlerts?'AVT Alerts':'Browse Cases') + '</div>'
+      + '<div style="margin-top:auto;padding-top:8px">'
+      + (hasAlerts
+          ? '<span style="background:rgba(255,255,255,.25);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">' + rehabMissing.length + ' missing</span>'
+          : '<span style="font-size:10px;color:rgba(255,255,255,.65)">All cases</span>')
+      + '</div>'
       + '</div>';
-    html += '</div>';    html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
+
+    html += '</div>';
+    html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'district') {
     // Cases to confirm = not yet confirmed by this district + transferred-in
@@ -6583,6 +6781,105 @@ function openCaseSummary(cas) {
 
 function openQuarterlyEval(cas) { openQEScreen(cas); }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// QUARTERLY REPORT SUBMISSION
+// Shown when AVT + Mapping + Eval are all done for the quarter.
+// Saves a record to quarterly_reports collection and marks the case.
+// ══════════════════════════════════════════════════════════════════════════════
+function openQuarterlyReportSubmit(cas, qNum) {
+  if (!cas || !qNum) return;
+  var qRomans = ['I','II','III','IV','V','VI','VII','VIII'];
+  var qLabel  = qRomans[qNum-1] || ('Q'+qNum);
+  var soStr   = cas.switchOn || cas.switchOnDate || '';
+  var avtSess = _rehabSess(cas) || 0;
+  var mapDone = mappingsDoneForProgQ(cas, qNum);
+
+  var existing = document.getElementById('qrep-overlay');
+  if (existing) existing.remove();
+
+  var ov = document.createElement('div');
+  ov.id = 'qrep-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  ov.innerHTML =
+    '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:420px;padding:24px 20px 40px;max-height:85vh;overflow-y:auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'
+    +'<div style="font-size:16px;font-weight:700;color:var(--text)">📋 Q'+qLabel+' Report Submission</div>'
+    +'<span onclick="document.getElementById(\'qrep-overlay\').remove()" style="font-size:22px;cursor:pointer;color:var(--text-light)">×</span>'
+    +'</div>'
+    // Summary of what's complete
+    +'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:14px;margin-bottom:16px">'
+    +'<div style="font-size:11px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">✅ All activities complete for Quarter '+qLabel+'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px">'
+    +'<div style="font-size:12px;color:#166534">📋 AVT sessions logged · '+avtSess+' total sessions</div>'
+    +'<div style="font-size:12px;color:#166534">🎧 Mapping sessions · '+mapDone+'/3 done</div>'
+    +'<div style="font-size:12px;color:#166534">🎯 Quarterly evaluation completed</div>'
+    +'</div></div>'
+    // Patient context
+    +'<div style="background:var(--blue-light);border:0.5px solid #B5D4F4;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:12px;color:var(--blue)">'
+    +'<strong>'+(isDemo()?maskName(cas.name):cas.name)+'</strong> · Card: '+cas.id+'<br>'
+    +'Switch-on: '+(soStr.substring(0,10)||'—')+' · Programme Q'+qNum
+    +'</div>'
+    // Remarks field
+    +'<div style="margin-bottom:14px">'
+    +'<div style="font-size:12px;font-weight:500;color:var(--text-mid);margin-bottom:5px">Remarks (optional)</div>'
+    +'<textarea id="qrep-remarks" rows="3" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;resize:none" placeholder="Any notes on this quarter\'s progress, challenges, or outcomes..."></textarea>'
+    +'</div>'
+    +'<div id="qrep-error" style="display:none;background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:10px"></div>'
+    +'<button onclick="submitQuarterlyReport(\''+cas.id+'\','+qNum+')" style="width:100%;padding:14px;background:var(--purple);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit" id="qrep-btn">✅ Submit Q'+qLabel+' Report →</button>'
+    +'</div>';
+
+  document.body.appendChild(ov);
+}
+
+async function submitQuarterlyReport(caseId, qNum) {
+  if (isDemo()) { alert('🔒 Demo account — submissions are disabled.'); return; }
+  var btn    = document.getElementById('qrep-btn');
+  var errEl  = document.getElementById('qrep-error');
+  var remarks= (document.getElementById('qrep-remarks')||{}).value || '';
+  if (btn) { btn.disabled=true; btn.textContent='Saving...'; }
+  if (errEl) errEl.style.display='none';
+
+  var cas = SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); });
+  if (!cas) { if(errEl){errEl.textContent='Case not found.';errEl.style.display='block';} return; }
+
+  var now    = new Date().toISOString();
+  var qKey   = '_qRepQ'+qNum;
+  var record = {
+    type:          'quarterly_report',
+    caseId:        String(caseId),
+    caseName:      cas.name||'',
+    quarterNum:    qNum,
+    avtSessions:   _rehabSess(cas)||0,
+    mappingDone:   mappingsDoneForProgQ(cas, qNum),
+    evalDone:      !!(cas['_evalQ'+qNum]),
+    remarks:       remarks,
+    rehabCentre:   window.currentUser ? window.currentUser.unit : '',
+    submittedBy:   window.currentUser ? window.currentUser.username : '',
+    timestamp:     now,
+    entryId:       'QREP-'+Date.now()
+  };
+
+  try {
+    var _add = window._fbFns.addDoc, _col = window._fbFns.collection;
+    var _doc = window._fbFns.doc,   _upd = window._fbFns.updateDoc;
+    await _add(_col(window._fbDb,'quarterly_reports'), record);
+    var updates = {};
+    updates[qKey] = { submittedAt: now, submittedBy: record.submittedBy, entryId: record.entryId };
+    updates._lastQuarterReport = now;
+    await _upd(_doc(window._fbDb,'cases',String(caseId)), updates);
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
+    if (idx>-1) Object.assign(SAMPLE_CASES[idx], updates);
+    if (selectedCase && String(selectedCase.id)===String(caseId)) Object.assign(selectedCase, updates);
+    document.getElementById('qrep-overlay').remove();
+    // Refresh summary to show updated state
+    openCaseSummary(selectedCase || cas);
+    alert('✅ Q'+(['I','II','III','IV','V','VI','VII','VIII'][qNum-1]||qNum)+' quarterly report submitted successfully!');
+  } catch(e) {
+    if(errEl){errEl.textContent='Error: '+e.message;errEl.style.display='block';}
+    if(btn){btn.disabled=false;btn.textContent='✅ Submit Report →';}
+  }
+}
+
 function summaryAction() {
   const cas = selectedCase;
   if (currentRole === 'hospital') {
@@ -6653,6 +6950,45 @@ function buildSummaryHTML(c) {
 
   const journey = buildJourneyInfographic(c);
 
+  // ── Quarterly completeness card (rehab role only) ─────────────────────────
+  var qCompleteCard = '';
+  if (currentRole === 'rehab') {
+    var soStr2   = c.switchOn || c.switchOnDate || '';
+    if (soStr2 && !isNaN(new Date(soStr2))) {
+      var curQNum  = progQuarterOf(soStr2) || 1;
+      var avtDone  = !!(c['_avtQ'+curQNum+'done']);
+      var mapDone  = mappingsDoneForProgQ(c, curQNum);
+      var evalDone = !!(c['_evalQ'+curQNum]);
+      var allDone  = avtDone && mapDone >= 3 && evalDone;
+      var qNum2Str = ['I','II','III','IV','V','VI','VII','VIII'][curQNum-1] || ('Q'+curQNum);
+
+      function qRow(icon, label, done, detail) {
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">'
+          +'<div style="width:20px;height:20px;border-radius:50%;background:'+(done?'#dcfce7':'#fee2e2')+';display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0">'
+          +(done?'✓':'·')+'</div>'
+          +'<div style="flex:1"><div style="font-size:12px;font-weight:600;color:var(--text)">'+label+'</div>'
+          +(detail?'<div style="font-size:10px;color:var(--text-light)">'+detail+'</div>':'')
+          +'</div>'
+          +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+(done?'#dcfce7':'#fee2e2')+';color:'+(done?'#166534':'#991b1b')+'">'+(done?'Done':'Pending')+'</span>'
+          +'</div>';
+      }
+
+      qCompleteCard = '<div class="form-section">'
+        +'<div class="form-section-title" style="margin-top:4px">📊 Quarter '+qNum2Str+' Progress</div>'
+        +(allDone
+          ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;font-weight:700;color:#166534;display:flex;align-items:center;gap:8px">✅ All three activities complete — quarter ready to submit</div>'
+          : '<div style="background:#fef9c3;border:1px solid #fcd34d;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:#78350f">'
+            +'Complete all three activities below before submitting the quarterly report.</div>')
+        + qRow('📋', 'AVT Sessions Logged', avtDone, avtDone ? 'Quarter log marked complete' : 'Save at least one session log for Q'+curQNum)
+        + qRow('🎧', 'Mapping Session', mapDone>=3, mapDone>0 ? mapDone+'/3 sessions done this Q' : 'No mapping sessions for Q'+curQNum+' yet')
+        + qRow('🎯', 'Quarterly Evaluation', evalDone, evalDone ? 'Evaluation form submitted' : 'Evaluation not yet done for Q'+curQNum)
+        +(allDone
+          ? '<button onclick="openQuarterlyReportSubmit(selectedCase,'+curQNum+')" style="width:100%;margin-top:12px;padding:13px;background:var(--purple);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">📋 Submit Q'+curQNum+' Quarterly Report →</button>'
+          : '')
+        +'</div>';
+    }
+  }
+
   return '<div style="padding:16px 16px 0">'
     +'<div style="background:'+statusBg+';border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">'
     +'<div><div style="font-size:11px;color:'+statusColor+';font-weight:600;text-transform:uppercase;letter-spacing:.05em">Status</div>'
@@ -6660,6 +6996,7 @@ function buildSummaryHTML(c) {
     +'<div style="text-align:right"><div style="font-size:10px;color:var(--text-light)">Total Paid</div>'
     +'<div style="font-size:16px;font-weight:700;color:var(--text)">'+(c.totalNet&&c.totalNet!='0'?'&#8377;'+Number(c.totalNet).toLocaleString('en-IN'):'&#8212;')+'</div></div></div>'
     +'<div style="margin-bottom:16px">'+journey+'</div>'
+    + qCompleteCard
     +hospBadge
     +'<div class="form-section">'+sec('Patient Information','&#128118;')
     +row('TPA ID',c.tpa)+row('Gender',c.gender)+row('Age at Surgery', ageAtSurgery(c.dob, c.surgAdmit) || c.age)

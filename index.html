@@ -2718,10 +2718,11 @@ function openMappingForm(cas, progQ) {
   var soStr    = cas.switchOn || cas.switchOnDate || '';
 
   // Determine which programme quarter we're logging
-  var targetQ  = progQ || progQuarterOf(soStr) || 1;
-  var allSess  = (cas._mappingSessions||[]);
+  var targetQ       = progQ || progQuarterOf(soStr) || 1;
+  var allSess       = (cas._mappingSessions||[]);
   var mapsDoneThisQ = mappingsDoneForProgQ(cas, targetQ);
-  var sessNum  = mapsDoneThisQ + 1;
+  var mapsDone      = allSess.length;          // total across all quarters — for dots
+  var sessNum       = mapsDoneThisQ + 1;
 
   // Q date range for context
   var qRangeLabel = 'Programme Q'+targetQ;
@@ -2733,7 +2734,7 @@ function openMappingForm(cas, progQ) {
       + qStart.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})
       + ' – ' + qEnd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
   }
-  var isPastQ  = progQ && progQ < (progQuarterOf(soStr)||1);
+  var isPastQ = progQ && progQ < (progQuarterOf(soStr)||1);
 
   // Store targeted quarter on window for submit to reference
   window._mapTargetProgQ = targetQ;
@@ -2741,7 +2742,7 @@ function openMappingForm(cas, progQ) {
   document.getElementById('rs-title').textContent = '🎧 Mapping — '+(cas.name||'');
   document.getElementById('rs-sub').textContent   = qRangeLabel+' · Session '+sessNum+'/3'+(isPastQ?' (backfilling past quarter)':'');
 
-  // Patient info
+  // Patient info card
   var infoHTML =
     '<div style="margin:14px 16px 0;background:'+(isPastQ?'#fef9c3':'#e0fdf4')+';border:1px solid '+(isPastQ?'#fcd34d':'#6ee7b7')+';border-radius:12px;padding:12px 14px">'
     +(isPastQ ? '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">⚠ Logging past quarter — '+qRangeLabel+'</div>' : '')
@@ -2753,57 +2754,54 @@ function openMappingForm(cas, progQ) {
     +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Mobile</span><div style="color:#0a3d2e;font-weight:600">'+(mob?('<a href="tel:'+mob+'" style="color:#0a3d2e">'+mob+'</a>'):'—')+'</div></div>'
     +'</div></div>';
 
-  // Continuous count dots (up to 12, then +N)
-  var maxD = Math.min(mapsDone,12);
+  // Session dots (total across all quarters)
+  var maxD = Math.min(mapsDone, 12);
   var dotsHTML = '<div style="margin:10px 16px 0;background:#e0fdf4;border:1px solid #6ee7b7;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
     +'<span style="font-size:11px;color:#065f46;font-weight:600">Sessions done:</span>';
-  for (var i=0;i<maxD;i++) dotsHTML+='<div style="width:20px;height:20px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff">'+(i+1)+'</div>';
-  if (mapsDone>12) dotsHTML+='<span style="font-size:11px;color:#065f46;font-weight:700">+' +(mapsDone-12)+'</span>';
-  dotsHTML+='<span style="font-size:12px;font-weight:700;color:#0d5c4a;margin-left:6px">→ Session '+sessNum+' next</span></div>';
+  for (var i=0; i<maxD; i++) dotsHTML += '<div style="width:20px;height:20px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff">'+(i+1)+'</div>';
+  if (mapsDone > 12) dotsHTML += '<span style="font-size:11px;color:#065f46;font-weight:700">+'+(mapsDone-12)+'</span>';
+  dotsHTML += '<span style="font-size:12px;font-weight:700;color:#0d5c4a;margin-left:6px">→ Session '+sessNum+' next (Q'+targetQ+')</span></div>';
 
   // Previous sessions list
-  var prevHTML='';
-  if (allSess.length>0) {
-    prevHTML='<div style="margin:10px 16px 0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">'
+  var prevHTML = '';
+  if (allSess.length > 0) {
+    prevHTML = '<div style="margin:10px 16px 0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">'
       +'<div style="background:#f0fdf4;padding:7px 12px;font-size:11px;font-weight:700;color:#065f46;border-bottom:1px solid #e5e7eb">All previous mapping sessions ('+allSess.length+')</div>';
-    allSess.slice().reverse().forEach(function(m,i){
-      prevHTML+='<div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:11px;color:#374151">'
-        +'<span style="font-weight:700">#'+(allSess.length-i)+' · '+(m.date||'—')+'</span>'
-        +(m.audiologist?' · '+m.audiologist:'')
-        +(m.atOwnCentre===false?' · <span style="color:#dc2626">At: '+(m.mappingCentre||'other')+'</span>':'')
-        +(m.soundField==='Yes'?' · Sound field ✓':'')
-        +(m.ecap==='Yes'?' · ECAP ✓':'')
+    allSess.slice().reverse().forEach(function(m, i) {
+      var qLabel = m.progQuarterNum ? ' · Q'+m.progQuarterNum : '';
+      prevHTML += '<div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:11px;color:#374151">'
+        +'<span style="font-weight:700">#'+(allSess.length-i)+' · '+(m.date||'—')+qLabel+'</span>'
+        +(m.audiologist ? ' · '+m.audiologist : '')
+        +(m.mappingCentre && m.mappingCentre !== myUnit ? ' · <span style="color:#1a4a7a">At: '+m.mappingCentre+'</span>' : '')
+        +(m.soundField==='Yes' ? ' · Sound field ✓' : '')
+        +(m.ecap==='Yes' ? ' · ECAP ✓' : '')
         +'</div>';
     });
-    prevHTML+='</div>';
+    prevHTML += '</div>';
   }
-
-  // Build centre options
-  var centreOpts = REHAB_CENTRES.map(function(r){return '<option value="'+r+'">'+r+'</option>';}).join('');
 
   var formHTML =
     '<div style="margin:12px 16px 0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px">'
-    +'<div style="font-size:12px;font-weight:700;color:#0d5c4a;margin-bottom:12px">Mapping Session '+sessNum+'</div>'
+    +'<div style="font-size:12px;font-weight:700;color:#0d5c4a;margin-bottom:12px">Mapping Session '+sessNum+' — '+qRangeLabel+'</div>'
+    // Date + Audiologist
     +'<div class="field-row" style="margin-bottom:10px">'
     +'<div class="field"><div class="field-label">Date <span class="req">*</span></div>'
     +'<input type="date" class="field-input has-value" id="map-date" value="'+today10+'"></div>'
     +'<div class="field"><div class="field-label">Mapping Audiologist</div>'
     +'<input class="field-input" id="map-audiologist" placeholder="Name of audiologist"></div>'
     +'</div>'
-    // Own centre toggle
-    +'<div class="field" style="margin-bottom:8px">'
-    +'<div class="field-label">Mapping done at own centre?</div>'
-    +'<div class="radio-group" id="map-own-centre" style="flex-direction:row;gap:8px">'
-    +'<div class="radio-item checked" onclick="selectRadio(this,\'map-own-centre\');document.getElementById(\'map-other-row\').style.display=\'none\'" style="flex:1;padding:8px 6px"><div class="radio-dot"></div>Yes — '+(myUnit||'own centre')+'</div>'
-    +'<div class="radio-item" onclick="selectRadio(this,\'map-own-centre\');document.getElementById(\'map-other-row\').style.display=\'block\'" style="flex:1;padding:8px 6px"><div class="radio-dot"></div>No — another centre</div>'
-    +'</div></div>'
-    // Other centre (hidden by default)
-    +'<div id="map-other-row" style="display:none;margin-bottom:10px">'
-    +'<div class="field-label" style="margin-bottom:4px">Mapping centre <span class="req">*</span></div>'
-    +'<select class="field-input" id="map-other-sel" onchange="document.getElementById(\'map-other-txt\').style.display=this.value===\'Other\'?\'block\':\'none\'">'
-    +'<option value="">Select centre...</option>'+centreOpts+'<option value="Other">Other (type below)</option>'
-    +'</select>'
-    +'<input class="field-input" id="map-other-txt" placeholder="Centre name" style="display:none;margin-top:6px">'
+    // Mapping centre — default own centre, free-text override
+    +'<div class="field" style="margin-bottom:10px">'
+    +'<div class="field-label">Mapping centre</div>'
+    +'<div style="background:#f0fdf4;border:1px solid #6ee7b7;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:#0a3d2e;margin-bottom:6px">'
+    +'🏫 Default: '+(myUnit||'Your rehab institute')+'</div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
+    +'<input type="checkbox" id="map-diff-centre" onchange="document.getElementById(\'map-centre-row\').style.display=this.checked?\'block\':\'none\'">'
+    +'<label for="map-diff-centre" style="font-size:12px;color:var(--text-mid);cursor:pointer">Mapping was done at a different centre</label>'
+    +'</div>'
+    +'<div id="map-centre-row" style="display:none;margin-top:6px">'
+    +'<input class="field-input" id="map-centre-name" placeholder="Name of the mapping centre where session was done">'
+    +'</div>'
     +'</div>'
     // No. of maps + device
     +'<div class="field-row" style="margin-bottom:10px">'
@@ -2855,16 +2853,16 @@ async function submitMappingForm() {
   var btn   = document.getElementById('map-submit-btn');
   if (errEl) errEl.style.display = 'none';
 
-  var date   = (document.getElementById('map-date')||{}).value||'';
-  var ownEl  = document.querySelector('#map-own-centre .radio-item.checked');
-  var atOwn  = ownEl && ownEl.textContent.trim().startsWith('Yes');
-  var othSel = (document.getElementById('map-other-sel')||{}).value||'';
-  var othTxt = (document.getElementById('map-other-txt')||{}).value.trim()||'';
-  var mapCtr = atOwn ? (window.currentUser?window.currentUser.unit:'') : (othSel==='Other'?othTxt:othSel);
-  var getR   = function(id){ var e=document.querySelector('#'+id+' .radio-item.checked'); return e?e.textContent.trim():'No'; };
+  var date      = (document.getElementById('map-date')||{}).value||'';
+  var diffChk   = document.getElementById('map-diff-centre');
+  var atOwn     = !diffChk || !diffChk.checked;
+  var centreTxt = ((document.getElementById('map-centre-name')||{}).value||'').trim();
+  var myUnit    = (window.currentUser&&window.currentUser.unit)||'';
+  var mapCtr    = atOwn ? myUnit : centreTxt;
+  var getR      = function(id){ var e=document.querySelector('#'+id+' .radio-item.checked'); return e?e.textContent.trim():'No'; };
 
   if (!date) { if(errEl){errEl.textContent='Date is required.';errEl.style.display='block';} return; }
-  if (!atOwn && !mapCtr) { if(errEl){errEl.textContent='Please select the mapping centre.';errEl.style.display='block';} return; }
+  if (!atOwn && !mapCtr) { if(errEl){errEl.textContent='Please enter the name of the mapping centre.';errEl.style.display='block';} return; }
 
   if (btn) { btn.disabled=true; btn.textContent='Saving...'; }
 

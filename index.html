@@ -2524,6 +2524,389 @@ function openAVTMissing() {
 // ══════════════════════════════════════════════════════════════════════════════
 // REHAB — EVAL CASE LIST (children due for quarterly evaluation)
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB — MAPPING SESSIONS LIST
+// ══════════════════════════════════════════════════════════════════════════════
+function openMappingList() {
+  var myCases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
+    return !!(c.switchOn || c.switchOnDate);
+  });
+
+  var existing = document.getElementById('mapping-list-overlay');
+  if (existing) existing.remove();
+  var ov = document.createElement('div');
+  ov.id = 'mapping-list-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  function mapStatusBadge(c) {
+    var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
+    var soD   = new Date(soStr);
+    var now   = Date.now();
+    var qNum  = 1;
+    for (var q = 1; q <= 8; q++) {
+      if (now >= soD.getTime() + (q-1)*91.31*24*3600*1000) qNum = q;
+    }
+    var done = 0;
+    for (var m = 1; m <= 3; m++) { if (c['_mapQ'+qNum+'_'+m]) done++; }
+    return { qNum: qNum, done: done };
+  }
+
+  function mapCard(c) {
+    var nm  = isDemo() ? maskName(c.name) : (c.name||'—');
+    var st  = mapStatusBadge(c);
+    var col = st.done === 0 ? '#dc2626' : st.done < 3 ? '#d97706' : '#16a34a';
+    var lbl = st.done === 0 ? 'None done' : st.done + '/3 done';
+    return '<div class="mapping-case-row" data-id="'+c.id+'" data-q="'+st.qNum+'" '
+      +'style="background:#fff;border-bottom:1px solid #f1f5f9;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">'
+      +'<span style="font-size:13px;font-weight:700;color:#111">'+nm+'</span>'
+      +'<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+col+'22;color:'+col+'">Q'+st.qNum+' \u00b7 '+lbl+'</span>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-top:4px">'
+      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Hospital:</span> '+(isDemo()?'***':(c.hospital||'—').substring(0,28))+'</div>'
+      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Switch-on:</span> '+((c.switchOn||c.switchOnDate||'').substring(0,10)||'—')+'</div>'
+      +'</div>'
+      +'</div>'
+      +'<div style="font-size:20px;color:#d1d5db">\u203a</div>'
+      +'</div>';
+  }
+
+  function buildGrouped(cases) {
+    if (!cases.length) {
+      return '<div style="padding:48px 24px;text-align:center;color:#9ca3af;font-size:14px">No active cases with switch-on date</div>';
+    }
+    var hospMap = {};
+    cases.forEach(function(c) {
+      var h  = c.hospital || 'Unknown Hospital';
+      var fy = c.fy       || 'Unknown Year';
+      if (!hospMap[h]) hospMap[h] = {};
+      if (!hospMap[h][fy]) hospMap[h][fy] = [];
+      hospMap[h][fy].push(c);
+    });
+    var html = '';
+    Object.keys(hospMap).sort().forEach(function(hosp, hi) {
+      var hCases = Object.values(hospMap[hosp]).reduce(function(a,b){return a.concat(b);}, []);
+      var hId    = 'mh'+hi;
+      var inner  = '';
+      Object.keys(hospMap[hosp]).sort().forEach(function(fy, fi) {
+        var fyId = hId+'f'+fi;
+        inner +=
+          '<div style="background:#f9fafb;padding:7px 14px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;cursor:pointer" '
+          +'onclick="var e=document.getElementById(\''+fyId+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'">'
+          +'<span style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.04em">FY '+fy+'</span>'
+          +'<span style="font-size:10px;color:#6b7280">'+hospMap[hosp][fy].length+' case'+(hospMap[hosp][fy].length!==1?'s':'')+'</span>'
+          +'</div>'
+          +'<div id="'+fyId+'" style="display:none">'+hospMap[hosp][fy].map(mapCard).join('')+'</div>';
+      });
+      html +=
+        '<div style="margin:10px 12px 0;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb">'
+        +'<div style="background:#f0fdf9;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" '
+        +'onclick="var e=document.getElementById(\''+hId+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'">'
+        +'<div style="font-size:13px;font-weight:700;color:#0a5a4a">\ud83c\udfe5 '+hosp+'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+        +'<span style="font-size:11px;color:#6b7280">'+hCases.length+' case'+(hCases.length!==1?'s':'')+'</span>'
+        +'<span style="font-size:14px;color:#0a5a4a">\u21d4</span>'
+        +'</div></div>'
+        +'<div id="'+hId+'" style="display:none">'+inner+'</div>'
+        +'</div>';
+    });
+    html += '<div style="height:20px"></div>';
+    return html;
+  }
+
+  ov.innerHTML =
+    '<div style="background:#0a5a4a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    +'<div id="mapping-list-back" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">\u2190</div>'
+    +'<div><div style="color:#fff;font-weight:700;font-size:15px">\ud83c\udfa7 Mapping Sessions</div>'
+    +'<div style="color:rgba(255,255,255,.7);font-size:11px">'+myCases.length+' cases \u00b7 tap hospital to expand</div></div>'
+    +'</div>'
+    +'<div style="flex:1;overflow-y:auto">'+buildGrouped(myCases)+'</div>';
+
+  document.body.appendChild(ov);
+  document.getElementById('mapping-list-back').addEventListener('click', function() {
+    document.getElementById('mapping-list-overlay').remove();
+  });
+  ov.querySelector('[style*="overflow-y:auto"]').addEventListener('click', function(e) {
+    var row = e.target.closest('.mapping-case-row');
+    if (!row) return;
+    var id  = row.getAttribute('data-id');
+    var q   = parseInt(row.getAttribute('data-q'), 10);
+    var cas = SAMPLE_CASES.find(function(x){ return String(x.id) === String(id); });
+    if (!cas) return;
+    document.getElementById('mapping-list-overlay').remove();
+    selectedCase = cas;
+    openMappingScreen(cas, q);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REHAB — MAPPING SESSION SCREEN (3 sessions per quarter)
+// ══════════════════════════════════════════════════════════════════════════════
+function openMappingScreen(cas, qNum) {
+  selectedCase = cas;
+  qNum = qNum || 1;
+  var qRomans = ['','I','II','III','IV','V','VI','VII','VIII'];
+  var qLabel  = qRomans[qNum] || String(qNum);
+  var nm = isDemo() ? maskName(cas.name) : (cas.name||'—');
+
+  var existing = document.getElementById('mapping-screen-overlay');
+  if (existing) existing.remove();
+  var ov = document.createElement('div');
+  ov.id = 'mapping-screen-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  function tabStrip(active) {
+    return [1,2,3].map(function(n) {
+      var done  = !!(cas['_mapQ'+qNum+'_'+n]);
+      var isCur = n === active;
+      return '<div class="ms-tab" data-mn="'+n+'" '
+        +'style="flex:1;padding:10px 6px;text-align:center;font-size:12px;cursor:pointer;'
+        +'font-weight:'+(isCur?'700':'500')+';'
+        +'color:'+(isCur?'#0a5a4a':'#6b7280')+';'
+        +'border-bottom:3px solid '+(isCur?'#0a5a4a':'transparent')
+        +'">'+(done?'\u2705 ':'')+'Map '+n+'</div>';
+    }).join('');
+  }
+
+  function yesno(id, defYes, val) {
+    var yes = (val !== undefined && val !== '') ? (val==='Yes'||val===true) : defYes;
+    return '<div class="radio-group" id="'+id+'" style="flex-direction:row;gap:6px">'
+      +'<div class="radio-item'+(yes?' checked':'')+'" onclick="selectRadio(this,\''+id+'\')'+(id==='ms-own-centre'?';msToggleCentre()':'')+'">'
+      +'<div class="radio-dot"></div>Yes</div>'
+      +'<div class="radio-item'+(!yes?' checked':'')+'" onclick="selectRadio(this,\''+id+'\')'+(id==='ms-own-centre'?';msToggleCentre()':'')+'">'
+      +'<div class="radio-dot"></div>No</div>'
+      +'</div>';
+  }
+
+  function buildForm(mapNum) {
+    var saved     = cas['_mapQ'+qNum+'_'+mapNum] || {};
+    var isSaved   = !!(cas['_mapQ'+qNum+'_'+mapNum]);
+    var ownCentre = saved.mapAtOwnCentre !== false;
+    var pv = function(v){ return (v||'').toString().replace(/"/g,'&quot;'); };
+
+    var centreOpts = REHAB_CENTRES.map(function(r){
+      return '<option value="'+r+'"'+(r===saved.mapCentreName?' selected':'')+'>'+r+'</option>';
+    }).join('');
+    var isOtherCentre = saved.mapCentreName && REHAB_CENTRES.indexOf(saved.mapCentreName) < 0;
+
+    return '<div id="ms-form-wrap" style="padding:0 16px 32px">'
+
+      // Patient strip
+      +'<div style="background:#f0fdf9;border:1px solid #6ee7b7;border-radius:10px;padding:10px 14px;margin:14px 0 12px;display:flex;justify-content:space-between;align-items:center">'
+      +'<div><div style="font-size:13px;font-weight:700;color:#0a5a4a">'+nm+'</div>'
+      +'<div style="font-size:11px;color:#065f46">Quarter '+qLabel+' \u00b7 Mapping Session '+mapNum+'</div></div>'
+      +'<div style="text-align:right"><div style="font-size:9px;color:#065f46;font-weight:600;text-transform:uppercase">Card</div>'
+      +'<div style="font-size:12px;font-weight:700;color:#0a5a4a">'+cas.id+'</div></div></div>'
+
+      // Date + count
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+      +'<div class="field" style="margin:0"><div class="field-label">Mapping date <span class="req">*</span></div>'
+      +'<input type="date" class="field-input'+(saved.mapDate?' has-value':'')+'" id="ms-date" value="'+pv(saved.mapDate)+'"></div>'
+      +'<div class="field" style="margin:0"><div class="field-label">No. of maps</div>'
+      +'<input type="number" class="field-input'+(saved.mapCount?' has-value':'')+'" id="ms-count" min="1" max="10" placeholder="e.g. 2" value="'+pv(saved.mapCount)+'"></div>'
+      +'</div>'
+
+      // Own centre
+      +'<div class="field"><div class="field-label">Mapping done at own centre?</div>'
+      +yesno('ms-own-centre', true, ownCentre ? 'Yes' : 'No')
+      +'</div>'
+
+      // Other centre (hidden when Yes)
+      +'<div class="field" id="ms-other-centre-wrap" style="display:'+(ownCentre?'none':'block')+'">'
+      +'<div class="field-label">Mapping centre name <span class="req">*</span></div>'
+      +'<select class="field-input" id="ms-centre-sel" '
+      +'onchange="document.getElementById(\'ms-centre-other\').style.display=this.value===\'Other\'?\'block\':\'none\'">'
+      +'<option value="">Select centre...</option>'+centreOpts
+      +'<option value="Other"'+(isOtherCentre?' selected':'')+'>Other (type below)</option>'
+      +'</select>'
+      +'<input class="field-input" id="ms-centre-other" placeholder="Type centre name" '
+      +'style="margin-top:6px;display:'+(isOtherCentre?'block':'none')+'" '
+      +'value="'+(isOtherCentre?pv(saved.mapCentreName):'')+'"></div>'
+
+      // Audiologist
+      +'<div class="field"><div class="field-label">Mapping Audiologist</div>'
+      +'<input class="field-input'+(saved.mapAudiologist?' has-value':'')+'" id="ms-audiologist" '
+      +'placeholder="Full name of audiologist" value="'+pv(saved.mapAudiologist)+'"></div>'
+
+      // Clinical checks 2x2 grid
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">'
+      +[['ms-soundfield','Sound field test',saved.soundField],
+        ['ms-ecap','ECAP done',saved.ecap],
+        ['ms-magnet','Magnet/coil OK',saved.magnetOk],
+        ['ms-entref','ENT referral needed',saved.entReferral]].map(function(f){
+          return '<div class="field" style="margin:0">'
+            +'<div class="field-label" style="font-size:11px">'+f[1]+'</div>'
+            +yesno(f[0], false, f[2])+'</div>';
+        }).join('')
+      +'</div>'
+
+      // Device status + notes
+      +'<div class="field"><div class="field-label">Device status / issues</div>'
+      +'<input class="field-input'+(saved.deviceStatus?' has-value':'')+'" id="ms-devicestatus" '
+      +'placeholder="None, or describe..." value="'+pv(saved.deviceStatus)+'"></div>'
+      +'<div class="field"><div class="field-label">Notes / observations</div>'
+      +'<textarea class="field-input" id="ms-notes" rows="2" '
+      +'placeholder="Progress, parent feedback...">'+pv(saved.notes)+'</textarea></div>'
+
+      // Error + save button
+      +'<div id="ms-error" style="display:none;background:var(--red-light);border:0.5px solid #f5c6c2;'
+      +'border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:10px"></div>'
+      +(isSaved
+        ? '<div style="background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:10px 14px;'
+          +'font-size:12px;color:#15803d;margin-bottom:10px">\u2705 Mapping '+mapNum+' saved. You can update and save again.</div>'
+        : '')
+      +'<button id="ms-save-btn" onclick="submitMappingEntry('+qNum+','+mapNum+')" '
+      +'style="width:100%;padding:13px;background:#0a5a4a;color:#fff;border:none;'
+      +'border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">'
+      +'\ud83d\udcbe Save Mapping '+mapNum+' \u2192</button>'
+      +'</div>';
+  }
+
+  // Auto-select first incomplete slot
+  var activeMap = 1;
+  for (var m = 1; m <= 3; m++) {
+    if (!cas['_mapQ'+qNum+'_'+m]) { activeMap = m; break; }
+  }
+
+  ov.innerHTML =
+    '<div style="background:#0a5a4a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    +'<div id="ms-back" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;'
+    +'display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">\u2190</div>'
+    +'<div><div style="color:#fff;font-weight:700;font-size:15px">\ud83c\udfa7 Mapping \u2014 Q'+qLabel+'</div>'
+    +'<div style="color:rgba(255,255,255,.7);font-size:11px">'+nm+'</div></div>'
+    +'</div>'
+    +'<div id="ms-tabstrip" style="display:flex;border-bottom:2px solid #e2e8f0;background:#fff;flex-shrink:0">'
+    +tabStrip(activeMap)
+    +'</div>'
+    +'<div id="ms-body" style="flex:1;overflow-y:auto">'+buildForm(activeMap)+'</div>';
+
+  window._ms_qNum      = qNum;
+  window._ms_mapNum    = activeMap;
+  window._ms_cas       = cas;
+  window._ms_buildForm = buildForm;
+  window._ms_tabStrip  = tabStrip;
+
+  document.body.appendChild(ov);
+
+  document.getElementById('ms-back').addEventListener('click', function() {
+    document.getElementById('mapping-screen-overlay').remove();
+    openMappingList();
+  });
+
+  // Tab switching — re-delegate after each innerHTML swap
+  function attachTabListener() {
+    var strip = document.getElementById('ms-tabstrip');
+    if (!strip) return;
+    strip.addEventListener('click', function handler(e) {
+      var tab = e.target.closest('.ms-tab');
+      if (!tab) return;
+      var mn = parseInt(tab.getAttribute('data-mn'), 10);
+      window._ms_mapNum = mn;
+      strip.removeEventListener('click', handler);
+      strip.innerHTML = tabStrip(mn);
+      document.getElementById('ms-body').innerHTML = buildForm(mn);
+      attachTabListener();
+    });
+  }
+  attachTabListener();
+}
+
+// ── Show/hide other-centre field ──────────────────────────────────────────────
+function msToggleCentre() {
+  var checked = document.querySelector('#ms-own-centre .radio-item.checked');
+  var atOwn   = !checked || checked.textContent.trim() === 'Yes';
+  var wrap    = document.getElementById('ms-other-centre-wrap');
+  if (wrap) wrap.style.display = atOwn ? 'none' : 'block';
+}
+
+// ── Save a mapping entry to Firestore ─────────────────────────────────────────
+async function submitMappingEntry(qNum, mapNum) {
+  if (isDemo()) { alert('Demo account \u2014 submissions are disabled.'); return; }
+  var cas   = window._ms_cas || selectedCase;
+  var errEl = document.getElementById('ms-error');
+  var btn   = document.getElementById('ms-save-btn');
+  if (errEl) errEl.style.display = 'none';
+
+  var mapDate = (document.getElementById('ms-date')||{}).value || '';
+  if (!mapDate) {
+    if (errEl) { errEl.textContent = 'Mapping date is required.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  var ownEl  = document.querySelector('#ms-own-centre .radio-item.checked');
+  var atOwn  = !ownEl || ownEl.textContent.trim() === 'Yes';
+  var centreNm = atOwn ? (currentUser ? currentUser.unit : '') : (function(){
+    var sel = document.getElementById('ms-centre-sel');
+    var oth = document.getElementById('ms-centre-other');
+    if (sel && sel.value === 'Other' && oth && oth.value.trim()) return oth.value.trim();
+    return sel ? sel.value : '';
+  })();
+  if (!atOwn && !centreNm) {
+    if (errEl) { errEl.textContent = 'Please select or enter the mapping centre name.'; errEl.style.display = 'block'; }
+    return;
+  }
+
+  function radioVal(id) {
+    var el = document.querySelector('#'+id+' .radio-item.checked');
+    return el ? el.textContent.trim() : '';
+  }
+
+  var entry = {
+    type: 'mapping_session', quarter: 'Q'+qNum, quarterNum: qNum, mapNum: mapNum,
+    caseId: String(cas.id), caseName: cas.name||'',
+    caseDistrict: cas.district||'', caseHospital: cas.hospital||'',
+    rehabCentre:   currentUser ? currentUser.unit : '',
+    submittedBy:   currentUser ? currentUser.username : '',
+    mapDate:       mapDate,
+    mapCount:      (document.getElementById('ms-count')||{}).value || '',
+    mapAtOwnCentre: atOwn,
+    mapCentreName:  centreNm,
+    mapAudiologist: (document.getElementById('ms-audiologist')||{}).value || '',
+    soundField:    radioVal('ms-soundfield'),
+    ecap:          radioVal('ms-ecap'),
+    magnetOk:      radioVal('ms-magnet'),
+    entReferral:   radioVal('ms-entref'),
+    deviceStatus:  (document.getElementById('ms-devicestatus')||{}).value || '',
+    notes:         (document.getElementById('ms-notes')||{}).value || '',
+    timestamp:     new Date().toISOString(),
+    entryId:       'MAP-'+qNum+'-'+mapNum+'-'+Date.now()
+  };
+
+  if (btn) { btn.textContent = 'Saving\u2026'; btn.disabled = true; }
+
+  try {
+    await window._fbFns.addDoc(
+      window._fbFns.collection(window._fbDb, 'submissions_mapping'), entry);
+
+    // Update case flag
+    var flagKey = '_mapQ'+qNum+'_'+mapNum;
+    var caseUpd = { _lastModified: new Date().toISOString() };
+    caseUpd[flagKey] = entry;
+    try {
+      await window._fbFns.updateDoc(
+        window._fbFns.doc(window._fbDb, 'cases', String(cas.id)), caseUpd);
+    } catch(pe) { console.warn('case flag blocked:', pe.message); }
+
+    // Update local cache
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(cas.id); });
+    if (idx > -1) { SAMPLE_CASES[idx][flagKey] = entry; window._ms_cas = SAMPLE_CASES[idx]; }
+
+    if (btn) { btn.textContent = '\ud83d\udcbe Save Mapping '+mapNum+' \u2192'; btn.disabled = false; }
+    alert('\u2705 Mapping session '+mapNum+' saved for Q'+qNum+'.');
+
+    // Refresh to show saved state
+    if (window._ms_buildForm && window._ms_tabStrip) {
+      document.getElementById('ms-tabstrip').innerHTML = window._ms_tabStrip(mapNum);
+      document.getElementById('ms-body').innerHTML     = window._ms_buildForm(mapNum);
+    }
+  } catch(e) {
+    if (errEl) { errEl.textContent = 'Error saving: '+e.message; errEl.style.display = 'block'; }
+    if (btn) { btn.textContent = '\ud83d\udcbe Save Mapping '+mapNum+' \u2192'; btn.disabled = false; }
+  }
+}
+
 function openAVTEvalList() {
   var DAYS91 = 91.31 * 24 * 3600 * 1000;
   var cases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
@@ -3475,7 +3858,17 @@ function buildHome() {
       <div class="action-arrow">→</div>
     </div>`;
 
-    // Button 2: Children due for Quarterly Evaluation
+    // Button 2: Mapping Sessions
+    html += `<div class="action-card primary" onclick="openMappingList()" style="background:#0a5a4a;border-color:#0a5a4a">
+      <div class="action-icon">🎧</div>
+      <div>
+        <div class="action-title">Mapping Sessions</div>
+        <div class="action-desc">Up to 3 mapping sessions per quarter · Track audiologist &amp; centre</div>
+      </div>
+      <div class="action-arrow">→</div>
+    </div>`;
+
+    // Button 3: Children due for Quarterly Evaluation
     if (dueEval.length > 0) {
       html += `<div class="action-card primary" onclick="openAVTEvalList()" style="background:#5a3580;border-color:#5a3580">
         <div class="action-icon">🎯</div>
@@ -6768,7 +7161,7 @@ function openRehabSession(cas) {
   showScreen('rehabsession');
 
   // Capture the fully-built form HTML so we can render it after the Firestore check
-  var fullFormHTML = alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + saveBtnHTML + mappingHTML + mappingSaveBtnHTML + submitHTML;
+  var fullFormHTML = alertHTML + infoHTML + qtrHTML + commonHTML + tableHTML + saveBtnHTML + submitHTML;
 
   // Async: check Firestore for existing submissions for this case + quarter.
   // If AVT log already saved => show frozen. If mapping saved => pre-fill + freeze.

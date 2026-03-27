@@ -11400,6 +11400,17 @@ function openStateCorrection(cas) {
 // ══════════════════════════════════════════════════════════════
 // STATE: Delete role data OR entire case
 // ══════════════════════════════════════════════════════════════
+
+// ── Force Firebase auth token refresh before critical Firestore writes ────────
+async function refreshAuthToken() {
+  try {
+    var user = window._fbAuth && window._fbAuth.currentUser;
+    if (user) await user.getIdToken(true);
+  } catch(e) {
+    console.warn('Token refresh failed (non-critical):', e.message);
+  }
+}
+
 async function applyRoleDataDelete(caseId) {
   var role   = _scSelectedRole;
   var reason = (document.getElementById('sc-del-reason')||{}).value || '';
@@ -11426,6 +11437,9 @@ async function applyRoleDataDelete(caseId) {
   var btn = document.querySelector('#sc-panel-delete button[onclick]');
   if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
 
+  // Force token refresh so auth is current
+  await refreshAuthToken();
+
   var now  = new Date().toISOString();
   var _col = window._fbFns.collection;
   var _add = window._fbFns.addDoc;
@@ -11433,17 +11447,21 @@ async function applyRoleDataDelete(caseId) {
   var _upd = window._fbFns.updateDoc;
   var _del = window._fbFns.deleteDoc;
 
+  // Use _docId (actual Firestore doc ID) if available, else fall back to caseId
+  var cas       = SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); });
+  var firestoreDocId = (cas && cas._docId) ? cas._docId : String(caseId);
+
   try {
 
     if (role === 'entire') {
       // ── ENTIRE CASE DELETION ──────────────────────────────────────────
       // Step 1: Remove from Firestore cases collection
       try {
-        await _del(_doc(window._fbDb, 'cases', String(caseId)));
+        await _del(_doc(window._fbDb, 'cases', firestoreDocId));
       } catch(e) {
         // If delete is blocked by rules, mark as deleted with a flag instead
         try {
-          await _upd(_doc(window._fbDb, 'cases', String(caseId)), {
+          await _upd(_doc(window._fbDb, 'cases', firestoreDocId), {
             _deleted: true, _deletedBy: currentUser ? currentUser.username : 'state',
             _deletedAt: now, _deleteReason: reason.trim(), _lastModified: now
           });
@@ -11516,8 +11534,8 @@ async function applyRoleDataDelete(caseId) {
         updates._distDataDeleteReason = reason.trim();
       }
 
-      // Step 1: UPDATE THE CASE FIRST — this is the critical operation
-      await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+      // Step 1: UPDATE THE CASE FIRST — use firestoreDocId (actual Firestore doc ID)
+      await _upd(_doc(window._fbDb, 'cases', firestoreDocId), updates);
 
       // Step 2: Update local cache immediately
       var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
@@ -11577,94 +11595,7 @@ function scSelectRole(role) {
   if (warn) warn.style.display = role==='entire' ? 'block' : 'none';
 }
 
-async function applyRoleDataDelete(caseId) {
-  var reason = (document.getElementById('sc-del-reason')||{}).value||'';
-  var errEl  = document.getElementById('sc-del-error');
-  if (errEl) errEl.style.display = 'none';
-  if (!_scSelectedRole) { if(errEl){errEl.textContent='Please select a role.';errEl.style.display='block';} return; }
-  if (!reason.trim())   { if(errEl){errEl.textContent='Please enter a reason.';errEl.style.display='block';} return; }
-  var roleLabel = {hospital:'Hospital',rehab:'Rehab Institute',district:'District Officer'}[_scSelectedRole]||_scSelectedRole;
-  if (!confirm('Delete all '+roleLabel+' data for this case?\n\nThis cannot be undone. The deletion will be logged with your name.')) return;
-  var now = new Date().toISOString();
-  var updates = { _lastModified: now };
-  if (_scSelectedRole === 'hospital') {
-    ['surgAdmit','surgDate','surgDisch','switchOn','side','mentorSurgeon','rehabCentre',
-     'manufacturer','model','serialNo','remarks','hospRemarks','hospSubmittedBy','hospSubmittedAt',
-     'implantCompany','implantModel','implantNumber','speechProcessor','ciSurgeon'].forEach(function(f){ updates[f]=''; });
-    updates.status='pending'; updates.hospSubmitted=false;
-    updates._hospDataDeletedBy=currentUser?currentUser.username:'state';
-    updates._hospDataDeletedAt=now; updates._hospDataDeleteReason=reason.trim();
-  } else if (_scSelectedRole === 'rehab') {
-    updates.sessions=0; updates._rehabSessionsLogged=0; updates._rehabLastSubmit='';
-    updates._lastRehabDate=''; updates._attendanceFlag=''; updates._consecAbsent=0;
-    updates._missedThisMonth=0; updates._avtCompleteFromRehab=false;
-    updates._rehabDataDeletedBy=currentUser?currentUser.username:'state';
-    updates._rehabDataDeletedAt=now; updates._rehabDataDeleteReason=reason.trim();
-    for (var qi=1;qi<=5;qi++) { updates['_avtQ'+qi+'done']=false; }
-  } else if (_scSelectedRole === 'district') {
-    updates._distConfirmed=false; updates._distTransferredTo=''; updates._distTransferredBy='';
-    updates._distTransferredAt=''; updates._distConfirmedAt=''; updates._distConfirmedDistrict=''; updates._distPHC='';
-    updates._distDataDeletedBy=currentUser?currentUser.username:'state';
-    updates._distDataDeletedAt=now; updates._distDataDeleteReason=reason.trim();
-  }
-  try {
-    var _add=window._fbFns.addDoc, _col=window._fbFns.collection, _doc=window._fbFns.doc, _upd=window._fbFns.updateDoc;
-    await _add(_col(window._fbDb,'amendments'),{caseId:String(caseId),field:'_roleDataDelete_'+_scSelectedRole,
-      fieldLabel:roleLabel+' data deletion',oldVal:'all '+roleLabel+' fields',newVal:'cleared',
-      reason:reason.trim(),tier:3,status:'applied',role:'state',
-      submittedBy:currentUser?currentUser.username:'unknown',unit:currentUser?currentUser.unit:'',timestamp:now});
-    await _upd(_doc(window._fbDb,'cases',String(caseId)),updates);
-    var idx=SAMPLE_CASES.findIndex(function(c){return String(c.id)===String(caseId);});
-    if(idx>-1) Object.assign(SAMPLE_CASES[idx],updates);
-    document.getElementById('state-correction-overlay').remove();
-    _scSelectedRole=null;
-    alert('\u2705 '+roleLabel+' data cleared for this case. The deletion has been logged.');
-    buildCaseList();
-  } catch(e) {
-    if(errEl){errEl.textContent='Error: '+e.message;errEl.style.display='block';}
-  }
-}
-
-
-// ── Called when field dropdown changes — auto-fills current value and swaps correct-value input ──
-function scOnFieldChange(fieldLabel) {
-  var fm     = window._scFieldMap || {};
-  var cas    = window._scCas     || {};
-  var wrap   = document.getElementById('sc-new-wrap');
-  var oldEl  = document.getElementById('sc-old-val');
-  if (!fieldLabel || !fm[fieldLabel]) {
-    if (oldEl) oldEl.value = '';
-    if (wrap)  wrap.innerHTML = '<div class="field-label">Correct value <span class="req">*</span></div>'
-      + '<input class="field-input" id="sc-new-val" placeholder="Select a field first">';
-    return;
-  }
-  var fd = fm[fieldLabel];
-
-  // Auto-fill current value (read-only)
-  if (oldEl) oldEl.value = fd.cur || '';
-
-  // Build the appropriate correct-value input
-  var inputHtml = '';
-  if (fd.type === 'date') {
-    // Try to derive YYYY-MM-DD for the date input default
-    var dv = '';
-    if (fd.cur) {
-      var ds = String(fd.cur);
-      var dm = ds.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (dm) dv = dm[1]+'-'+dm[2]+'-'+dm[3];
-    }
-    inputHtml = '<input type="date" class="field-input has-value" id="sc-new-val" value="'+dv+'">';
-  } else if (fd.type === 'select' && fd.opts) {
-    var opts = fd.opts.map(function(o) {
-      var sel = (o === fd.cur) ? ' selected' : '';
-      return '<option value="'+o+'"'+sel+'>'+o+'</option>';
-    }).join('');
-    inputHtml = '<select class="field-input has-value" id="sc-new-val"><option value="">Select...</option>'+opts+'</select>';
-  } else {
-    inputHtml = '<input class="field-input" id="sc-new-val" placeholder="Enter correct value" value="'+(fd.cur||'').replace(/"/g,'&quot;')+'">';
-  }
-  if (wrap) wrap.innerHTML = '<div class="field-label">Correct value <span class="req">*</span></div>' + inputHtml;
-}
+// [old applyRoleDataDelete removed — see updated version above]
 
 async function applyStateOverride(caseId) {
   var fieldRaw = document.getElementById('sc-field').value.trim();
@@ -11709,8 +11640,14 @@ async function applyStateOverride(caseId) {
   updates._lastStateOverride = now;
   updates._lastModified = now;
 
+  // Use _docId (actual Firestore document ID) if available
+  var _sovCas = SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); });
+  var _sovDocId = (_sovCas && _sovCas._docId) ? _sovCas._docId : String(caseId);
+
+  await refreshAuthToken();
+
   try {
-    await _upd(_doc(window._fbDb, 'cases', String(caseId)), updates);
+    await _upd(_doc(window._fbDb, 'cases', _sovDocId), updates);
   } catch(permErr) {
     errEl.textContent = 'Error updating case: ' + permErr.message;
     errEl.style.display = 'block';

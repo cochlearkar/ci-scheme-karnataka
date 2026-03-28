@@ -12102,10 +12102,11 @@ function openStateCorrection(cas) {
     +'<option value="">Select field...</option>'
     +fieldOptions
     +'</select></div>'
-    +'<div class="field"><div class="field-label">Current value</div>'
-    +'<input class="field-input" id="sc-old-val" placeholder="Auto-filled when field is selected" readonly style="background:var(--gray-bg);color:var(--text2)"></div>'
+    +'<div class="field"><div class="field-label">Current value in database</div>'
+    +'<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:13px;color:#9ca3af;min-height:38px;font-style:italic" id="sc-old-display">Select a field above to see its current value</div>'
+    +'<input type="hidden" id="sc-old-val" value=""></div>'
     +'<div class="field" id="sc-new-wrap"><div class="field-label">Correct value <span class="req">*</span></div>'
-    +'<input class="field-input" id="sc-new-val" placeholder="Select a field first"></div>'
+    +'<input class="field-input" id="sc-new-val" placeholder="Select a field above first" disabled style="opacity:.5;background:#f8fafc"></div>'
     +'<div class="field"><div class="field-label">Reason / authority <span class="req">*</span></div>'
     +'<textarea class="field-input" id="sc-reason" rows="3" placeholder="e.g. Verified from physical records on DD/MM/YYYY by [name]"></textarea></div>'
     +'</div>'
@@ -12160,6 +12161,59 @@ function openStateCorrection(cas) {
     +'</div>'
     +'</div>';
   document.body.appendChild(ov);
+}
+
+// ── scOnFieldChange: fires when state user picks a field to correct ────────────
+// Pre-fills current value; replaces sc-new-wrap with appropriate input type.
+function scOnFieldChange(labelKey) {
+  var fm      = window._scFieldMap || {};
+  var def     = fm[labelKey];
+  var hiddenOld = document.getElementById('sc-old-val');
+  var display   = document.getElementById('sc-old-display');
+  var wrap      = document.getElementById('sc-new-wrap');
+  if (!wrap) return;
+
+  if (!def) {
+    // Nothing selected — reset to initial placeholder state
+    if (hiddenOld) hiddenOld.value = '';
+    if (display) {
+      display.textContent = 'Select a field above to see its current value';
+      display.style.color = '#9ca3af';
+      display.style.fontStyle = 'italic';
+    }
+    wrap.innerHTML = '<div class="field-label">Correct value <span class="req">*</span></div>'
+      + '<input class="field-input" id="sc-new-val" placeholder="Select a field above first" disabled style="opacity:.5;background:#f8fafc">';
+    return;
+  }
+
+  // Show current value in the display div and store in hidden input
+  var curVal = def.cur || '';
+  if (hiddenOld) hiddenOld.value = curVal;
+  if (display) {
+    display.textContent = curVal || '(empty — not yet set)';
+    display.style.color = curVal ? '#111' : '#9ca3af';
+    display.style.fontStyle = curVal ? 'normal' : 'italic';
+  }
+
+  // Build the correct-value input appropriate to the field type
+  var inputHTML;
+  if (def.type === 'date') {
+    inputHTML = '<input type="date" class="field-input has-value" id="sc-new-val" value="'
+      + curVal + '">';
+  } else if (def.type === 'select' && def.opts && def.opts.length) {
+    var opts = def.opts.map(function(o) {
+      return '<option value="' + o + '"' + (o === curVal ? ' selected' : '') + '>' + o + '</option>';
+    }).join('');
+    inputHTML = '<select class="field-input" id="sc-new-val">'
+      + '<option value="">Select correct value…</option>'
+      + opts
+      + '</select>';
+  } else {
+    inputHTML = '<input class="field-input" id="sc-new-val" value="'
+      + curVal.replace(/"/g, '&quot;') + '" placeholder="Enter correct value">';
+  }
+
+  wrap.innerHTML = '<div class="field-label">Correct value <span class="req">*</span></div>' + inputHTML;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -12367,6 +12421,8 @@ async function applyStateOverride(caseId) {
   var oldVal   = document.getElementById('sc-old-val').value.trim();
   var newValEl = document.getElementById('sc-new-val');
   var newVal   = newValEl ? newValEl.value.trim() : '';
+  // For select elements the .value already gives the selected option text
+  // No extra handling needed — both <input> and <select> expose .value
   var reason   = document.getElementById('sc-reason').value.trim();
   var errEl    = document.getElementById('sc-error');
   errEl.style.display = 'none';

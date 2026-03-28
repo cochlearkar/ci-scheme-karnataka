@@ -4118,6 +4118,35 @@ function buildHome() {
       + '</div>';
 
     html += '</div>';
+
+    // -- Transferred-in/out banners --
+    var myUnitNorm = (currentUser && currentUser.unit || '').toLowerCase().trim();
+    var transferredIn = allMyCases.filter(function(c) {
+      var cur  = (c.rehabCentre || '').toLowerCase().trim();
+      var hist = c.rehabCentreHistory || [];
+      return cur === myUnitNorm && hist.length > 1;
+    });
+    var transferredOut = allMyCases.filter(function(c) {
+      var cur  = (c.rehabCentre || '').toLowerCase().trim();
+      return cur !== myUnitNorm && (c.rehabCentreHistory || []).some(function(h) {
+        return (h.centre || '').toLowerCase().trim() === myUnitNorm;
+      });
+    });
+    if (transferredIn.length > 0) {
+      html += '<div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;cursor:pointer" onclick="buildCaseList();showScreen(\'cases\')">';
+      html += '<div style="display:flex;align-items:center;gap:10px">';
+      html += '<div style="font-size:24px">&#128260;</div>';
+      html += '<div style="flex:1">';
+      html += '<div style="font-size:13px;font-weight:700;color:#fff">' + transferredIn.length + ' case' + (transferredIn.length!==1?'s':'') + ' transferred in to your centre</div>';
+      html += '<div style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px">' + transferredIn.slice(0,3).map(function(c){ return isDemo() ? maskName(c.name) : c.name; }).join(' &middot; ') + (transferredIn.length>3?' + '+(transferredIn.length-3)+' more':'') + '</div>';
+      html += '</div><div style="color:rgba(255,255,255,.7);font-size:18px">&#8594;</div></div></div>';
+    }
+    if (transferredOut.length > 0) {
+      html += '<div style="background:#f8fafc;border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">';
+      html += '<div style="display:flex;align-items:center;gap:10px"><div style="font-size:20px">&#128228;</div>';
+      html += '<div><div style="font-size:12px;font-weight:700;color:var(--text)">' + transferredOut.length + ' case' + (transferredOut.length!==1?'s':'') + ' transferred out from your centre</div>';
+      html += '<div style="font-size:11px;color:var(--text-light);margin-top:1px">These cases are now managed by their new centre</div></div></div></div>';
+    }
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rehab checklist · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
 
   } else if (currentRole === 'district') {
@@ -4158,7 +4187,7 @@ function buildHome() {
     html += `<div class="action-card primary" onclick="openPendingCorrections()" style="background:#4a2a7a;border-color:#4a2a7a"><div class="action-icon">📨</div><div><div class="action-title">Correction Requests</div><div class="action-desc">Tier 2 — Review &amp; approve pending corrections</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none" onclick="window.open('dashboard.html','_blank')"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">Dashboard</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Charts &amp; Trends</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#0a3d2e,#1a6b4a);border:none" onclick="window.open('reports.html','_blank')"><div class="action-icon" style="font-size:22px">📋</div><div class="action-title" style="color:#fff">Reports</div><div class="action-desc" style="color:rgba(255,255,255,.7)">District · Hospital · FY · At-risk</div></div>`;
-    html += `<div class="action-card" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);border:none" onclick="window.open('sast-upload.html','_blank')"><div class="action-icon" style="font-size:22px">📥</div><div class="action-title" style="color:#fff">SAST Upload</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Add cases · Update claims from Excel</div></div>`;
+    html += `<div class="action-card" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);border:none" onclick="window.open('sast-upload.html','_blank')"><div class="action-icon" style="font-size:22px">&#128229;</div><div class="action-title" style="color:#fff">SAST Upload</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Add cases &middot; Update claims from Excel</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#128C7E,#25D366);border:none;cursor:pointer" onclick="shareWhatsApp()"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">📤</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Share Daily Update on WhatsApp</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Tap to open WhatsApp with today's hospital summary pre-filled</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#7f1d1d,#dc2626);border:none;cursor:pointer" onclick="buildDeleteCaseList();showScreen('cases')"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">🗑️</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Delete / Manage Cases</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Remove duplicate cases · Clear wrong hospital data</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">All guidelines · Rates · Checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
@@ -6739,78 +6768,114 @@ function openTransferRehabCentre(cas) {
   });
 }
 
-async function confirmTransfer(caseId) {
+// Step 1: validate, store pending data, show confirmation panel
+function confirmTransfer(caseId) {
   var errEl   = document.getElementById('tr-error');
   var newCen  = document.getElementById('tr-new-centre').value.trim();
   var trDate  = document.getElementById('tr-date').value.trim();
   var reason  = document.getElementById('tr-reason').value;
   var reasonO = document.getElementById('tr-reason-other').value.trim();
   errEl.style.display = 'none';
-
   if (!newCen)  { errEl.textContent='Please select the new rehab centre.'; errEl.style.display='block'; return; }
   if (!trDate)  { errEl.textContent='Transfer date is required.';          errEl.style.display='block'; return; }
-
+  if (!reason)  { errEl.textContent='Please select a reason for transfer.'; errEl.style.display='block'; return; }
   var cas = SAMPLE_CASES.find(function(c){ return String(c.id)===String(caseId); });
   if (!cas) return;
+  var curCentre = cas.rehabCentre || 'Not assigned';
+  if (newCen === curCentre) { errEl.textContent='New centre is the same as the current centre.'; errEl.style.display='block'; return; }
+  var finalReason = reason === 'Other' ? (reasonO || 'Other') : reason;
+  // Store on window to avoid all inline quote escaping
+  window._pendingTransfer = { caseId: caseId, newCen: newCen, trDate: trDate, finalReason: finalReason };
+  // Swap modal body to confirmation panel
+  var inner = document.getElementById('transfer-modal').querySelector('div');
+  inner.innerHTML = '';
+  // Header
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px';
+  hdr.innerHTML = '<div style="font-size:16px;font-weight:700;color:#92400e">&#9888;&#65039; Confirm Transfer</div>'
+    + '<span id="tr2-close" style="font-size:22px;cursor:pointer;color:#9ca3af">&times;</span>';
+  inner.appendChild(hdr);
+  // Info card
+  var info = document.createElement('div');
+  info.style.cssText = 'background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;padding:14px;margin-bottom:14px';
+  info.innerHTML =
+    '<div style="font-size:12px;font-weight:700;color:#92400e;margin-bottom:6px">This will permanently move:</div>'
+    + '<div style="font-size:14px;font-weight:800;color:#1a1a1a;margin-bottom:10px">' + (cas.name || '&mdash;') + '</div>'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+    + '<div style="flex:1;background:#fee2e2;border-radius:8px;padding:8px 10px;text-align:center">'
+    + '<div style="font-size:9px;font-weight:700;color:#991b1b;text-transform:uppercase;margin-bottom:3px">From</div>'
+    + '<div style="font-size:11px;font-weight:700;color:#1a1a1a">' + curCentre + '</div></div>'
+    + '<div style="font-size:20px;color:#92400e;font-weight:700">&rarr;</div>'
+    + '<div style="flex:1;background:#dcfce7;border-radius:8px;padding:8px 10px;text-align:center">'
+    + '<div style="font-size:9px;font-weight:700;color:#166534;text-transform:uppercase;margin-bottom:3px">To</div>'
+    + '<div style="font-size:11px;font-weight:700;color:#1a1a1a">' + newCen + '</div></div>'
+    + '</div>'
+    + '<div style="font-size:11px;color:#92400e;background:#fff;border-radius:8px;padding:8px 10px">'
+    + '&#128197; Transfer date: <strong>' + trDate + '</strong><br>'
+    + '&#128221; Reason: <strong>' + finalReason + '</strong></div>';
+  inner.appendChild(info);
+  // Warning
+  var warn = document.createElement('div');
+  warn.style.cssText = 'background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:11px;color:#dc2626';
+  warn.innerHTML = '&#9888; The previous centre will <strong>no longer see this case</strong> in their list. '
+    + 'The new centre gains access immediately. This cannot be undone from the app.';
+  inner.appendChild(warn);
+  // Buttons
+  var btns = document.createElement('div');
+  btns.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px';
+  var cancelBtn = document.createElement('button');
+  cancelBtn.style.cssText = 'padding:13px;background:#f1f5f9;border:1px solid #e2e8f0;color:#374151;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+  cancelBtn.textContent = '\u2715 Cancel';
+  cancelBtn.onclick = function() { document.getElementById('transfer-modal').remove(); };
+  var execBtn = document.createElement('button');
+  execBtn.id = 'tr2-exec';
+  execBtn.style.cssText = 'padding:13px;background:linear-gradient(135deg,#92400e,#d97706);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit';
+  execBtn.textContent = '\u2705 Yes, Transfer Now';
+  execBtn.onclick = executeTransfer;
+  btns.appendChild(cancelBtn);
+  btns.appendChild(execBtn);
+  inner.appendChild(btns);
+  document.getElementById('tr2-close').onclick = function() { document.getElementById('transfer-modal').remove(); };
+}
 
+// Step 2: write to Firebase after double-confirm
+async function executeTransfer() {
+  var p = window._pendingTransfer;
+  if (!p) return;
+  var execBtn = document.getElementById('tr2-exec');
+  if (execBtn) { execBtn.disabled = true; execBtn.textContent = '\u23f3 Saving...'; }
+  var cas = SAMPLE_CASES.find(function(c){ return String(c.id)===String(p.caseId); });
+  if (!cas) return;
   var curCentre = cas.rehabCentre || '';
-  if (newCen === curCentre) {
-    errEl.textContent = 'New centre is the same as the current centre. Please select a different centre.';
-    errEl.style.display = 'block'; return;
-  }
-
   var now  = new Date().toISOString();
   var hist = (cas.rehabCentreHistory || []).slice();
-
-  // Seed history with original centre if first transfer
   if (hist.length === 0 && curCentre) {
-    hist.push({
-      centre:  curCentre,
-      from:    cas.surgAdmit || '',
-      addedBy: 'hospital',
-      addedAt: now,
-      reason:  'Initial assignment'
-    });
+    hist.push({ centre: curCentre, from: cas.surgAdmit || '', addedBy: 'hospital', addedAt: now, reason: 'Initial assignment' });
   }
-  // Add new centre
-  hist.push({
-    centre:  newCen,
-    from:    trDate,
-    addedBy: currentUser ? currentUser.username : '',
-    addedAt: now,
-    reason:  reason === 'Other' ? (reasonO||'Other') : (reason||'')
-  });
-
+  hist.push({ centre: p.newCen, from: p.trDate, addedBy: currentUser ? currentUser.username : '', addedAt: now, reason: p.finalReason });
   try {
     var _doc = window._fbFns.doc;
     var _upd = window._fbFns.updateDoc;
-    await _upd(_doc(window._fbDb, 'cases', String(caseId)), {
-      rehabCentre:        newCen,
+    await _upd(_doc(window._fbDb, 'cases', String(cas._docId || p.caseId)), {
+      rehabCentre:        p.newCen,
       rehabCentreHistory: hist,
       _lastModified:      now,
-      _transferredAt:     trDate,
+      _transferredAt:     p.trDate,
       _transferredBy:     currentUser ? currentUser.username : ''
     });
-    // Update local cache
-    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(caseId); });
-    if (idx > -1) {
-      SAMPLE_CASES[idx].rehabCentre        = newCen;
-      SAMPLE_CASES[idx].rehabCentreHistory = hist;
-    }
-    if (cas) {
-      cas.rehabCentre        = newCen;
-      cas.rehabCentreHistory = hist;
-    }
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id)===String(p.caseId); });
+    if (idx > -1) { SAMPLE_CASES[idx].rehabCentre = p.newCen; SAMPLE_CASES[idx].rehabCentreHistory = hist; }
+    cas.rehabCentre = p.newCen; cas.rehabCentreHistory = hist;
+    window._pendingTransfer = null;
     document.getElementById('transfer-modal').remove();
-    alert('✅ Transfer recorded. '+cas.name+' is now assigned to '+newCen);
-    // Refresh the summary view
+    alert('Transfer recorded.\n\n' + cas.name + ' is now assigned to:\n' + p.newCen);
     if (selectedCase) openCaseSummary(selectedCase);
+    buildHomeScreen();
   } catch(e) {
-    errEl.textContent = 'Error saving transfer: '+e.message;
-    errEl.style.display = 'block';
+    if (execBtn) { execBtn.disabled = false; execBtn.textContent = '\u2705 Yes, Transfer Now'; }
+    alert('Error saving transfer: ' + e.message);
   }
 }
-
 
 // ── Summary action bar: transfer slot helper ──────────────────────────────
 function _summaryTransferSlot(role) {
@@ -6825,10 +6890,16 @@ function _summaryTransferSlot(role) {
   var bg     = role === 'state'    ? '#1a4a7a' : 'transparent';
   var txtCol = role === 'state'    ? '#fff' : color;
   slot.style.display = 'block';
+  var isRehab = (role === 'rehab');
+  var btnBg  = isRehab ? 'linear-gradient(135deg,#92400e,#d97706)' : bg;
+  var btnBdr = isRehab ? 'none' : border;
+  var btnCol = isRehab ? '#fff' : txtCol;
   slot.innerHTML = '<button onclick="openTransferRehabCentre(selectedCase)" '
-    + 'style="width:100%;padding:11px;background:' + bg + ';border:' + border + ';color:' + txtCol + ';'
-    + 'border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">'
-    + '🔄 Transfer to Another Rehab Centre'
+    + 'style="width:100%;padding:12px;background:' + btnBg + ';border:' + btnBdr + ';color:' + btnCol + ';'
+    + 'border-radius:var(--radius-sm);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;'
+    + 'display:flex;align-items:center;justify-content:center;gap:8px">'
+    + '<span>&#128260; Transfer to Another Rehab Centre</span>'
+    + (isRehab ? '<span style="font-size:10px;background:rgba(255,255,255,.25);padding:2px 7px;border-radius:8px">ACTION</span>' : '')
     + '</button>';
 }
 

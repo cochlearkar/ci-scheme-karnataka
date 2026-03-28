@@ -2606,17 +2606,10 @@ function qStatusStripHTML(c) {
 }
 
 function openMappingList() {
+  // One card per case — like AVT log. No per-quarter rows.
   var allCases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
-    return (c.switchOn||c.switchOnDate) &&
-           (c.status==='rehab1'||c.status==='rehab2'||c.status==='paid');
-  });
-
-  // Build flat list of {cas, qNum, done, current} — one row per pending quarter
-  var allPendingRows = [];
-  allCases.forEach(function(c) {
-    getPendingMappingQuarters(c).forEach(function(qInfo) {
-      allPendingRows.push({ cas: c, qNum: qInfo.qNum, done: qInfo.done, current: !!qInfo.current });
-    });
+    return (c.switchOn || c.switchOnDate) &&
+           (c.status === 'rehab1' || c.status === 'rehab2' || c.status === 'paid');
   });
 
   var existing = document.getElementById('mapping-list-overlay');
@@ -2625,140 +2618,128 @@ function openMappingList() {
   ov.id = 'mapping-list-overlay';
   ov.style.cssText = 'position:fixed;inset:0;background:#f0fdf9;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
 
-  // ── Case card for one (case, quarter) pair ─────────────────────────────────
-  function mappingCard(row) {
-    var c   = row.cas;
-    var nm  = isDemo() ? maskName(c.name) : (c.name||'—');
-    var isPast = !row.current;
-    var badgeBg  = isPast && row.done<3 ? '#fef2f2' : '#fff8e1';
-    var badgeCol = isPast && row.done<3 ? '#991b1b' : '#92400e';
-    var badgeTxt = row.done+'/3 '+(isPast && row.done<3 ? '⚠ past Q' : 'this Q');
-    var switchOnStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
-    var qRangeLabel = '';
-    if (switchOnStr && !isNaN(new Date(switchOnStr))) {
-      var soD    = new Date(switchOnStr);
-      var qStart = new Date(soD.getTime() + (row.qNum-1)*91*86400000);
-      var qEnd   = new Date(soD.getTime() +  row.qNum   *91*86400000 - 86400000);
-      qRangeLabel = qStart.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})
-        + '\u2013' + qEnd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-    }
-    return '<div class="map-case-row" data-id="'+c.id+'" data-q="'+row.qNum+'" '
-      +'style="background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 14px;cursor:pointer;'
-      +(isPast && row.done<3 ? 'border-left:3px solid #ef4444;' : '')
-      +'display:flex;align-items:center;gap:10px">'
-      +'<div style="flex:1;min-width:0">'
-      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">'
-      +'<span style="font-size:13px;font-weight:700;color:#111">'+nm+'</span>'
-      +'<div style="display:flex;gap:4px;flex-shrink:0">'
-      +'<span style="background:'+badgeBg+';color:'+badgeCol+';font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px">'+badgeTxt+'</span>'
-      +'<span style="background:#f0fdf4;color:#0d5c4a;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px">Prog Q'+row.qNum+'</span>'
-      +'</div></div>'
-      +'<div style="font-size:11px;color:#6b7280;margin-top:3px">'
-      +(isDemo()?'***':(c.district||'—'))+' \u00b7 Switch-on: '+(switchOnStr||'—')+' \u00b7 Period: '+(qRangeLabel||'—')
-      +'</div>'
+  // ── One card per case ─────────────────────────────────────────────────────
+  function mappingCard(c) {
+    var nm       = isDemo() ? maskName(c.name) : (c.name || '\u2014');
+    var soStr    = (c.switchOn || c.switchOnDate || '').substring(0, 10);
+    var allSess  = (c._mappingSessions || []);
+    var total    = allSess.length;
+    var lastDate = c._lastMappingDate || (allSess.length ? allSess[allSess.length-1].date : null);
+    var lastStr  = lastDate ? lastDate.substring(0,10) : null;
+    // Days since last mapping
+    var daysSince = lastStr ? Math.floor((Date.now() - new Date(lastStr)) / 86400000) : null;
+    var statusBg  = daysSince === null ? '#f1f5f9'
+                  : daysSince > 90    ? '#fef2f2'
+                  : daysSince > 30    ? '#fef9c3'
+                  : '#f0fdf4';
+    var statusCol = daysSince === null ? '#64748b'
+                  : daysSince > 90    ? '#dc2626'
+                  : daysSince > 30    ? '#92400e'
+                  : '#166534';
+    var statusTxt = daysSince === null ? 'No sessions yet'
+                  : daysSince > 90    ? daysSince + ' days since last mapping'
+                  : daysSince > 30    ? daysSince + ' days since last'
+                  : 'Last: ' + lastStr;
+
+    return '<div class="map-case-row" data-id="' + c.id + '" '
+      + 'style="background:#fff;border-bottom:1px solid #e5e7eb;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px">'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">'
+      + '<span style="font-size:13px;font-weight:700;color:#111">' + nm + '</span>'
+      + '<span style="background:' + statusBg + ';color:' + statusCol + ';font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">' + statusTxt + '</span>'
+      + '</div>'
+      + '<div style="font-size:11px;color:#6b7280;margin-top:3px">'
+      + (isDemo() ? '***' : (c.hospital || '\u2014').substring(0, 30))
+      + ' \u00b7 ' + (isDemo() ? '***' : (c.district || '\u2014'))
+      + ' \u00b7 Switch-on: ' + (soStr || '\u2014')
+      + '</div>'
+      + '<div style="font-size:11px;color:#0d5c4a;font-weight:600;margin-top:2px">'
+      + total + ' mapping session' + (total !== 1 ? 's' : '') + ' recorded in total'
+      + '</div>'
       + qStatusStripHTML(c)
-      +'</div>'
-      +'<div style="font-size:20px;color:#d1d5db">\u203a</div></div>';
+      + '</div>'
+      + '<div style="font-size:20px;color:#d1d5db">\u203a</div>'
+      + '</div>';
   }
 
-  // ── Build grouped view: hospital → FY → case cards ────────────────────────
-  function buildGrouped(rows, searchQ) {
-    if (!rows.length) {
-      if (searchQ) return '<div style="padding:48px 24px;text-align:center;color:#9ca3af;font-size:14px">No cases match &ldquo;'+searchQ+'&rdquo;</div>';
-      return '<div style="padding:48px 24px;text-align:center;color:#9ca3af">'
-        +'<div style="font-size:28px;margin-bottom:10px">\u2705</div>'
-        +'<div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px">All caught up!</div>'
-        +'<div style="font-size:12px">No pending mapping sessions for any case.</div></div>';
+  // ── Group by hospital \u2192 FY (same accordion as AVT log) ─────────────────────
+  function buildGrouped(cases, searchQ) {
+    if (!cases.length) {
+      if (searchQ) return '<div style="padding:48px 24px;text-align:center;color:#9ca3af;font-size:14px">No cases match \u201c' + searchQ + '\u201d</div>';
+      return '<div style="padding:48px 24px;text-align:center;color:#9ca3af;font-size:14px">No active cases with switch-on date</div>';
     }
 
-    // Overdue banner
-    var overdueRows = rows.filter(function(r){ return !r.current && r.done<3; });
-    var html = '';
-    if (overdueRows.length && !searchQ) {
-      html += '<div style="background:#fef2f2;border-left:3px solid #ef4444;margin:10px 12px 0;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;color:#991b1b">'
-        +'\u26a0 '+overdueRows.length+' past-quarter session'+(overdueRows.length!==1?'s':'')+' incomplete \u2014 tap to fill in</div>';
-    }
-
-    // Group by hospital → FY
     var hospMap = {};
-    rows.forEach(function(row) {
-      var h  = row.cas.hospital || 'Unknown Hospital';
-      var fy = row.cas.fy       || 'Unknown Year';
+    cases.forEach(function(c) {
+      var h  = c.hospital || 'Unknown Hospital';
+      var fy = c.fy       || 'Unknown Year';
       if (!hospMap[h]) hospMap[h] = {};
       if (!hospMap[h][fy]) hospMap[h][fy] = [];
-      hospMap[h][fy].push(row);
+      hospMap[h][fy].push(c);
     });
 
     var searchActive = !!(searchQ && searchQ.trim());
     var singleHosp   = Object.keys(hospMap).length === 1;
+    var html = '';
 
     Object.keys(hospMap).sort().forEach(function(hosp, hi) {
-      var hRows    = Object.values(hospMap[hosp]).reduce(function(a,b){return a.concat(b);}, []);
-      var hOverdue = hRows.filter(function(r){ return !r.current && r.done<3; }).length;
-      var hId      = 'mph' + hi;
-      var hOpen    = (searchActive || singleHosp) ? 'block' : 'none';
+      var hCases = Object.values(hospMap[hosp]).reduce(function(a,b){return a.concat(b);}, []);
+      var hId    = 'mph' + hi;
+      var hOpen  = (searchActive || singleHosp) ? 'block' : 'none';
 
       var innerHtml = '';
       Object.keys(hospMap[hosp]).sort().forEach(function(fy, fi) {
-        var fyRows  = hospMap[hosp][fy];
+        var fyCases = hospMap[hosp][fy];
         var fyId    = hId + 'f' + fi;
         var fyOpen  = searchActive ? 'block' : 'none';
-        var fyOver  = fyRows.filter(function(r){ return !r.current && r.done<3; }).length;
 
         innerHtml +=
-          '<div id="fyph-'+fyId+'" style="background:#f1f5f9;padding:8px 14px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;cursor:pointer">'
-          +'<div><span style="font-size:12px;font-weight:700;color:#374151">FY '+fy+'</span>'
-          +(fyOver>0 ? ' &nbsp;<span style="font-size:10px;background:#fef2f2;color:#dc2626;padding:1px 6px;border-radius:4px;font-weight:700">'+fyOver+' overdue</span>' : '')
-          +'</div>'
-          +'<div style="display:flex;align-items:center;gap:6px">'
-          +'<span style="font-size:10px;color:#6b7280">'+fyRows.length+' pending</span>'
-          +'<span style="font-size:14px;color:#64748b" id="fyarr-'+fyId+'">'+(fyOpen==='block'?'&#8963;':'&#8964;')+'</span>'
-          +'</div></div>'
-          +'<div id="'+fyId+'" style="display:'+fyOpen+';background:#fff">'
-          + fyRows.map(mappingCard).join('')
-          +'</div>';
+          '<div id="fyph-' + fyId + '" style="background:#f1f5f9;padding:8px 14px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;cursor:pointer">'
+          + '<span style="font-size:12px;font-weight:700;color:#374151">FY ' + fy + '</span>'
+          + '<div style="display:flex;align-items:center;gap:6px">'
+          + '<span style="font-size:10px;color:#6b7280">' + fyCases.length + ' case' + (fyCases.length !== 1 ? 's' : '') + '</span>'
+          + '<span style="font-size:14px;color:#64748b" id="fyarr-' + fyId + '">' + (fyOpen === 'block' ? '&#8963;' : '&#8964;') + '</span>'
+          + '</div></div>'
+          + '<div id="' + fyId + '" style="display:' + fyOpen + ';background:#fff">'
+          + fyCases.map(mappingCard).join('')
+          + '</div>';
       });
 
       html +=
-        '<div style="margin:10px 12px 0;border-radius:10px;overflow:hidden;border:1px solid '+(hOverdue>0?'#fca5a5':'#d1fae5')+'">'
-        +'<div id="hdrph-'+hId+'" style="background:'+(hOverdue>0?'#fef2f2':'#e0fdf4')+';padding:12px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">'
-        +'<div>'
-        +'<div style="font-size:13px;font-weight:700;color:'+(hOverdue>0?'#991b1b':'#0d5c4a')+'">\ud83c\udfe5 '+hosp+'</div>'
-        +'<div style="font-size:10px;color:#6b7280;margin-top:2px">'+hRows.length+' pending quarter'+(hRows.length!==1?'s':'')
-        +(hOverdue>0 ? ' &nbsp;&middot;&nbsp; <span style="color:#dc2626;font-weight:600">'+hOverdue+' overdue</span>' : '')+'</div>'
-        +'</div>'
-        +'<span style="font-size:18px;color:#6b7280" id="harrph-'+hId+'">'+(hOpen==='block'?'&#8963;':'&#8964;')+'</span>'
-        +'</div>'
-        +'<div id="'+hId+'" style="display:'+hOpen+'">'+innerHtml+'</div>'
-        +'</div>';
+        '<div style="margin:10px 12px 0;border-radius:10px;overflow:hidden;border:1px solid #d1fae5">'
+        + '<div id="hdrph-' + hId + '" style="background:#e0fdf4;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">'
+        + '<div>'
+        + '<div style="font-size:13px;font-weight:700;color:#0d5c4a">\ud83c\udfe5 ' + hosp + '</div>'
+        + '<div style="font-size:10px;color:#6b7280;margin-top:2px">' + hCases.length + ' case' + (hCases.length !== 1 ? 's' : '') + '</div>'
+        + '</div>'
+        + '<span style="font-size:18px;color:#6b7280" id="harrph-' + hId + '">' + (hOpen === 'block' ? '&#8963;' : '&#8964;') + '</span>'
+        + '</div>'
+        + '<div id="' + hId + '" style="display:' + hOpen + '">' + innerHtml + '</div>'
+        + '</div>';
     });
 
     html += '<div style="height:24px"></div>';
     return html;
   }
 
-  // ── Render (with search filter applied) ────────────────────────────────────
   function renderMappingList(searchQ) {
-    var q = (searchQ||'').trim().toLowerCase();
-    var filtered = q ? allPendingRows.filter(function(row) {
-      var c = row.cas;
+    var q = (searchQ || '').trim().toLowerCase();
+    var filtered = q ? allCases.filter(function(c) {
       return (c.name||'').toLowerCase().includes(q)
           || (c.hospital||'').toLowerCase().includes(q)
           || (c.district||'').toLowerCase().includes(q)
           || (c.village||'').toLowerCase().includes(q)
           || (c.rehabCentre||'').toLowerCase().includes(q);
-    }) : allPendingRows;
+    }) : allCases;
 
     var listEl = document.getElementById('map-list-scroll');
-    if (listEl) listEl.innerHTML = buildGrouped(filtered, q);
+    if (!listEl) return;
+    listEl.innerHTML = buildGrouped(filtered, q);
 
     // Wire hospital accordion toggles
-    var hospMap2 = {};
-    filtered.forEach(function(row) {
-      var h = row.cas.hospital || 'Unknown Hospital';
-      if (!hospMap2[h]) hospMap2[h] = true;
-    });
-    Object.keys(hospMap2).sort().forEach(function(hosp, hi) {
+    var hospSeen = {};
+    filtered.forEach(function(c){ hospSeen[c.hospital||'Unknown Hospital'] = true; });
+    Object.keys(hospSeen).sort().forEach(function(hosp, hi) {
       var hId  = 'mph' + hi;
       var hdr  = document.getElementById('hdrph-' + hId);
       var body = document.getElementById(hId);
@@ -2770,276 +2751,298 @@ function openMappingList() {
       });
     });
 
-    // Wire FY toggles — scan DOM
-    if (listEl) {
-      listEl.querySelectorAll('[id^="fyph-"]').forEach(function(fyHdr) {
-        var fyId  = fyHdr.id.replace('fyph-', '');
-        var fyBod = document.getElementById(fyId);
-        var fyArr = document.getElementById('fyarr-' + fyId);
-        if (fyHdr && fyBod) fyHdr.addEventListener('click', function(e) {
-          e.stopPropagation();
-          var open = fyBod.style.display !== 'none';
-          fyBod.style.display = open ? 'none' : 'block';
-          if (fyArr) fyArr.innerHTML = open ? '&#8964;' : '&#8963;';
-        });
+    // Wire FY toggles
+    listEl.querySelectorAll('[id^="fyph-"]').forEach(function(fyHdr) {
+      var fyId  = fyHdr.id.replace('fyph-', '');
+      var fyBod = document.getElementById(fyId);
+      var fyArr = document.getElementById('fyarr-' + fyId);
+      if (fyHdr && fyBod) fyHdr.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var open = fyBod.style.display !== 'none';
+        fyBod.style.display = open ? 'none' : 'block';
+        if (fyArr) fyArr.innerHTML = open ? '&#8964;' : '&#8963;';
       });
+    });
 
-      // Wire case row taps
-      listEl.querySelectorAll('.map-case-row').forEach(function(row) {
-        row.addEventListener('click', function() {
-          var id  = row.getAttribute('data-id');
-          var qN  = parseInt(row.getAttribute('data-q')) || null;
-          var cas = SAMPLE_CASES.find(function(x){ return String(x.id)===String(id); });
-          if (!cas) return;
-          document.getElementById('mapping-list-overlay').remove();
-          selectedCase = cas;
-          openMappingForm(cas, qN);
-        });
+    // Wire case row taps \u2014 open form for the case (no quarter arg)
+    listEl.querySelectorAll('.map-case-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        var id  = row.getAttribute('data-id');
+        var cas = SAMPLE_CASES.find(function(x){ return String(x.id) === String(id); });
+        if (!cas) return;
+        document.getElementById('mapping-list-overlay').remove();
+        selectedCase = cas;
+        openMappingForm(cas);
       });
-    }
+    });
   }
-
-  var pendingCount = allPendingRows.filter(function(r){ return r.done<3; }).length;
 
   ov.innerHTML =
     '<div style="background:#0d5c4a;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
-    +'<div id="map-list-back" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px;flex-shrink:0">\u2190</div>'
-    +'<div><div style="color:#fff;font-weight:700;font-size:15px">\ud83c\udfa7 Mapping Sessions</div>'
-    +'<div style="color:rgba(255,255,255,.7);font-size:11px">'
-    +(pendingCount>0 ? pendingCount+' pending \u00b7 ' : 'All done \u00b7 ')
-    +allCases.length+' active cases \u00b7 3 per programme quarter</div></div></div>'
-    // Search bar (same pattern as AVT log)
-    +'<div style="background:#fff;padding:8px 12px;border-bottom:1px solid #e5e7eb;flex-shrink:0">'
-    +'<div style="display:flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:10px;padding:8px 12px">'
-    +'<span style="font-size:15px;color:#9ca3af">&#128269;</span>'
-    +'<input id="map-search-inp" type="search" placeholder="Search by name, hospital, district\u2026" '
-    +'autocomplete="off" style="border:none;background:transparent;flex:1;font-size:13px;color:#111;outline:none;font-family:inherit">'
-    +'</div></div>'
-    // Scrollable grouped list
-    +'<div id="map-list-scroll" style="flex:1;overflow-y:auto"></div>';
+    + '<div id="map-list-back" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px;flex-shrink:0">\u2190</div>'
+    + '<div><div style="color:#fff;font-weight:700;font-size:15px">\ud83c\udfa7 Mapping Sessions</div>'
+    + '<div style="color:rgba(255,255,255,.7);font-size:11px">' + allCases.length + ' active cases \u00b7 tap case to add sessions</div></div></div>'
+    + '<div style="background:#fff;padding:8px 12px;border-bottom:1px solid #e5e7eb;flex-shrink:0">'
+    + '<div style="display:flex;align-items:center;gap:8px;background:#f1f5f9;border-radius:10px;padding:8px 12px">'
+    + '<span style="font-size:15px;color:#9ca3af">&#128269;</span>'
+    + '<input id="map-search-inp" type="search" placeholder="Search by name, hospital, district\u2026" '
+    + 'autocomplete="off" style="border:none;background:transparent;flex:1;font-size:13px;color:#111;outline:none;font-family:inherit">'
+    + '</div></div>'
+    + '<div id="map-list-scroll" style="flex:1;overflow-y:auto"></div>';
 
   document.body.appendChild(ov);
   document.getElementById('map-list-back').addEventListener('click', function(){ document.getElementById('mapping-list-overlay').remove(); });
   document.getElementById('map-search-inp').addEventListener('input', function(){ renderMappingList(this.value); });
-
   renderMappingList('');
 }
 
+
 // ══════════════════════════════════════════════════════════════════════════════
-// REHAB — MAPPING SESSION FORM (programme-quarter aware)
-// progQ: the programme quarter number being logged (passed from mapping list)
+// REHAB \u2014 MAPPING FORM: date-first, free entry, no quarter selection needed
+// Opens for a case, shows all past sessions, lets user add new ones by date.
+// Quarter is auto-calculated from session date at save time.
 // ══════════════════════════════════════════════════════════════════════════════
-function openMappingForm(cas, progQ) {
+function openMappingForm(cas) {
   if (!cas) return;
   selectedCase = cas;
-  var today10  = new Date().toISOString().split('T')[0];
-  var myUnit   = (window.currentUser&&window.currentUser.unit)||'';
-  var mob      = cleanMob(cas.mobile||'');
-  var soStr    = cas.switchOn || cas.switchOnDate || '';
+  var myUnit  = (window.currentUser && window.currentUser.unit) || '';
+  var mob     = cleanMob(cas.mobile || '');
+  var soStr   = (cas.switchOn || cas.switchOnDate || '').substring(0, 10);
+  var allSess = (cas._mappingSessions || []).slice().sort(function(a,b){ return (a.date||'') < (b.date||'') ? -1 : 1; });
+  var today10 = new Date().toISOString().split('T')[0];
 
-  // Determine which programme quarter we're logging
-  var targetQ       = progQ || progQuarterOf(soStr) || 1;
-  var allSess       = (cas._mappingSessions||[]);
-  var mapsDoneThisQ = mappingsDoneForProgQ(cas, targetQ);
-  var mapsDone      = allSess.length;          // total across all quarters — for dots
-  var sessNum       = mapsDoneThisQ + 1;
+  document.getElementById('rs-title').textContent = '\ud83c\udfa7 Mapping \u2014 ' + (cas.name || '');
+  document.getElementById('rs-sub').textContent   = allSess.length + ' session' + (allSess.length !== 1 ? 's' : '') + ' recorded \u00b7 switch-on: ' + (soStr || '\u2014');
 
-  // Q date range for context
-  var qRangeLabel = 'Programme Q'+targetQ;
-  if (soStr && !isNaN(new Date(soStr))) {
-    var soD    = new Date(soStr);
-    var qStart = new Date(soD.getTime() + (targetQ-1)*91*86400000);
-    var qEnd   = new Date(soD.getTime() +  targetQ   *91*86400000 - 86400000);
-    qRangeLabel = 'Q'+targetQ+' · '
-      + qStart.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})
-      + ' – ' + qEnd.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  }
-  var isPastQ = progQ && progQ < (progQuarterOf(soStr)||1);
-
-  // Store targeted quarter on window for submit to reference
-  window._mapTargetProgQ = targetQ;
-
-  document.getElementById('rs-title').textContent = '🎧 Mapping — '+(cas.name||'');
-  document.getElementById('rs-sub').textContent   = qRangeLabel+' · Session '+sessNum+'/3'+(isPastQ?' (backfilling past quarter)':'');
-
-  // Patient info card
+  // ── Patient info strip ────────────────────────────────────────────────────
   var infoHTML =
-    '<div style="margin:14px 16px 0;background:'+(isPastQ?'#fef9c3':'#e0fdf4')+';border:1px solid '+(isPastQ?'#fcd34d':'#6ee7b7')+';border-radius:12px;padding:12px 14px">'
-    +(isPastQ ? '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">⚠ Logging past quarter — '+qRangeLabel+'</div>' : '')
-    +'<div style="font-size:10px;font-weight:700;color:'+(isPastQ?'#78350f':'#065f46')+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Patient · '+qRangeLabel+' · Session '+sessNum+'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px">'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Name</span><div style="color:#0a3d2e;font-weight:600">'+(cas.name||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Card</span><div style="color:#0a3d2e;font-weight:600">'+(cas.id||'—')+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Hospital</span><div style="color:#0a3d2e;font-weight:600">'+(cas.hospital||'—').substring(0,28)+'</div></div>'
-    +'<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Mobile</span><div style="color:#0a3d2e;font-weight:600">'+(mob?('<a href="tel:'+mob+'" style="color:#0a3d2e">'+mob+'</a>'):'—')+'</div></div>'
-    +'</div></div>';
+    '<div style="margin:14px 16px 0;background:#e0fdf4;border:1px solid #6ee7b7;border-radius:12px;padding:12px 14px">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px">'
+    + '<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Name</span><div style="color:#0a3d2e;font-weight:600">' + (cas.name || '\u2014') + '</div></div>'
+    + '<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Card No.</span><div style="color:#0a3d2e;font-weight:600">' + (cas.id || '\u2014') + '</div></div>'
+    + '<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Hospital</span><div style="color:#0a3d2e;font-weight:600">' + (cas.hospital || '\u2014').substring(0, 28) + '</div></div>'
+    + '<div><span style="color:#065f46;font-size:10px;font-weight:600;text-transform:uppercase">Mobile</span><div style="color:#0a3d2e;font-weight:600">' + (mob ? ('<a href="tel:' + mob + '" style="color:#0a3d2e">' + mob + '</a>') : '\u2014') + '</div></div>'
+    + '</div>'
+    + (soStr ? '<div style="margin-top:6px;font-size:10px;color:#065f46">Switch-on: ' + soStr + ' \u00b7 ' + allSess.length + ' mapping session' + (allSess.length !== 1 ? 's' : '') + ' on record</div>' : '')
+    + '</div>';
 
-  // Session dots (total across all quarters)
-  var maxD = Math.min(mapsDone, 12);
-  var dotsHTML = '<div style="margin:10px 16px 0;background:#e0fdf4;border:1px solid #6ee7b7;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
-    +'<span style="font-size:11px;color:#065f46;font-weight:600">Sessions done:</span>';
-  for (var i=0; i<maxD; i++) dotsHTML += '<div style="width:20px;height:20px;border-radius:50%;background:#059669;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff">'+(i+1)+'</div>';
-  if (mapsDone > 12) dotsHTML += '<span style="font-size:11px;color:#065f46;font-weight:700">+'+(mapsDone-12)+'</span>';
-  dotsHTML += '<span style="font-size:12px;font-weight:700;color:#0d5c4a;margin-left:6px">→ Session '+sessNum+' next (Q'+targetQ+')</span></div>';
-
-  // Previous sessions list
-  var prevHTML = '';
-  if (allSess.length > 0) {
-    prevHTML = '<div style="margin:10px 16px 0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">'
-      +'<div style="background:#f0fdf4;padding:7px 12px;font-size:11px;font-weight:700;color:#065f46;border-bottom:1px solid #e5e7eb">All previous mapping sessions ('+allSess.length+')</div>';
-    allSess.slice().reverse().forEach(function(m, i) {
-      var qLabel = m.progQuarterNum ? ' · Q'+m.progQuarterNum : '';
-      prevHTML += '<div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:11px;color:#374151">'
-        +'<span style="font-weight:700">#'+(allSess.length-i)+' · '+(m.date||'—')+qLabel+'</span>'
-        +(m.audiologist ? ' · '+m.audiologist : '')
-        +(m.mappingCentre && m.mappingCentre !== myUnit ? ' · <span style="color:#1a4a7a">At: '+m.mappingCentre+'</span>' : '')
-        +(m.soundField==='Yes' ? ' · Sound field ✓' : '')
-        +(m.ecap==='Yes' ? ' · ECAP ✓' : '')
-        +'</div>';
-    });
-    prevHTML += '</div>';
+  // ── Previous sessions log ─────────────────────────────────────────────────
+  function buildSessionLog() {
+    if (!allSess.length) return '';
+    var rows = allSess.map(function(m, i) {
+      var qLabel = '';
+      if (soStr && m.date && !isNaN(new Date(soStr))) {
+        var pq = progQuarterOf(soStr, m.date);
+        if (pq) qLabel = ' \u00b7 <span style="background:#f0fdf4;color:#0d5c4a;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px">Q' + pq + '</span>';
+      }
+      var centreTxt = (m.mappingCentre && m.mappingCentre !== myUnit) ? ' \u00b7 <span style="color:#1a4a7a">At: ' + m.mappingCentre + '</span>' : '';
+      var checks = [
+        m.soundField === 'Yes' ? 'Sound field \u2713' : '',
+        m.ecap === 'Yes'       ? 'ECAP \u2713'        : '',
+        m.entReferral === 'Yes'? 'ENT ref'            : ''
+      ].filter(Boolean).join(' \u00b7 ');
+      return '<div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:11px;color:#374151">'
+        + '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">'
+        + '<span style="font-weight:700;font-size:12px">#' + (i+1) + '</span>'
+        + '<span style="font-weight:600">' + (m.date || '\u2014') + '</span>'
+        + qLabel
+        + (m.audiologist ? ' \u00b7 ' + m.audiologist : '')
+        + centreTxt
+        + '</div>'
+        + (checks ? '<div style="margin-top:3px;color:#6b7280">' + checks + '</div>' : '')
+        + (m.notes ? '<div style="margin-top:2px;color:#6b7280;font-style:italic">' + m.notes + '</div>' : '')
+        + '</div>';
+    }).join('');
+    return '<div style="margin:10px 16px 0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden">'
+      + '<div style="background:#f0fdf4;padding:8px 12px;font-size:11px;font-weight:700;color:#065f46;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center">'
+      + '<span>Sessions recorded (' + allSess.length + ')</span>'
+      + (allSess.length > 3 ? '<span style="font-size:10px;color:#6b7280;font-weight:400">most recent first</span>' : '')
+      + '</div>'
+      + (allSess.length > 3 ? allSess.slice().reverse().map(function(m,i){
+          var qLabel = '';
+          if (soStr && m.date && !isNaN(new Date(soStr))) {
+            var pq = progQuarterOf(soStr, m.date);
+            if (pq) qLabel = ' \u00b7 <span style="background:#f0fdf4;color:#0d5c4a;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px">Q' + pq + '</span>';
+          }
+          var centreTxt = (m.mappingCentre && m.mappingCentre !== myUnit) ? ' \u00b7 <span style="color:#1a4a7a">At: ' + m.mappingCentre + '</span>' : '';
+          var checks2 = [m.soundField==='Yes'?'Sound field \u2713':'', m.ecap==='Yes'?'ECAP \u2713':'', m.entReferral==='Yes'?'ENT ref':''].filter(Boolean).join(' \u00b7 ');
+          return '<div style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:11px;color:#374151">'
+            + '<div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">'
+            + '<span style="font-weight:700;font-size:12px">#' + (allSess.length - i) + '</span>'
+            + '<span style="font-weight:600">' + (m.date||'\u2014') + '</span>'
+            + qLabel + (m.audiologist?' \u00b7 '+m.audiologist:'') + centreTxt
+            + '</div>'
+            + (checks2?'<div style="margin-top:3px;color:#6b7280">'+checks2+'</div>':'')
+            + (m.notes?'<div style="margin-top:2px;color:#6b7280;font-style:italic">'+m.notes+'</div>':'')
+            + '</div>';
+        }).join('') : rows)
+      + '</div>';
   }
 
+  // ── New session form ──────────────────────────────────────────────────────
   var formHTML =
-    '<div style="margin:12px 16px 0;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px">'
-    +'<div style="font-size:12px;font-weight:700;color:#0d5c4a;margin-bottom:12px">Mapping Session '+sessNum+' — '+qRangeLabel+'</div>'
-    // Date + Audiologist
-    +'<div class="field-row" style="margin-bottom:10px">'
-    +'<div class="field"><div class="field-label">Date <span class="req">*</span></div>'
-    +'<input type="date" class="field-input has-value" id="map-date" value="'+today10+'"></div>'
-    +'<div class="field"><div class="field-label">Mapping Audiologist</div>'
-    +'<input class="field-input" id="map-audiologist" placeholder="Name of audiologist"></div>'
-    +'</div>'
-    // Mapping centre — default own centre, free-text override
-    +'<div class="field" style="margin-bottom:10px">'
-    +'<div class="field-label">Mapping centre</div>'
-    +'<div style="background:#f0fdf4;border:1px solid #6ee7b7;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:#0a3d2e;margin-bottom:6px">'
-    +'🏫 Default: '+(myUnit||'Your rehab institute')+'</div>'
-    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
-    +'<input type="checkbox" id="map-diff-centre" onchange="document.getElementById(\'map-centre-row\').style.display=this.checked?\'block\':\'none\'">'
-    +'<label for="map-diff-centre" style="font-size:12px;color:var(--text-mid);cursor:pointer">Mapping was done at a different centre</label>'
-    +'</div>'
-    +'<div id="map-centre-row" style="display:none;margin-top:6px">'
-    +'<input class="field-input" id="map-centre-name" placeholder="Name of the mapping centre where session was done">'
-    +'</div>'
-    +'</div>'
-    // No. of maps + device
-    +'<div class="field-row" style="margin-bottom:10px">'
-    +'<div class="field"><div class="field-label">No. of maps done</div>'
-    +'<input type="number" class="field-input" id="map-count" min="1" max="10" placeholder="e.g. 2"></div>'
-    +'<div class="field"><div class="field-label">Device condition</div>'
-    +'<select class="field-input" id="map-device"><option value="">Select...</option>'
-    +'<option>Functioning well</option><option>Coil issue</option><option>Battery issue</option>'
-    +'<option>Processor issue</option><option>Needs service</option></select>'
-    +'</div></div>'
-    // Toggles
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'
-    +[['map-soundfield','Sound field test'],['map-ecap','ECAP done'],
-      ['map-magnet','Magnet/coil comfortable'],['map-entref','ENT referral']].map(function(f){
-      return '<div class="field" style="margin:0"><div class="field-label" style="font-size:11px">'+f[1]+'</div>'
-        +'<div class="radio-group" id="'+f[0]+'" style="flex-direction:row;gap:4px">'
-        +'<div class="radio-item" onclick="selectRadio(this,\''+f[0]+'\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>Yes</div>'
-        +'<div class="radio-item checked" onclick="selectRadio(this,\''+f[0]+'\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>No</div>'
-        +'</div></div>';
-    }).join('')
-    +'</div>'
+    '<div style="margin:12px 16px 0;background:#fff;border:2px solid #6ee7b7;border-radius:12px;padding:14px 16px">'
+    + '<div style="font-size:12px;font-weight:700;color:#0d5c4a;margin-bottom:12px">+ Add mapping session</div>'
+
+    // Date + Audiologist side by side
+    + '<div class="field-row" style="margin-bottom:10px">'
+    + '<div class="field"><div class="field-label">Date of mapping <span class="req">*</span></div>'
+    + '<input type="date" class="field-input has-value" id="map-date" value="' + today10 + '"></div>'
+    + '<div class="field"><div class="field-label">Audiologist</div>'
+    + '<input class="field-input" id="map-audiologist" placeholder="Full name"></div>'
+    + '</div>'
+
+    // Mapping centre toggle
+    + '<div class="field" style="margin-bottom:10px">'
+    + '<div class="field-label">Where was mapping done?</div>'
+    + '<div style="background:#f0fdf4;border:1px solid #6ee7b7;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:600;color:#0a3d2e;margin-bottom:6px">'
+    + '\ud83c\udfe2 Default: ' + (myUnit || 'Your rehab institute') + '</div>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-mid);cursor:pointer">'
+    + '<input type="checkbox" id="map-diff-centre" onchange="document.getElementById(\'map-centre-row\').style.display=this.checked?\'block\':\'none\'">'
+    + 'Done at a different centre</label>'
+    + '<div id="map-centre-row" style="display:none;margin-top:8px">'
+    + '<input class="field-input" id="map-centre-name" placeholder="Name of the mapping centre">'
+    + '</div></div>'
+
+    // No. of maps + device condition
+    + '<div class="field-row" style="margin-bottom:10px">'
+    + '<div class="field"><div class="field-label">No. of maps</div>'
+    + '<input type="number" class="field-input" id="map-count" min="1" max="10" placeholder="e.g. 2"></div>'
+    + '<div class="field"><div class="field-label">Device condition</div>'
+    + '<select class="field-input" id="map-device"><option value="">Select\u2026</option>'
+    + '<option>Functioning well</option><option>Coil issue</option><option>Battery issue</option>'
+    + '<option>Processor issue</option><option>Needs service</option></select>'
+    + '</div></div>'
+
+    // Clinical checks 2\xd72
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'
+    + [['map-soundfield','Sound field test'],['map-ecap','ECAP done'],
+       ['map-magnet','Magnet / coil OK'],  ['map-entref','ENT referral needed']].map(function(f){
+        return '<div class="field" style="margin:0"><div class="field-label" style="font-size:11px">' + f[1] + '</div>'
+          + '<div class="radio-group" id="' + f[0] + '" style="flex-direction:row;gap:4px">'
+          + '<div class="radio-item" onclick="selectRadio(this,\'' + f[0] + '\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>Yes</div>'
+          + '<div class="radio-item checked" onclick="selectRadio(this,\'' + f[0] + '\')" style="flex:1;padding:5px 4px"><div class="radio-dot"></div>No</div>'
+          + '</div></div>';
+      }).join('')
+    + '</div>'
+
+    // Issues checkboxes
+    + '<div class="field"><div class="field-label">Issues to flag</div>'
+    + '<div style="display:flex;flex-direction:column;gap:7px;margin-top:4px">'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-none" onchange="mapIssueNone(this)"> None</label>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-proc"> Processor use</label>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-suture"> Status of sutures</label>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-skin"> Skin under coil</label>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-other"> Other</label>'
+    + '<input class="field-input" id="map-issue-detail" placeholder="Details on flagged issues" style="margin-top:2px">'
+    + '</div></div>'
+
     // Notes
-    +'<div class="field"><div class="field-label">Notes / observations</div>'
-    +'<textarea class="field-input" id="map-notes" rows="2" placeholder="Mapping outcomes, patient response, concerns..."></textarea></div>'
-    // Issues to flag
-    +'<div class="field"><div class="field-label">Issues to flag</div>'
-    +'<div style="display:flex;flex-direction:column;gap:7px;margin-top:4px">'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-none" onchange="mapIssueNone(this)"> None</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-proc"> Use of Processor</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-suture"> Status of Sutures</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-skin"> Status of skin under the coil</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="map-issue-other"> Others</label>'
-    +'<input class="field-input" id="map-issue-detail" placeholder="Details on flagged issues" style="margin-top:2px">'
-    +'</div></div>'
-    +'</div>';
+    + '<div class="field" style="margin-top:8px"><div class="field-label">Notes / observations</div>'
+    + '<textarea class="field-input" id="map-notes" rows="2" placeholder="Outcomes, device response, parent feedback\u2026"></textarea></div>'
+    + '</div>';
 
   var submitHTML =
     '<div style="padding:12px 16px 40px">'
-    +'<div id="map-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:10px;display:none;"></div>'
-    +'<button onclick="submitMappingForm()" style="width:100%;padding:14px;background:#0d5c4a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit" id="map-submit-btn">💾 Save Mapping Session →</button>'
-    +'</div>';
+    + '<div id="map-error" style="background:var(--red-light);border:0.5px solid #f5c6c2;border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);margin-bottom:10px;display:none;"></div>'
+    + '<button onclick="submitMappingForm()" id="map-submit-btn" '
+    + 'style="width:100%;padding:14px;background:#0d5c4a;color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">'
+    + '\ud83d\udcbe Save Session \u2192</button>'
+    + '</div>';
 
-  document.getElementById('rs-body').innerHTML = infoHTML + dotsHTML + prevHTML + formHTML + submitHTML;
+  document.getElementById('rs-body').innerHTML = infoHTML + buildSessionLog() + formHTML + submitHTML;
   showScreen('rehabsession');
 }
+
 
 async function submitMappingForm() {
   var errEl = document.getElementById('map-error');
   var btn   = document.getElementById('map-submit-btn');
   if (errEl) errEl.style.display = 'none';
 
-  var date      = (document.getElementById('map-date')||{}).value||'';
+  var date      = (document.getElementById('map-date') || {}).value || '';
   var diffChk   = document.getElementById('map-diff-centre');
   var atOwn     = !diffChk || !diffChk.checked;
-  var centreTxt = ((document.getElementById('map-centre-name')||{}).value||'').trim();
-  var myUnit    = (window.currentUser&&window.currentUser.unit)||'';
+  var centreTxt = ((document.getElementById('map-centre-name') || {}).value || '').trim();
+  var myUnit    = (window.currentUser && window.currentUser.unit) || '';
   var mapCtr    = atOwn ? myUnit : centreTxt;
-  var getR      = function(id){ var e=document.querySelector('#'+id+' .radio-item.checked'); return e?e.textContent.trim():'No'; };
+  var getR      = function(id) { var e = document.querySelector('#' + id + ' .radio-item.checked'); return e ? e.textContent.trim() : 'No'; };
 
-  if (!date) { if(errEl){errEl.textContent='Date is required.';errEl.style.display='block';} return; }
-  if (!atOwn && !mapCtr) { if(errEl){errEl.textContent='Please enter the name of the mapping centre.';errEl.style.display='block';} return; }
+  if (!date) { if (errEl) { errEl.textContent = 'Date is required.'; errEl.style.display = 'block'; } return; }
+  if (!atOwn && !mapCtr) { if (errEl) { errEl.textContent = 'Please enter the name of the mapping centre.'; errEl.style.display = 'block'; } return; }
 
-  if (btn) { btn.disabled=true; btn.textContent='Saving...'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+  // Auto-calculate programme quarter from session date + switch-on date
+  var soStr2 = selectedCase.switchOn || selectedCase.switchOnDate || '';
+  var autoQ  = progQuarterOf(soStr2, date) || 1;
 
   var rec = {
-    date:          date,
-    sessionNum:    ((selectedCase._mappingSessions||[]).length)+1,
-    progQuarterNum: window._mapTargetProgQ || progQuarterOf(selectedCase.switchOn||selectedCase.switchOnDate) || 1,
-    audiologist:   (document.getElementById('map-audiologist')||{}).value.trim()||'',
-    atOwnCentre:   atOwn,
-    mappingCentre: mapCtr,
-    mapCentreName: mapCtr,
-    mapCount:      (document.getElementById('map-count')||{}).value||'',
-    deviceStatus:  (document.getElementById('map-device')||{}).value||'',
-    soundField:    getR('map-soundfield'),
-    ecap:          getR('map-ecap'),
-    magnet:        getR('map-magnet'),
-    entReferral:   getR('map-entref'),
-    notes:         (document.getElementById('map-notes')||{}).value.trim()||'',
-    issueNone:     !!(document.getElementById('map-issue-none')||{}).checked,
-    issueProcessor:!!(document.getElementById('map-issue-proc')||{}).checked,
-    issueSutures:  !!(document.getElementById('map-issue-suture')||{}).checked,
-    issueSkin:     !!(document.getElementById('map-issue-skin')||{}).checked,
-    issueOther:    !!(document.getElementById('map-issue-other')||{}).checked,
-    issueDetail:   (document.getElementById('map-issue-detail')||{}).value.trim()||'',
-    rehabCentre:   window.currentUser?window.currentUser.unit:'',
-    submittedBy:   window.currentUser?window.currentUser.username:'',
-    caseId:        String(selectedCase.id),
-    caseName:      selectedCase.name||'',
-    caseHospital:  selectedCase.hospital||'',
-    caseDistrict:  selectedCase.district||'',
-    timestamp:     new Date().toISOString(),
-    entryId:       'MAP-'+Date.now()
+    date:           date,
+    sessionNum:     ((selectedCase._mappingSessions || []).length) + 1,
+    progQuarterNum: autoQ,
+    audiologist:    (document.getElementById('map-audiologist') || {}).value.trim() || '',
+    atOwnCentre:    atOwn,
+    mappingCentre:  mapCtr,
+    mapCentreName:  mapCtr,
+    mapCount:       (document.getElementById('map-count') || {}).value || '',
+    deviceStatus:   (document.getElementById('map-device') || {}).value || '',
+    soundField:     getR('map-soundfield'),
+    ecap:           getR('map-ecap'),
+    magnet:         getR('map-magnet'),
+    entReferral:    getR('map-entref'),
+    notes:          (document.getElementById('map-notes') || {}).value.trim() || '',
+    issueNone:      !!((document.getElementById('map-issue-none') || {}).checked),
+    issueProcessor: !!((document.getElementById('map-issue-proc') || {}).checked),
+    issueSutures:   !!((document.getElementById('map-issue-suture') || {}).checked),
+    issueSkin:      !!((document.getElementById('map-issue-skin') || {}).checked),
+    issueOther:     !!((document.getElementById('map-issue-other') || {}).checked),
+    issueDetail:    (document.getElementById('map-issue-detail') || {}).value.trim() || '',
+    rehabCentre:    window.currentUser ? window.currentUser.unit : '',
+    submittedBy:    window.currentUser ? window.currentUser.username : '',
+    caseId:         String(selectedCase.id),
+    caseName:       selectedCase.name || '',
+    caseHospital:   selectedCase.hospital || '',
+    caseDistrict:   selectedCase.district || '',
+    timestamp:      new Date().toISOString(),
+    entryId:        'MAP-' + Date.now()
   };
 
   try {
-    var _add=window._fbFns.addDoc, _col=window._fbFns.collection,
-        _doc=window._fbFns.doc,   _upd=window._fbFns.updateDoc;
-    await _add(_col(window._fbDb,'submissions_mapping'), rec);
-    var allM = (selectedCase._mappingSessions||[]).slice();
+    var _add = window._fbFns.addDoc, _col = window._fbFns.collection,
+        _doc = window._fbFns.doc,   _upd = window._fbFns.updateDoc;
+    await _add(_col(window._fbDb, 'submissions_mapping'), rec);
+    var allM = (selectedCase._mappingSessions || []).slice();
     allM.push(rec);
     var fid = selectedCase._docId || String(selectedCase.id);
-    await _upd(_doc(window._fbDb,'cases',fid),{
-      _mappingSessions:allM, _lastMappingDate:date,
-      _lastMappingCentre:mapCtr, _lastModified:new Date().toISOString()
-    });
-    var idx=SAMPLE_CASES.findIndex(function(c){return String(c.id)===String(selectedCase.id);});
-    if(idx>-1){ SAMPLE_CASES[idx]._mappingSessions=allM; SAMPLE_CASES[idx]._lastMappingDate=date; }
-    selectedCase._mappingSessions=allM; selectedCase._lastMappingDate=date;
-    if(btn){btn.disabled=false;btn.textContent='💾 Save Mapping Session →';}
-    alert('✅ Mapping session '+rec.sessionNum+' saved for '+selectedCase.name+(atOwn?'':' · at '+mapCtr)+'.');
-    openMappingList();
+    try {
+      await _upd(_doc(window._fbDb, 'cases', fid), {
+        _mappingSessions: allM, _lastMappingDate: date,
+        _lastMappingCentre: mapCtr, _lastModified: new Date().toISOString()
+      });
+    } catch(pe) { console.warn('case update blocked:', pe.message); }
+
+    // Update local cache
+    var idx = SAMPLE_CASES.findIndex(function(c){ return String(c.id) === String(selectedCase.id); });
+    if (idx > -1) {
+      SAMPLE_CASES[idx]._mappingSessions = allM;
+      SAMPLE_CASES[idx]._lastMappingDate = date;
+      SAMPLE_CASES[idx]._lastMappingCentre = mapCtr;
+    }
+    selectedCase._mappingSessions   = allM;
+    selectedCase._lastMappingDate   = date;
+    selectedCase._lastMappingCentre = mapCtr;
+
+    if (btn) { btn.disabled = false; btn.textContent = '\ud83d\udcbe Save Session \u2192'; }
+
+    // Refresh the form in-place so they can add the next session immediately
+    openMappingForm(selectedCase);
+
   } catch(e) {
-    if(errEl){errEl.textContent='Error: '+e.message;errEl.style.display='block';}
-    if(btn){btn.disabled=false;btn.textContent='💾 Save Mapping Session →';}
+    if (errEl) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = '\ud83d\udcbe Save Session \u2192'; }
   }
 }
-
 function openAVTEvalList() {
   var DAYS91 = 91.31 * 24 * 3600 * 1000;
   var cases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {

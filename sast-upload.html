@@ -384,7 +384,7 @@ async function doLogin() {
   btn.disabled = true;
 
   try {
-    const email = username + '@shravan-sanjeevini.in';
+    const email = username + '@shravan.app';
     const cred  = await window._fb.signInWithEmailAndPassword(window._auth, email, password);
 
     // Load Firestore user profile and verify role = state

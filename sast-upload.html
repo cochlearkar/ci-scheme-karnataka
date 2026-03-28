@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAST Excel Upload · Shravan Sanjeevini</title>
+<style>
+  :root {
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text: #1a1a2e;
+    --text-light: #64748b;
+    --blue: #2563eb;
+    --blue-dark: #1e3a5f;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+    --purple: #7c3aed;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #1e3a5f, #2563eb);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-back {
+    width: 36px; height: 36px;
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+  .header-title { color: #fff; font-size: 16px; font-weight: 700; }
+  .header-sub { color: rgba(255,255,255,.65); font-size: 11px; margin-top: 1px; }
+  .header-chip {
+    margin-left: auto;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  /* ── Body ── */
+  .body { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+  /* ── Auth gate ── */
+  #auth-gate {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .auth-gate-title { font-size: 14px; font-weight: 700; color: var(--blue-dark); margin-bottom: 4px; }
+  .auth-gate-sub { font-size: 12px; color: var(--text-light); margin-bottom: 16px; }
+  .field-label { font-size: 12px; font-weight: 600; color: var(--text-light); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .4px; }
+  .field-input {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit; color: var(--text);
+    background: #f8fafc;
+    margin-bottom: 12px;
+    outline: none;
+  }
+  .field-input:focus { border-color: var(--blue); background: #fff; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 700; color: var(--blue-dark);
+    margin-bottom: 4px;
+  }
+  .card-sub { font-size: 11px; color: var(--text-light); margin-bottom: 14px; }
+
+  /* ── Drop zone ── */
+  #drop-zone {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: #eff6ff;
+    border: 2px dashed #93c5fd;
+    border-radius: 10px;
+    padding: 22px;
+    cursor: pointer;
+    font-size: 13px; font-weight: 600; color: var(--blue);
+    transition: background .15s;
+  }
+  #drop-zone:hover { background: #dbeafe; }
+  #drop-zone.dragover { background: #dbeafe; border-color: var(--blue); }
+
+  /* ── Summary stat boxes ── */
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .stat-box {
+    border-radius: 10px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .stat-num { font-size: 22px; font-weight: 800; }
+  .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+
+  /* ── Preview list ── */
+  #preview-list {
+    max-height: 340px; overflow-y: auto;
+    border: 0.5px solid var(--border); border-radius: 10px;
+    margin-bottom: 14px;
+  }
+  .preview-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 12px;
+  }
+  .preview-row:last-child { border-bottom: none; }
+  .preview-badge {
+    flex-shrink: 0; padding: 2px 7px;
+    border-radius: 20px; font-size: 10px; font-weight: 700;
+    white-space: nowrap; margin-top: 1px;
+  }
+  .badge-new    { background: #dcfce7; color: #166534; }
+  .badge-update { background: #dbeafe; color: #1e40af; }
+  .badge-skip   { background: #f1f5f9; color: #64748b; }
+  .badge-warn   { background: #fef9c3; color: #854d0e; }
+  .preview-name { font-weight: 700; color: var(--text); }
+  .preview-detail { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+  .preview-change { font-size: 11px; color: var(--blue); margin-top: 2px; }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    width: 100%; padding: 15px;
+    background: linear-gradient(135deg, #1e3a5f, #2563eb);
+    color: #fff; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    font-family: inherit;
+    transition: opacity .15s;
+  }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-secondary {
+    padding: 10px 20px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit; color: var(--text);
+  }
+
+  /* ── Error box ── */
+  .error-box {
+    padding: 10px 12px;
+    background: var(--red-light); border: 1px solid #fecaca;
+    border-radius: 8px; font-size: 12px; color: var(--red);
+    margin-top: 8px;
+  }
+
+  /* ── Progress log ── */
+  #progress-wrap {
+    background: #0f172a; border-radius: 12px;
+    padding: 14px; margin-bottom: 14px;
+  }
+  #progress-log {
+    font-family: monospace; font-size: 11px; color: #4ade80;
+    max-height: 220px; overflow-y: auto; white-space: pre-wrap;
+  }
+  .log-warn  { color: #fbbf24; }
+  .log-error { color: #f87171; }
+  .log-info  { color: #94a3b8; }
+
+  /* ── Done banner ── */
+  #done-banner {
+    background: linear-gradient(135deg, #052e16, #166534);
+    border-radius: 14px; padding: 24px;
+    text-align: center; margin-bottom: 14px;
+  }
+
+  /* ── Warning banner ── */
+  .warn-banner {
+    background: var(--amber-light);
+    border: 1px solid #fcd34d;
+    border-radius: 10px; padding: 10px 14px;
+    font-size: 12px; color: #92400e;
+    margin-bottom: 14px;
+  }
+
+  /* ── Spinner ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block; vertical-align: middle; margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="header">
+  <a class="header-back" href="index.html">←</a>
+  <div>
+    <div class="header-title">📥 SAST Excel Upload</div>
+    <div class="header-sub">Shravan Sanjeevini · Karnataka CI Programme</div>
+  </div>
+  <div class="header-chip">State Admin Only</div>
+</div>
+
+<div class="body">
+
+  <!-- ── Step 0: Login ── -->
+  <div id="auth-gate">
+    <div class="auth-gate-title">🔐 Sign in as State Admin</div>
+    <div class="auth-gate-sub">Only state team accounts can sync Firebase data.</div>
+    <div class="field-label">Username</div>
+    <input class="field-input" id="login-user" type="text" placeholder="e.g. cochlearkar" autocomplete="username">
+    <div class="field-label">Password</div>
+    <input class="field-input" id="login-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn-primary" onclick="doLogin()" id="login-btn">Sign In</button>
+    <div id="login-error" class="error-box" style="display:none"></div>
+  </div>
+
+  <!-- ── Main tool (hidden until authenticated) ── -->
+  <div id="main-tool" style="display:none">
+
+    <!-- Logged-in badge -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--text-light)">Signed in as <strong id="user-badge" style="color:var(--blue-dark)"></strong></div>
+      <button class="btn-secondary" onclick="doLogout()" style="font-size:11px;padding:6px 12px">Sign out</button>
+    </div>
+
+    <!-- Step 1: File picker -->
+    <div class="card" id="step-pick">
+      <div class="card-title">Step 1 — Select SAST Claims Excel file</div>
+      <div class="card-sub">The .xlsx file exported from the SAST portal (Claims Data sheet)</div>
+      <label id="drop-zone">
+        <span style="font-size:26px">📂</span>
+        <span id="file-label">Tap to choose file · or drag &amp; drop</span>
+        <input type="file" accept=".xlsx" id="file-input" style="display:none">
+      </label>
+    </div>
+
+    <!-- Step 2: Analysis (hidden until file loaded) -->
+    <div id="step-analyse" style="display:none">
+      <div class="card">
+        <div class="card-title">Step 2 — Review before writing to Firebase</div>
+        <div class="card-sub">Each row from the Excel has been matched to Firebase. Review what will change.</div>
+
+        <!-- Summary stats -->
+        <div class="stat-grid" id="stat-grid"></div>
+
+        <!-- Filter tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap" id="filter-tabs"></div>
+
+        <!-- Preview rows -->
+        <div id="preview-list"></div>
+
+        <div class="warn-banner">
+          ⚠️ Only <strong>claim status</strong> and <strong>net paid amounts</strong> will be updated on existing cases. All rehab session logs, attendance data, and other fields are untouched.
+        </div>
+
+        <!-- Confirm button -->
+        <button class="btn-primary" id="confirm-btn" onclick="confirmWrite()">
+          ✅ Write Changes to Firebase →
+        </button>
+        <div id="confirm-error" class="error-box" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Progress log -->
+    <div id="progress-wrap" style="display:none">
+      <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+        Write Progress
+      </div>
+      <div id="progress-log"></div>
+    </div>
+
+    <!-- Done banner -->
+    <div id="done-banner" style="display:none">
+      <div style="font-size:36px;margin-bottom:10px">✅</div>
+      <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px" id="done-title"></div>
+      <div style="font-size:12px;color:rgba(255,255,255,.75)" id="done-sub"></div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
+        <button onclick="resetTool()" style="padding:10px 22px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+          Upload another file
+        </button>
+        <a href="index.html" style="padding:10px 22px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none">
+          Back to app
+        </a>
+      </div>
+    </div>
+
+  </div><!-- /main-tool -->
+</div><!-- /body -->
+
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp }  from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js';
+import { getFirestore, collection, getDocs, doc, setDoc, updateDoc, addDoc, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            'AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI',
+  authDomain:        'shravan-sanjeevini.firebaseapp.com',
+  projectId:         'shravan-sanjeevini',
+  storageBucket:     'shravan-sanjeevini.firebasestorage.app',
+  messagingSenderId: '130742586600',
+  appId:             '1:130742586600:web:1618bb56710c6fbbcc8d5d'
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// Expose to non-module scope
+window._auth = auth;
+window._db   = db;
+window._fb   = { signInWithEmailAndPassword, signOut, onAuthStateChanged, collection, getDocs, doc, setDoc, updateDoc, addDoc, serverTimestamp };
+
+onAuthStateChanged(auth, user => {
+  if (user) {
+    // Will be verified against Firestore profile in doLogin()
+    // but if page is refreshed while already logged in, restore UI
+    window._fbUser = user;
+  }
+});
+</script>
+
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════════════
+let currentUser   = null;   // { username, email, role, unit }
+let firestoreCases = [];    // live array from Firebase cases collection
+let analysedRows   = [];    // result of analyseExcel()
+let activeFilter   = 'all';
+
+// ═══════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════
+async function doLogin() {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const errEl    = document.getElementById('login-error');
+  const btn      = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+
+  if (!username || !password) {
+    errEl.textContent = 'Please enter username and password.';
+    errEl.style.display = 'block'; return;
+  }
+
+  btn.innerHTML = '<span class="spinner"></span>Signing in…';
+  btn.disabled = true;
+
+  try {
+    const email = username + '@shravan-sanjeevini.in';
+    const cred  = await window._fb.signInWithEmailAndPassword(window._auth, email, password);
+
+    // Load Firestore user profile and verify role = state
+    const { getDocs, collection } = window._fb;
+    const snap = await getDocs(window._fb.collection(window._db, 'users'));
+    const profile = snap.docs.map(d => d.data()).find(u =>
+      u.username === username || u.email === email
+    );
+
+    if (!profile) throw new Error('User profile not found.');
+    if (profile.role !== 'state') throw new Error('This tool is only accessible to state team accounts.');
+    if (profile.status && profile.status !== 'active') throw new Error('Account is not active.');
+
+    currentUser = profile;
+    document.getElementById('user-badge').textContent = profile.username || username;
+    document.getElementById('auth-gate').style.display   = 'none';
+    document.getElementById('main-tool').style.display   = 'block';
+
+    // Now load Firebase cases
+    await loadFirestoreCases();
+
+  } catch (e) {
+    errEl.textContent = e.message.includes('auth/') ? 'Invalid username or password.' : e.message;
+    errEl.style.display = 'block';
+    btn.innerHTML = 'Sign In';
+    btn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  await window._fb.signOut(window._auth);
+  currentUser = null; firestoreCases = []; analysedRows = [];
+  document.getElementById('auth-gate').style.display   = 'block';
+  document.getElementById('main-tool').style.display   = 'none';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+// Allow Enter key on login fields
+document.getElementById('login-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('login-user').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+// ═══════════════════════════════════════════════════════
+// LOAD FIREBASE CASES
+// ═══════════════════════════════════════════════════════
+async function loadFirestoreCases() {
+  const snap = await window._fb.getDocs(window._fb.collection(window._db, 'cases'));
+  firestoreCases = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+  logLine(`Loaded ${firestoreCases.length} existing cases from Firebase.`);
+}
+
+// ═══════════════════════════════════════════════════════
+// FILE INPUT & DRAG-DROP
+// ═══════════════════════════════════════════════════════
+const fileInput = document.getElementById('file-input');
+const dropZone  = document.getElementById('drop-zone');
+
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) processFile(fileInput.files[0]); });
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.xlsx')) processFile(f);
+  else alert('Please drop an .xlsx file.');
+});
+
+// ═══════════════════════════════════════════════════════
+// PROCESS FILE → PARSE EXCEL
+// ═══════════════════════════════════════════════════════
+function processFile(file) {
+  document.getElementById('file-label').textContent = '⏳ Reading ' + file.name + '…';
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'dd-mmm-yyyy' });
+
+      if (rows.length < 2) { alert('No data rows found in the file.'); return; }
+
+      document.getElementById('file-label').textContent = '✅ ' + file.name + ' (' + (rows.length - 1) + ' rows)';
+
+      analysedRows = analyseExcel(rows);
+      renderPreview();
+      document.getElementById('step-analyse').style.display = 'block';
+      document.getElementById('step-analyse').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    } catch(err) {
+      alert('Could not read Excel file: ' + err.message);
+      document.getElementById('file-label').textContent = 'Tap to choose file · or drag & drop';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════════════════
+// ANALYSE EXCEL ROWS
+// ═══════════════════════════════════════════════════════
+
+// Column indices (0-based) from SAST Claims Data sheet
+const COL = {
+  refNo:      1,
+  name:       2,
+  gender:     3,
+  age:        4,
+  zone:       5,
+  hospital:   6,
+  hospDist:   9,
+  doctor:     10,
+  caste:      13,
+  cardNo:     14,
+  tpaId:      15,
+  village:    19,
+  district:   20,
+  admitDate:  26,
+  dischDate:  27,
+  status:     32,
+  pkg:        38,
+  taluk:      59,
+  division:   61,
+  scheme:     74,
+  hospType:   84,
+  claimStatus:86,
+  finalAmt:   92,
+  netPaid:    94
+};
+
+function cleanStr(v) {
+  if (v === undefined || v === null) return '';
+  return String(v).trim();
+}
+
+function cleanAmt(v) {
+  if (v === undefined || v === null || v === '') return '';
+  const n = parseFloat(String(v).replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? '' : String(Math.round(n));
+}
+
+function formatDate(v) {
+  if (!v) return '';
+  // XLSX with dateNF gives dd-mmm-yyyy strings
+  if (typeof v === 'string' && v.length > 0) return v;
+  return '';
+}
+
+function pkgSlot(pkgRaw) {
+  const p = cleanStr(pkgRaw).toUpperCase();
+  if (p.startsWith('2001') || p.startsWith('3001')) return 'surg';
+  if (p.startsWith('2002')) return 'r1';
+  if (p.startsWith('2003')) return 'r2';
+  return null;
+}
+
+function analyseExcel(rows) {
+  const headers = rows[0];
+  const results = [];
+
+  // Build lookup maps from Firestore
+  const byTPA   = {};
+  const byName  = {};
+  firestoreCases.forEach(c => {
+    if (c.tpa)  byTPA[cleanStr(c.tpa)]              = c;
+    if (c.name) byName[cleanStr(c.name).toUpperCase()] = c;
+  });
+  const fbIds = new Set(firestoreCases.map(c => cleanStr(c.id)));
+
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.every(v => !v)) continue;  // skip blank rows
+
+    const cardNo   = cleanStr(r[COL.cardNo]);
+    const tpaId    = cleanStr(r[COL.tpaId]);
+    const nameRaw  = cleanStr(r[COL.name]);
+    const nameUp   = nameRaw.toUpperCase();
+    const slot     = pkgSlot(r[COL.pkg]);
+    const exStatus = cleanStr(r[COL.claimStatus] || r[COL.status]);
+    const exNet    = cleanAmt(r[COL.netPaid]);
+    const exAdmit  = formatDate(r[COL.admitDate]);
+    const exDisch  = formatDate(r[COL.dischDate]);
+    const exRef    = cleanStr(r[COL.refNo]);
+
+    if (!slot) continue;  // skip rows with unknown package
+
+    // ── Match to Firebase ──
+    let fbCase = byTPA[tpaId] || byName[nameUp] || null;
+
+    if (!fbCase) {
+      // Truly new case
+      if (!cardNo) continue; // can't add without a card number
+
+      // Build full new case object
+      const newCase = {
+        id: cardNo, tpa: tpaId, name: nameRaw,
+        gender:   cleanStr(r[COL.gender]),
+        age:      cleanStr(r[COL.age]),
+        caste:    cleanStr(r[COL.caste]),
+        zone:     cleanStr(r[COL.zone]),
+        district: cleanStr(r[COL.district]),
+        village:  cleanStr(r[COL.village]),
+        taluk:    cleanStr(r[COL.taluk]),
+        mobile:   '',
+        fy:       deriveFY(exAdmit),
+        hospital: cleanStr(r[COL.hospital]),
+        hospDist: cleanStr(r[COL.hospDist]),
+        doctor:   cleanStr(r[COL.doctor]),
+        hospType: cleanStr(r[COL.hospType]),
+        surgRefNo:'', surgAdmit:'', surgDisch:'', surgStatus:'', surgPkg:'', surgNet:'',
+        r1RefNo:  '', r1Admit:  '', r1Status: '', r1Net:  '',
+        r2RefNo:  '', r2Admit:  '', r2Status: '', r2Net:  '',
+        journey:  '', phase: '', totalNet: '0',
+        status:   'pending', risk: false, sessions: 0, totalSessions: 54,
+        lastContact: 'Not recorded',
+        _addedBy: currentUser ? currentUser.username : 'sast-upload',
+        _addedAt: new Date().toISOString()
+      };
+
+      // Fill the correct slot
+      if (slot === 'surg') {
+        newCase.surgRefNo = exRef; newCase.surgAdmit = exAdmit;
+        newCase.surgDisch  = exDisch; newCase.surgStatus = exStatus;
+        newCase.surgPkg    = cleanStr(r[COL.pkg]).substring(0, 6);
+        newCase.surgNet    = exNet;
+      } else if (slot === 'r1') {
+        newCase.r1RefNo = exRef; newCase.r1Admit = exAdmit;
+        newCase.r1Status = exStatus; newCase.r1Net = exNet;
+      } else {
+        newCase.r2RefNo = exRef; newCase.r2Admit = exAdmit;
+        newCase.r2Status = exStatus; newCase.r2Net = exNet;
+      }
+
+      recomputeJourney(newCase);
+
+      results.push({
+        action: 'NEW',
+        rowNum: i + 1,
+        name: nameRaw, cardNo, tpaId, slot,
+        exStatus, exNet, exAdmit,
+        newCase,
+        fbCase: null,
+        changes: []
+      });
+
+    } else {
+      // Existing case — check what needs updating
+      const changes = [];
+      const updates = {};
+
+      const statusField = slot === 'surg' ? 'surgStatus' : slot === 'r1' ? 'r1Status' : 'r2Status';
+      const netField    = slot === 'surg' ? 'surgNet'    : slot === 'r1' ? 'r1Net'    : 'r2Net';
+      const refField    = slot === 'surg' ? 'surgRefNo'  : slot === 'r1' ? 'r1RefNo'  : 'r2RefNo';
+      const admField    = slot === 'surg' ? 'surgAdmit'  : slot === 'r1' ? 'r1Admit'  : 'r2Admit';
+
+      // Fill ref/admit if currently empty
+      if (exRef && !cleanStr(fbCase[refField])) {
+        updates[refField] = exRef;
+        changes.push('Added Ref No');
+      }
+      if (exAdmit && !cleanStr(fbCase[admField])) {
+        updates[admField] = exAdmit;
+        changes.push('Added Admit Date');
+      }
+
+      // Update status if changed
+      if (exStatus && cleanStr(fbCase[statusField]) !== exStatus) {
+        const old = cleanStr(fbCase[statusField]) || '(blank)';
+        updates[statusField] = exStatus;
+        changes.push(`Status: ${old} → ${exStatus}`);
+      }
+
+      // Update net if changed and Excel has a value
+      if (exNet && cleanStr(fbCase[netField]) !== exNet) {
+        const old = cleanStr(fbCase[netField]) || '(blank)';
+        updates[netField] = exNet;
+        changes.push(`Net paid: ₹${old} → ₹${exNet}`);
+      }
+
+      if (changes.length === 0) {
+        results.push({ action: 'SKIP', rowNum: i+1, name: nameRaw, cardNo, tpaId, slot, exStatus, exNet, fbCase, changes: [] });
+      } else {
+        results.push({ action: 'UPDATE', rowNum: i+1, name: nameRaw, cardNo, tpaId, slot, exStatus, exNet, fbCase, updates, changes });
+      }
+    }
+  }
+
+  return results;
+}
+
+function deriveFY(dateStr) {
+  if (!dateStr) return '';
+  // dateStr like "16-May-2024" or "16/05/2024"
+  const m = dateStr.match(/(\d{4})/);
+  if (!m) return '';
+  const yr = parseInt(m[1]);
+  // FY: Apr to Mar
+  const monthStr = dateStr.toUpperCase();
+  const lateMonths = ['APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC','04','05','06','07','08','09','10','11','12'];
+  const isLate = lateMonths.some(mo => dateStr.includes(mo));
+  return isLate ? `${yr}-${yr+1}` : `${yr-1}-${yr}`;
+}
+
+function recomputeJourney(c) {
+  const hasSurg = c.surgRefNo || c.surgAdmit;
+  const hasR1   = c.r1RefNo   || c.r1Admit;
+  const hasR2   = c.r2RefNo   || c.r2Admit;
+
+  const parts = [];
+  if (hasSurg) parts.push('Surgery');
+  if (hasR1)   parts.push('Rehab1');
+  if (hasR2)   parts.push('Rehab2');
+  c.journey = parts.join(' → ') || 'Pre-auth';
+  c.phase   = c.journey;
+
+  // Compute status
+  if (c.r2Status === 'CLAIMS PAID') c.status = 'paid';
+  else if (hasR2) c.status = 'rehab2';
+  else if (c.r1Status === 'CLAIMS PAID') c.status = 'rehab2';
+  else if (hasR1) c.status = 'rehab1';
+  else if (hasSurg) c.status = 'rehab1';
+  else c.status = 'pending';
+
+  // Compute total net
+  const sum = [c.surgNet, c.r1Net, c.r2Net]
+    .map(v => parseFloat(v) || 0).reduce((a,b) => a+b, 0);
+  c.totalNet = sum > 0 ? String(sum) : '0';
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER PREVIEW
+// ═══════════════════════════════════════════════════════
+function renderPreview() {
+  const newCount    = analysedRows.filter(r => r.action === 'NEW').length;
+  const updateCount = analysedRows.filter(r => r.action === 'UPDATE').length;
+  const skipCount   = analysedRows.filter(r => r.action === 'SKIP').length;
+  const total       = analysedRows.length;
+
+  // Stat boxes
+  const statGrid = document.getElementById('stat-grid');
+  statGrid.innerHTML = `
+    <div class="stat-box" style="background:#dcfce7;color:#166534">
+      <div class="stat-num">${newCount}</div>
+      <div class="stat-label">✨ New cases to add</div>
+    </div>
+    <div class="stat-box" style="background:#dbeafe;color:#1e40af">
+      <div class="stat-num">${updateCount}</div>
+      <div class="stat-label">🔄 Existing to update</div>
+    </div>
+    <div class="stat-box" style="background:#f1f5f9;color:#475569">
+      <div class="stat-num">${skipCount}</div>
+      <div class="stat-label">⏭ Already up to date</div>
+    </div>
+    <div class="stat-box" style="background:#f8fafc;color:#334155">
+      <div class="stat-num">${total}</div>
+      <div class="stat-label">📋 Total rows matched</div>
+    </div>
+  `;
+
+  // Filter tabs
+  const tabsEl = document.getElementById('filter-tabs');
+  const filters = [
+    { key:'all',    label:`All (${total})` },
+    { key:'NEW',    label:`✨ New (${newCount})` },
+    { key:'UPDATE', label:`🔄 Updates (${updateCount})` },
+    { key:'SKIP',   label:`⏭ Skip (${skipCount})` }
+  ];
+  tabsEl.innerHTML = filters.map(f => `
+    <button onclick="setFilter('${f.key}')" id="tab-${f.key}"
+      style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
+             border:1px solid ${activeFilter===f.key?'var(--blue)':'var(--border)'};
+             background:${activeFilter===f.key?'#dbeafe':'var(--surface)'};
+             color:${activeFilter===f.key?'var(--blue)':'var(--text-light)'}">
+      ${f.label}
+    </button>
+  `).join('');
+
+  // Preview list
+  renderPreviewRows();
+
+  // Show/hide confirm button
+  const actionable = newCount + updateCount;
+  document.getElementById('confirm-btn').style.display = actionable > 0 ? 'block' : 'none';
+  if (actionable === 0) {
+    const noAction = document.createElement('div');
+    noAction.style.cssText = 'text-align:center;padding:16px;font-size:13px;color:var(--text-light)';
+    noAction.textContent = '✅ Firebase is already up to date — nothing to write.';
+    document.getElementById('preview-list').after(noAction);
+  }
+}
+
+function setFilter(f) {
+  activeFilter = f;
+  renderPreview();
+}
+
+function renderPreviewRows() {
+  const list = document.getElementById('preview-list');
+  const rows = activeFilter === 'all' ? analysedRows : analysedRows.filter(r => r.action === activeFilter);
+
+  if (rows.length === 0) {
+    list.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:var(--text-light)">No rows in this category.</div>';
+    return;
+  }
+
+  list.innerHTML = rows.map(r => {
+    let badgeClass = 'badge-skip', badgeText = 'SKIP';
+    if (r.action === 'NEW')    { badgeClass = 'badge-new';    badgeText = 'NEW'; }
+    if (r.action === 'UPDATE') { badgeClass = 'badge-update'; badgeText = 'UPDATE'; }
+
+    const slotLabel = r.slot === 'surg' ? 'Surgery' : r.slot === 'r1' ? 'Rehab 1' : 'Rehab 2';
+    const fbId = r.fbCase ? (r.fbCase._docId || r.fbCase.id || '—') : '—';
+    const detail = r.action === 'NEW'
+      ? `Card: ${r.cardNo || '—'} · TPA: ${r.tpaId || '—'} · ${slotLabel}`
+      : `Firebase ID: ${fbId} · ${slotLabel}`;
+
+    const changes = r.changes && r.changes.length > 0
+      ? `<div class="preview-change">↳ ${r.changes.join(' · ')}</div>` : '';
+
+    return `<div class="preview-row">
+      <span class="preview-badge ${badgeClass}">${badgeText}</span>
+      <div>
+        <div class="preview-name">${r.name || '—'}</div>
+        <div class="preview-detail">${detail}</div>
+        ${changes}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// WRITE TO FIREBASE
+// ═══════════════════════════════════════════════════════
+async function confirmWrite() {
+  const btn    = document.getElementById('confirm-btn');
+  const errEl  = document.getElementById('confirm-error');
+  errEl.style.display = 'none';
+
+  const toWrite = analysedRows.filter(r => r.action === 'NEW' || r.action === 'UPDATE');
+  if (toWrite.length === 0) { errEl.textContent = 'Nothing to write.'; errEl.style.display = 'block'; return; }
+
+  btn.innerHTML = '<span class="spinner"></span>Writing to Firebase…';
+  btn.disabled  = true;
+
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('progress-wrap').scrollIntoView({ behavior: 'smooth' });
+  const logEl = document.getElementById('progress-log');
+  logEl.innerHTML = '';
+
+  const { doc, setDoc, updateDoc, addDoc, collection, serverTimestamp } = window._fb;
+
+  let added = 0, updated = 0, errors = 0;
+
+  for (const row of toWrite) {
+    try {
+      if (row.action === 'NEW') {
+        const docId = row.cardNo || row.tpaId;
+        await setDoc(doc(window._db, 'cases', docId), row.newCase);
+
+        // Audit log
+        await addDoc(collection(window._db, 'submissions_state'), {
+          caseId: docId, field: 'sast_import_new',
+          fieldLabel: 'SAST Excel Import — New Case',
+          oldVal: '', newVal: row.name,
+          reason: 'SAST Excel upload by ' + (currentUser?.username || 'state'),
+          tier: 3, status: 'applied', role: 'state',
+          submittedBy: currentUser?.username || 'state',
+          timestamp: new Date().toISOString()
+        }).catch(() => {});  // audit failure is non-blocking
+
+        logLine(`✅ ADDED   ${row.name} (${docId})`);
+        added++;
+
+      } else {
+        // UPDATE
+        const fbDocId = row.fbCase._docId || row.fbCase.id;
+
+        // Also recompute journey/status/totalNet if we changed any slot fields
+        const augmentedCase = { ...row.fbCase, ...row.updates };
+        recomputeJourney(augmentedCase);
+        const fullUpdates = {
+          ...row.updates,
+          journey:  augmentedCase.journey,
+          phase:    augmentedCase.phase,
+          status:   augmentedCase.status,
+          totalNet: augmentedCase.totalNet
+        };
+
+        await updateDoc(doc(window._db, 'cases', fbDocId), fullUpdates);
+
+        // Audit log
+        await addDoc(collection(window._db, 'submissions_state'), {
+          caseId: row.fbCase.id || fbDocId, field: 'sast_import_update',
+          fieldLabel: 'SAST Excel Import — Field Update',
+          oldVal: '', newVal: row.changes.join('; '),
+          reason: 'SAST Excel upload by ' + (currentUser?.username || 'state'),
+          tier: 3, status: 'applied', role: 'state',
+          submittedBy: currentUser?.username || 'state',
+          timestamp: new Date().toISOString()
+        }).catch(() => {});
+
+        logLine(`🔄 UPDATED ${row.name} — ${row.changes.join(', ')}`);
+        updated++;
+      }
+
+    } catch(e) {
+      logLine(`❌ ERROR   ${row.name} — ${e.message}`, 'error');
+      errors++;
+    }
+  }
+
+  // Summary
+  logLine('');
+  logLine(`─────────────────────────────────`, 'info');
+  logLine(`Done.  Added: ${added}  Updated: ${updated}  Errors: ${errors}`, 'info');
+
+  // Show done banner
+  document.getElementById('done-title').textContent =
+    `Firebase Updated — ${added + updated} changes written`;
+  document.getElementById('done-sub').textContent =
+    `${added} new cases added · ${updated} existing cases updated · ${errors} errors`;
+  document.getElementById('done-banner').style.display = 'block';
+  document.getElementById('done-banner').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+function logLine(msg, type) {
+  const logEl = document.getElementById('progress-log');
+  const span  = document.createElement('span');
+  if (type === 'error') span.className = 'log-error';
+  else if (type === 'info') span.className = 'log-info';
+  span.textContent = msg + '\n';
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function resetTool() {
+  analysedRows = []; activeFilter = 'all';
+  document.getElementById('file-input').value  = '';
+  document.getElementById('file-label').textContent = 'Tap to choose file · or drag & drop';
+  document.getElementById('step-analyse').style.display  = 'none';
+  document.getElementById('progress-wrap').style.display = 'none';
+  document.getElementById('done-banner').style.display   = 'none';
+  document.getElementById('confirm-btn').disabled = false;
+  document.getElementById('confirm-btn').innerHTML = '✅ Write Changes to Firebase →';
+  document.getElementById('confirm-error').style.display = 'none';
+  document.getElementById('progress-log').innerHTML = '';
+}
+</script>
+</body>
+</html>

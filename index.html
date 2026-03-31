@@ -2691,6 +2691,145 @@ function openAVTMissing() {
 // ══════════════════════════════════════════════════════════════════════════════
 // REHAB — MAPPING SESSIONS LIST
 // ══════════════════════════════════════════════════════════════════════════════
+// =============================================================================
+// REHAB — QUARTERLY EVALUATION CASE LIST
+// =============================================================================
+function openAVTEvalList() {
+  var DAYS91 = 91.31 * 24 * 3600 * 1000;
+  var allMyCases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
+    return !!(c.switchOn || c.switchOnDate);
+  });
+  var dueCases = allMyCases.filter(function(c) {
+    var soStr = c.switchOn || c.switchOnDate || '';
+    if (!soStr || isNaN(new Date(soStr))) return false;
+    if (!c['_evalQ0']) return true;
+    var soD = new Date(soStr);
+    for (var q = 1; q <= 8; q++) {
+      var dueTs = soD.getTime() + q * DAYS91;
+      if (dueTs > Date.now() + 14*24*3600*1000) break;
+      if (!c['_evalQ'+q]) return true;
+    }
+    return false;
+  });
+  var cases = dueCases.length > 0 ? dueCases : allMyCases;
+
+  var existing = document.getElementById('avt-eval-list-overlay');
+  if (existing) existing.remove();
+  var ov = document.createElement('div');
+  ov.id = 'avt-eval-list-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:#f8fafc;z-index:9999;display:flex;flex-direction:column;overflow:hidden';
+
+  function evalCard(c) {
+    var soStr = (c.switchOn||c.switchOnDate||'').substring(0,10);
+    var soD   = new Date(soStr);
+    var nm    = isDemo() ? maskName(c.name) : (c.name||'\u2014');
+    var nextQ = 0;
+    if (c['_evalQ0']) {
+      nextQ = 1;
+      for (var q = 1; q <= 8; q++) {
+        var dueTs = soD.getTime() + q * 91.31*24*3600*1000;
+        if (dueTs <= Date.now() + 14*24*3600*1000 && !c['_evalQ'+q]) { nextQ = q; break; }
+        if (dueTs > Date.now() + 14*24*3600*1000) { nextQ = q; break; }
+      }
+    }
+    var qRomans = ['I','II','III','IV','V','VI','VII','VIII'];
+    var qLabel  = nextQ === 0 ? 'Baseline' : (qRomans[nextQ-1]||String(nextQ));
+    var dueDate = nextQ === 0 ? soStr : new Date(soD.getTime() + nextQ*91.31*24*3600*1000).toISOString().substring(0,10);
+    var overdue = !c['_evalQ'+nextQ] && new Date(dueDate) < new Date();
+    var done    = nextQ > 0 && c['_evalQ'+nextQ];
+    return '<div class="avt-eval-row" data-id="'+c.id+'" data-q="'+nextQ+'" '
+      +'style="background:#fff;border-bottom:1px solid #f1f5f9;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:6px">'
+      +'<span style="font-size:13px;font-weight:700;color:#111">'+nm+'</span>'
+      +'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;'
+      +(done ? 'background:#dcfce7;color:#16a34a' : overdue ? 'background:#fef2f2;color:#dc2626' : 'background:#f5f3ff;color:#5a3580')+'">'
+      +'Q'+qLabel+(done?' \u2713':overdue?' \u2014 Overdue':'')+'</span>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-top:5px">'
+      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">District:</span> '+(isDemo()?'***':(c.district||'\u2014'))+'</div>'
+      +'<div style="font-size:10px;color:#6b7280"><span style="color:#374151;font-weight:600">Switch-on:</span> '+(soStr||'\u2014')+'</div>'
+      +'</div></div>'
+      +'<div style="font-size:20px;color:#d1d5db">\u203a</div>'
+      +'</div>';
+  }
+
+  function buildGrouped(cases) {
+    if (!cases.length) return '<div style="padding:48px 24px;text-align:center;color:#9ca3af;font-size:14px">No active cases with switch-on date</div>';
+    var hospMap = {};
+    cases.forEach(function(c) {
+      var h=c.hospital||'Unknown Hospital', fy=c.fy||'Unknown Year';
+      if(!hospMap[h]) hospMap[h]={};
+      if(!hospMap[h][fy]) hospMap[h][fy]=[];
+      hospMap[h][fy].push(c);
+    });
+    var html='';
+    Object.keys(hospMap).sort().forEach(function(hosp,hi) {
+      var hCases=Object.values(hospMap[hosp]).reduce(function(a,b){return a.concat(b);},[]);
+      var hId='eh'+hi, inner='';
+      Object.keys(hospMap[hosp]).sort().forEach(function(fy,fi) {
+        var fyId=hId+'f'+fi;
+        inner+='<div style="background:#f9fafb;padding:7px 14px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;cursor:pointer" '
+          +'onclick="var e=document.getElementById(\''+fyId+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'"><span style="font-size:11px;font-weight:700;color:#374151">FY '+fy+'</span>'
+          +'<span style="font-size:10px;color:#6b7280">'+hospMap[hosp][fy].length+' cases</span></div>'
+          +'<div id="'+fyId+'" style="display:none">'+hospMap[hosp][fy].map(evalCard).join('')+'</div>';
+      });
+      html+='<div style="margin:10px 12px 0;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb">'
+        +'<div style="background:#f5f3ff;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" '
+        +'onclick="var e=document.getElementById(\''+hId+'\');e.style.display=e.style.display===\'none\'?\'block\':\'none\'">'
+        +'<div style="font-size:13px;font-weight:700;color:#5a3580">\ud83c\udfe5 '+hosp+'</div>'
+        +'<span style="font-size:11px;color:#6b7280">'+hCases.length+' cases</span></div>'
+        +'<div id="'+hId+'" style="display:none">'+inner+'</div></div>';
+    });
+    html+='<div style="height:20px"></div>';
+    return html;
+  }
+
+  var subtitle = dueCases.length>0 ? dueCases.length+' pending \u00b7 tap hospital to expand' : 'All up to date \u00b7 tap to review any case';
+  ov.innerHTML =
+    '<div style="background:#5a3580;padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">'
+    +'<div id="avt-eval-back" style="background:rgba(255,255,255,.2);border-radius:10px;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;font-size:18px">\u2190</div>'
+    +'<div><div style="color:#fff;font-weight:700;font-size:15px">\ud83c\udfaf Quarterly Evaluation</div>'
+    +'<div style="color:rgba(255,255,255,.7);font-size:11px">'+subtitle+'</div></div>'
+    +'</div>'
+    +'<div style="flex:1;overflow-y:auto">'+buildGrouped(cases)+'</div>';
+
+  document.body.appendChild(ov);
+  document.getElementById('avt-eval-back').addEventListener('click', function() {
+    document.getElementById('avt-eval-list-overlay').remove();
+  });
+  ov.querySelector('[style*="overflow-y:auto"]').addEventListener('click', function(e) {
+    var row=e.target.closest('.avt-eval-row');
+    if(!row) return;
+    var id=row.getAttribute('data-id'), q=parseInt(row.getAttribute('data-q'),10);
+    var cas=SAMPLE_CASES.find(function(x){return String(x.id)===String(id);});
+    if(!cas) return;
+    if(!cas['_evalQ0']) {
+      var pop=document.createElement('div');
+      pop.id='baseline-popup';
+      pop.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10001;display:flex;align-items:center;justify-content:center;padding:24px';
+      pop.innerHTML='<div style="background:#fff;border-radius:16px;padding:24px;max-width:340px;width:100%">'
+        +'<div style="font-size:22px;text-align:center;margin-bottom:12px">\ud83d\udccb</div>'
+        +'<div style="font-size:15px;font-weight:700;color:#111;margin-bottom:8px;text-align:center">Baseline Evaluation Not Done</div>'
+        +'<div style="font-size:13px;color:#374151;line-height:1.6;margin-bottom:16px">Baseline has not been filled for <strong>'+(cas.name||'this child')+'</strong>.<br><br>You can proceed directly to <strong>Quarter I</strong> if baseline was missed.</div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px">'
+        +'<button id="bp-baseline" style="padding:12px;background:#5a3580;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Fill Baseline Evaluation</button>'
+        +'<button id="bp-q1" style="padding:12px;background:#f5f3ff;color:#5a3580;border:1.5px solid #c4b5fd;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Skip to Quarter I \u2192</button>'
+        +'<button id="bp-cancel" style="padding:10px;background:transparent;color:#6b7280;border:none;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>'
+        +'</div></div>';
+      document.body.appendChild(pop);
+      document.getElementById('bp-baseline').addEventListener('click',function(){pop.remove();document.getElementById('avt-eval-list-overlay').remove();selectedCase=cas;openQEScreen(cas,0);});
+      document.getElementById('bp-q1').addEventListener('click',function(){pop.remove();document.getElementById('avt-eval-list-overlay').remove();selectedCase=cas;openQEScreen(cas,1);});
+      document.getElementById('bp-cancel').addEventListener('click',function(){pop.remove();});
+      return;
+    }
+    document.getElementById('avt-eval-list-overlay').remove();
+    selectedCase=cas;
+    openQEScreen(cas,q);
+  });
+}
+
+
 function openMappingList() {
   var myCases = filterCasesByUser(SAMPLE_CASES).filter(function(c) {
     return !!(c.switchOn || c.switchOnDate);
@@ -3969,17 +4108,15 @@ function buildHome() {
       <div class="action-arrow">→</div>
     </div>`;
 
-    // Button 3: Children due for Quarterly Evaluation
-    if (dueEval.length > 0) {
-      html += `<div class="action-card primary" onclick="openAVTEvalList()" style="background:#5a3580;border-color:#5a3580">
-        <div class="action-icon">🎯</div>
-        <div>
-          <div class="action-title">${dueEval.length} child${dueEval.length!==1?'ren':''} due for Quarterly Evaluation</div>
-          <div class="action-desc">Rehabilitation Update · Mapping Report</div>
-        </div>
-        <div class="action-arrow" style="color:#fff">→</div>
-      </div>`;
-    }
+    // Button 3: Children due for Quarterly Evaluation — always shown
+    html += `<div class="action-card primary" onclick="openAVTEvalList()" style="background:#5a3580;border-color:#5a3580">
+      <div class="action-icon">🎯</div>
+      <div>
+        <div class="action-title">${dueEval.length > 0 ? dueEval.length + ' child' + (dueEval.length!==1?'ren':'') + ' due for Quarterly Evaluation' : 'Quarterly Evaluation'}</div>
+        <div class="action-desc">${dueEval.length > 0 ? 'Tap to fill evaluation forms' : 'All evaluations up to date · tap to review'}</div>
+      </div>
+      <div class="action-arrow" style="color:#fff">→</div>
+    </div>`;
 
     // Button 3: Children missing AVT
     if (rehabMissing.length > 0) {

@@ -3696,60 +3696,62 @@ function buildHome() {
   html += `<div class="section-label">Quick action</div><div class="action-grid">`;
 
   if (currentRole === 'hospital') {
-    const pending = allMyCases.filter(c => !isHospitalUpdated(c)).length;
-    const updated = allMyCases.filter(c =>  isHospitalUpdated(c)).length;
-    if (pending > 0) {
-      html += `<div class="action-card primary" onclick="openHospCasesOverlay('pending')" style="background:var(--red);border-color:var(--red)"><div class="action-icon">🔴</div><div><div class="action-title">${pending} case${pending!==1?'s':''} need your update</div><div class="action-desc">Surgery &amp; device details not yet submitted</div></div><div class="action-arrow">→</div></div>`;
-    }
+    const pending   = allMyCases.filter(c => !isHospitalUpdated(c)).length;
+    const nmiCases  = allMyCases.filter(function(cas){
+      var d = getSASTClaims(cas);
+      return d && d.c.some(function(cl){ return cl.st==='NEED MORE INFO'||cl.st==='RECONSIDER'; });
+    });
+    const avtAlerts = avtRed.length;
 
-    if (avtRed.length > 0) {
-      html += `<div class="action-card primary" onclick="openHospCasesOverlay('alerts')" style="background:#8a2a2a;border-color:#8a2a2a"><div class="action-icon">🎧</div><div><div class="action-title">${avtRed.length} child${avtRed.length!==1?'ren':''} missing AVT 🔴</div><div class="action-desc">Not attending regularly — tap to review</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
-    }
-    html += `<div class="action-card" onclick="window.open('dashboard.html','_blank')"><div class="action-icon">📊</div><div class="action-title">Dashboard</div><div class="action-desc">Programme overview</div></div>`;
-    html += `<div class="action-card" onclick="openResources()"><div class="action-icon">📚</div><div class="action-title">Resources</div><div class="action-desc">Guidelines · Rates · Checklists</div></div>`;
-
-    // Close action grid then show attention section
+    // Close the action-grid div opened above (not used for hospital)
     html += `</div>`;
 
-    // ── Cases needing attention — Clinical + Administrative ────────────────
-    const clinicalCases = allMyCases.filter(c => c._attendanceFlag === 'red');
-    const adminCases    = allMyCases.filter(c => adminRisk(c));
-
-    if (clinicalCases.length || adminCases.length) {
-      html += `<div class="section-label" style="margin-top:16px">Cases needing attention</div>`;
-
-      if (clinicalCases.length) {
-        html += `<div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 6px;display:flex;align-items:center;gap:5px">🎧 Clinical — AVT Attendance Concerns (${clinicalCases.length})</div>`;
-        clinicalCases.forEach(c => {
-          const daysSince = c._lastRehabDate ? Math.floor((Date.now()-new Date(c._lastRehabDate))/86400000) : null;
-          const lastInfo  = daysSince !== null ? `Last session ${daysSince}d ago`
-                          : (c.switchOn||c.switchOnDate) ? 'AVT not yet started' : 'Switch-on not recorded';
-          html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
-            <div class="alert-dot" style="background:#dc2626"></div>
-            <div style="flex:1"><div class="alert-name">${c.name}</div>
-            <div class="alert-detail">${c.village||c.taluk} · ${lastInfo}</div></div>
-            <span class="alert-tag" style="background:#fee2e2;color:#dc2626">AVT concern</span>
-          </div>`;
-        });
+    // 1. URGENT BANNER (only when action needed)
+    if (pending > 0 || nmiCases.length > 0 || avtAlerts > 0) {
+      html += `<div style="background:#fff8f0;border:1.5px solid #fcd34d;border-radius:14px;padding:14px 16px;margin-bottom:14px">`;
+      html += `<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">&#128308; Action needed</div>`;
+      if (pending > 0) {
+        html += `<div onclick="openHospCasesOverlay('pending')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid #fde68a;cursor:pointer"><div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:#dc2626"></div><span style="font-size:12px;font-weight:600;color:#1a1a1a">${pending} case${pending!==1?'s':''} awaiting surgery details</span></div><span style="font-size:14px;color:#d97706">&#8594;</span></div>`;
       }
-
-      if (adminCases.length) {
-        html += `<div style="font-size:10px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:.5px;margin:${clinicalCases.length?'14px':'8px'} 0 6px;display:flex;align-items:center;gap:5px">📋 Administrative — Claim / TPA Issues (${adminCases.length})</div>`;
-        adminCases.forEach(c => {
-          const claimStatus = c.surgStatus && c.surgStatus !== 'CLAIMS PAID' ? c.surgStatus
-                            : (c.r1Status  && c.r1Status  !== 'CLAIMS PAID' ? c.r1Status : 'Claim flagged');
-          html += `<div class="alert-card" onclick="openCaseFromList('${c.id}')">
-            <div class="alert-dot" style="background:#d97706"></div>
-            <div style="flex:1"><div class="alert-name">${c.name}</div>
-            <div class="alert-detail">${c.village||c.taluk} · ${claimStatus}</div></div>
-            <span class="alert-tag" style="background:#fef3c7;color:#92400e">Claim issue</span>
-          </div>`;
-        });
+      if (nmiCases.length > 0) {
+        var _nmiAmt=0;
+        nmiCases.forEach(function(c){ var d=getSASTClaims(c); if(d) d.c.forEach(function(cl){ if(cl.st==='NEED MORE INFO'||cl.st==='RECONSIDER') _nmiAmt+=cl.amt; }); });
+        html += `<div id="hosp-nmi-banner" style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;${avtAlerts>0?'border-bottom:0.5px solid #fde68a;':''}cursor:pointer"><div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:#d97706"></div><span style="font-size:12px;font-weight:600;color:#1a1a1a">${nmiCases.length} SAST claim${nmiCases.length!==1?'s':''} need info &mdash; &#8377;${Math.round(_nmiAmt/1000)}K blocked</span></div><span style="font-size:14px;color:#d97706">&#8594;</span></div>`;
       }
+      if (avtAlerts > 0) {
+        html += `<div onclick="openHospCasesOverlay('alerts')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;cursor:pointer"><div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:#dc2626"></div><span style="font-size:12px;font-weight:600;color:#1a1a1a">${avtAlerts} child${avtAlerts!==1?'ren':''} missing AVT sessions</span></div><span style="font-size:14px;color:#d97706">&#8594;</span></div>`;
+      }
+      html += `</div>`;
     }
 
+    // 2. STATS ROW
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">`;
+    html += `<div onclick="openHospCasesOverlay('all')" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer"><div style="font-size:22px;font-weight:800;color:var(--text)">${allMyCases.length}</div><div style="font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-top:2px">Total</div></div>`;
+    html += `<div onclick="openHospCasesOverlay('pending')" style="background:${pending>0?'#fff7ed':'var(--surface)'};border:1px solid ${pending>0?'#fcd34d':'var(--border)'};border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer"><div style="font-size:22px;font-weight:800;color:${pending>0?'#d97706':'var(--text-light)'}">${pending}</div><div style="font-size:9px;font-weight:700;color:${pending>0?'#92400e':'var(--text-light)'};text-transform:uppercase;margin-top:2px">Pending</div></div>`;
+    html += `<div onclick="openHospCasesOverlay('alerts')" style="background:${avtAlerts>0?'#fef2f2':'var(--surface)'};border:1px solid ${avtAlerts>0?'#fecaca':'var(--border)'};border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer"><div style="font-size:22px;font-weight:800;color:${avtAlerts>0?'#dc2626':'var(--text-light)'}">${avtAlerts}</div><div style="font-size:9px;font-weight:700;color:${avtAlerts>0?'#991b1b':'var(--text-light)'};text-transform:uppercase;margin-top:2px">AVT alerts</div></div>`;
+    html += `</div>`;
 
-    // Hospital does not get a transfer button — they only recommend
+    // 3. SAST CLAIMS PANEL (primary content)
+    html += buildSASTHomePanel(allMyCases);
+
+    // 4. QUICK ACTIONS
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">`;
+    html += `<div onclick="buildCaseList();showScreen('cases')" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;display:flex;align-items:center;gap:10px"><span style="font-size:20px">&#128203;</span><div><div style="font-size:12px;font-weight:700;color:var(--text)">Browse Cases</div><div style="font-size:10px;color:var(--text-light)">${allMyCases.length} total</div></div></div>`;
+    html += `<div onclick="openHospCasesOverlay('pending')" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;display:flex;align-items:center;gap:10px"><span style="font-size:20px">&#9999;&#65039;</span><div><div style="font-size:12px;font-weight:700;color:var(--text)">Surgery Data</div><div style="font-size:10px;color:var(--text-light)">${pending} pending</div></div></div>`;
+    html += `</div>`;
+
+    // 5. UTILITIES at bottom, muted
+    html += `<div style="display:flex;gap:8px">`;
+    html += `<div onclick="window.open('dashboard.html','_blank')" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:6px"><span style="font-size:14px">&#128202;</span><span style="font-size:10px;font-weight:600;color:var(--text-light)">Dashboard</span></div>`;
+    html += `<div onclick="openResources()" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;cursor:pointer;display:flex;align-items:center;gap:6px"><span style="font-size:14px">&#128218;</span><span style="font-size:10px;font-weight:600;color:var(--text-light)">Resources</span></div>`;
+    html += `</div>`;
+
+    setTimeout(function(){
+      var b = document.getElementById('hosp-nmi-banner');
+      if (b) b.onclick = function(){ openSASTClaimsList('nmi'); };
+    }, 0);
+
+    // Hospital does not get a transfer button
     var hospSlot = document.getElementById('summary-transfer-slot');
     if (hospSlot) hospSlot.style.display = 'none';
   } else if (currentRole === 'rehab') {
@@ -3867,6 +3869,7 @@ function buildHome() {
     html += `<div class="action-card primary" onclick="openPendingCorrections()" style="background:#4a2a7a;border-color:#4a2a7a"><div class="action-icon">📨</div><div><div class="action-title">Correction Requests</div><div class="action-desc">Tier 2 — Review &amp; approve pending corrections</div></div><div class="action-arrow" style="color:#fff">→</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#1d4ed8,#4338ca);border:none" onclick="window.open('dashboard.html','_blank')"><div class="action-icon" style="font-size:22px">📊</div><div class="action-title" style="color:#fff">Dashboard</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Charts &amp; Trends</div></div>`;
     html += `<div class="action-card" style="background:linear-gradient(135deg,#0a3d2e,#1a6b4a);border:none" onclick="window.open('reports.html','_blank')"><div class="action-icon" style="font-size:22px">📋</div><div class="action-title" style="color:#fff">Reports</div><div class="action-desc" style="color:rgba(255,255,255,.7)">District · Hospital · FY · At-risk</div></div>`;
+    html += `<div class="action-card" style="background:linear-gradient(135deg,#1e3a5f,#2563eb);border:none" onclick="window.open('sast-upload.html','_blank')"><div class="action-icon" style="font-size:22px">&#128229;</div><div class="action-title" style="color:#fff">SAST Upload</div><div class="action-desc" style="color:rgba(255,255,255,.7)">Sync claims from Excel</div></div>`;
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#128C7E,#25D366);border:none;cursor:pointer" onclick="shareWhatsApp()"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">📤</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Share Daily Update on WhatsApp</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Tap to open WhatsApp with today's hospital summary pre-filled</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
     html += `<div class="action-card" style="grid-column:span 2;background:linear-gradient(135deg,#7f1d1d,#dc2626);border:none;cursor:pointer" onclick="buildDeleteCaseList();showScreen('cases')"><div style="display:flex;align-items:center;gap:12px;width:100%"><div style="font-size:28px">🗑️</div><div style="flex:1"><div style="color:#fff;font-size:14px;font-weight:600">Delete / Manage Cases</div><div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:2px">Remove duplicate cases · Clear wrong hospital data</div></div><div style="color:#fff;font-size:20px">→</div></div></div>`;
     html += `<div class="action-card" style="grid-column:span 2" onclick="openResources()"><div class="action-icon">📚</div><div><div class="action-title">Resources</div><div class="action-desc">All guidelines · Rates · Checklists · Annexure forms</div></div><div class="action-arrow">→</div></div>`;
@@ -6776,7 +6779,8 @@ function buildSummaryHTML(c) {
     + '</div>'
     +'</div>'
     
-    +'</div>'
+    
+    + (currentRole==='hospital' ? buildSASTClaimPanel(c) : '')+'</div>'
     +'</div>';
 }
 

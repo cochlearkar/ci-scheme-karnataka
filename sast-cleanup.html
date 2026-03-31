@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAST Cleanup — Remove Spurious Preauth Cases</title>
+<style>
+  :root {
+    --bg:#f4f6f9; --surface:#fff; --border:#e2e8f0;
+    --text:#1a1a2e; --text-light:#64748b;
+    --red:#dc2626; --red-l:#fef2f2;
+    --green:#16a34a; --green-l:#f0fdf4;
+    --amber:#d97706; --amber-l:#fffbeb;
+    --blue:#2563eb; --blue-dark:#1e3a5f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);}
+  .header{background:linear-gradient(135deg,#7f1d1d,#dc2626);padding:16px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100;}
+  .header a{width:36px;height:36px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:10px;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;text-decoration:none;flex-shrink:0;}
+  .header-title{color:#fff;font-size:16px;font-weight:700;}
+  .header-sub{color:rgba(255,255,255,.65);font-size:11px;margin-top:1px;}
+  .body{max-width:640px;margin:0 auto;padding:16px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;}
+  .card-title{font-size:13px;font-weight:700;color:var(--blue-dark);margin-bottom:4px;}
+  .card-sub{font-size:11px;color:var(--text-light);margin-bottom:14px;}
+  .field-label{font-size:12px;font-weight:600;color:var(--text-light);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px;}
+  .field-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;color:var(--text);background:#f8fafc;margin-bottom:12px;outline:none;}
+  .field-input:focus{border-color:var(--blue);background:#fff;}
+  #drop-zone{display:flex;align-items:center;justify-content:center;gap:10px;background:#eff6ff;border:2px dashed #93c5fd;border-radius:10px;padding:22px;cursor:pointer;font-size:13px;font-weight:600;color:var(--blue);transition:background .15s;}
+  #drop-zone:hover,#drop-zone.dragover{background:#dbeafe;border-color:var(--blue);}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+  .stat-box{border-radius:10px;padding:12px 14px;text-align:center;}
+  .stat-num{font-size:22px;font-weight:800;}
+  .stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+  #case-list{max-height:440px;overflow-y:auto;border:.5px solid var(--border);border-radius:10px;margin-bottom:14px;}
+  .case-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:.5px solid var(--border);font-size:12px;}
+  .case-row:last-child{border-bottom:none;}
+  .case-row.selected{background:#fef2f2;}
+  .case-cb{width:16px;height:16px;flex-shrink:0;margin-top:2px;accent-color:var(--red);cursor:pointer;}
+  .case-name{font-weight:700;color:var(--text);}
+  .case-detail{font-size:11px;color:var(--text-light);margin-top:2px;}
+  .case-reason{font-size:11px;color:var(--red);margin-top:2px;font-weight:600;}
+  .badge{flex-shrink:0;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;margin-top:1px;}
+  .badge-preauth{background:#fef9c3;color:#854d0e;}
+  .badge-unmatched{background:#fef2f2;color:#991b1b;}
+  .badge-safe{background:#f0fdf4;color:#166534;}
+  .btn-primary{width:100%;padding:15px;background:linear-gradient(135deg,#7f1d1d,#dc2626);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s;}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-secondary{padding:10px 20px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--text);}
+  .warn-box{background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:12px 14px;font-size:12px;color:#92400e;margin-bottom:14px;line-height:1.6;}
+  .info-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;font-size:12px;color:#1e40af;margin-bottom:14px;line-height:1.6;}
+  .error-box{padding:10px 12px;background:var(--red-l);border:1px solid #fecaca;border-radius:8px;font-size:12px;color:var(--red);margin-top:8px;}
+  #progress-wrap{background:#0f172a;border-radius:12px;padding:14px;margin-bottom:14px;}
+  #progress-log{font-family:monospace;font-size:11px;color:#4ade80;max-height:220px;overflow-y:auto;white-space:pre-wrap;}
+  .log-warn{color:#fbbf24;}.log-error{color:#f87171;}.log-info{color:#94a3b8;}
+  #done-banner{background:linear-gradient(135deg,#052e16,#166534);border-radius:14px;padding:24px;text-align:center;margin-bottom:14px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px;}
+  .step-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:var(--red);color:#fff;border-radius:50%;font-size:12px;font-weight:800;flex-shrink:0;}
+  .controls-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+  .controls-row label{font-size:12px;color:var(--text-light);cursor:pointer;display:flex;align-items:center;gap:5px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="index.html">←</a>
+  <div>
+    <div class="header-title">🗑 SAST Cleanup Tool</div>
+    <div class="header-sub">Remove spurious preauth cases from Firebase</div>
+  </div>
+</div>
+
+<div class="body">
+
+  <!-- ── EXPLAIN ── -->
+  <div class="warn-box">
+    <strong>⚠️ What happened:</strong> The preauth Excel was accidentally uploaded, adding cases that shouldn't be in the database. This tool identifies those spurious cases by comparing Firebase against the <strong>correct claims file</strong>, then lets you delete only the ones that don't belong.
+  </div>
+
+  <div class="info-box">
+    <strong>How this works:</strong><br>
+    1. Sign in as state admin<br>
+    2. Upload the <strong>correct SAST Claims Excel</strong> (the one with only settled/in-progress claims)<br>
+    3. The tool finds every Firebase case that was added by the upload tool but does <em>not</em> appear in the correct claims file<br>
+    4. Review the list — deselect any you want to keep — then delete
+  </div>
+
+  <!-- ── AUTH ── -->
+  <div class="card" id="auth-gate">
+    <div class="card-title">🔐 Sign in as State Admin</div>
+    <div class="card-sub">Only state team accounts can use this tool.</div>
+    <div class="field-label">Username</div>
+    <input class="field-input" id="login-user" type="text" placeholder="e.g. cochlearkar" autocomplete="username">
+    <div class="field-label">Password</div>
+    <input class="field-input" id="login-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn-primary" style="background:linear-gradient(135deg,#1e3a5f,#2563eb)" onclick="doLogin()" id="login-btn">Sign In</button>
+    <div id="login-error" class="error-box" style="display:none"></div>
+  </div>
+
+  <!-- ── MAIN TOOL ── -->
+  <div id="main-tool" style="display:none">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:12px;color:var(--text-light)">Signed in as <strong id="user-badge" style="color:var(--blue-dark)"></strong></div>
+      <button class="btn-secondary" onclick="doLogout()" style="font-size:11px;padding:6px 12px">Sign out</button>
+    </div>
+
+    <!-- Step 1: Upload correct claims file -->
+    <div class="card" id="step-upload">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px"><span class="step-num">1</span> Upload the CORRECT Claims Excel</div>
+      <div class="card-sub">The legitimate SAST Claims Data file — the one that should define what's in Firebase.</div>
+      <label id="drop-zone">
+        <span style="font-size:26px">📂</span>
+        <span id="file-label">Tap to choose file · or drag &amp; drop</span>
+        <input type="file" accept=".xlsx" id="file-input" style="display:none">
+      </label>
+    </div>
+
+    <!-- Step 2: Review spurious cases -->
+    <div id="step-review" style="display:none">
+      <div class="card">
+        <div class="card-title" style="display:flex;align-items:center;gap:8px"><span class="step-num">2</span> Spurious Cases Found — Review Before Deleting</div>
+        <div class="card-sub">These Firebase cases were added by the upload tool but do NOT appear in your correct claims file. Review each one carefully.</div>
+
+        <div class="stat-grid" id="stat-grid"></div>
+
+        <div class="controls-row">
+          <label><input type="checkbox" id="select-all" onchange="toggleAll(this.checked)"> Select all</label>
+          <span style="font-size:12px;color:var(--text-light)" id="selected-count">0 selected</span>
+          <button class="btn-secondary" style="font-size:11px;padding:5px 12px" onclick="showAll()">Show all</button>
+        </div>
+
+        <div id="case-list"></div>
+
+        <div class="warn-box" style="margin-bottom:14px">
+          ⚠️ <strong>Deletion is permanent.</strong> Cases with data entered by hospital or rehab logins are highlighted — double-check before deleting those.
+        </div>
+
+        <button class="btn-primary" id="delete-btn" onclick="confirmDelete()" disabled>
+          🗑 Delete Selected Cases from Firebase →
+        </button>
+        <div id="delete-error" class="error-box" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress-wrap" style="display:none">
+      <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Deletion Progress</div>
+      <div id="progress-log"></div>
+    </div>
+
+    <!-- Done -->
+    <div id="done-banner" style="display:none">
+      <div style="font-size:36px;margin-bottom:10px">✅</div>
+      <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px" id="done-title"></div>
+      <div style="font-size:12px;color:rgba(255,255,255,.75)" id="done-sub"></div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
+        <a href="sast-upload.html" style="padding:10px 22px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">
+          Now re-upload correct claims →
+        </a>
+        <a href="index.html" style="padding:10px 22px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;font-size:13px;font-weight:600;text-decoration:none">
+          Back to app
+        </a>
+      </div>
+    </div>
+
+  </div><!-- /main-tool -->
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, signOut }
+  from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js';
+import { getFirestore, collection, getDocs, doc, deleteDoc, addDoc }
+  from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js';
+
+const app  = initializeApp({
+  apiKey:            'AIzaSyCWmmONeQA-mxAGogJqBMHdnNakUhz-TZI',
+  authDomain:        'shravan-sanjeevini.firebaseapp.com',
+  projectId:         'shravan-sanjeevini',
+  storageBucket:     'shravan-sanjeevini.firebasestorage.app',
+  messagingSenderId: '130742586600',
+  appId:             '1:130742586600:web:1618bb56710c6fbbcc8d5d'
+});
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+window._auth = auth; window._db = db;
+window._fb   = { signInWithEmailAndPassword, signOut, collection, getDocs, doc, deleteDoc, addDoc };
+</script>
+
+<!-- SheetJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+let currentUser     = null;
+let firestoreCases  = [];   // all cases from Firebase
+let spuriousCases   = [];   // cases to potentially delete
+let claimsCardNos   = new Set(); // card nos + TPA IDs from the correct claims file
+let claimsNames     = new Set(); // uppercase names from correct claims file
+
+// ══════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════
+async function doLogin() {
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  const errEl    = document.getElementById('login-error');
+  const btn      = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+  if (!username || !password) { errEl.textContent='Enter username and password.'; errEl.style.display='block'; return; }
+
+  btn.innerHTML = '<span class="spinner"></span>Signing in…'; btn.disabled = true;
+  try {
+    const email = username + '@shravan.app';
+    await window._fb.signInWithEmailAndPassword(window._auth, email, password);
+    const snap = await window._fb.getDocs(window._fb.collection(window._db, 'users'));
+    const profile = snap.docs.map(d=>d.data()).find(u => u.username===username || u.email===email);
+    if (!profile)                throw new Error('User profile not found.');
+    if (profile.role !== 'state') throw new Error('This tool is only for state team accounts.');
+    if (profile.status && profile.status !== 'active') throw new Error('Account inactive.');
+
+    currentUser = profile;
+    document.getElementById('user-badge').textContent = profile.username || username;
+    document.getElementById('auth-gate').style.display  = 'none';
+    document.getElementById('main-tool').style.display  = 'block';
+
+    // Load all Firebase cases
+    const casesSnap = await window._fb.getDocs(window._fb.collection(window._db, 'cases'));
+    firestoreCases = casesSnap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+
+  } catch(e) {
+    errEl.textContent = e.message.includes('auth/') ? 'Invalid username or password.' : e.message;
+    errEl.style.display = 'block';
+    btn.innerHTML = 'Sign In'; btn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  await window._fb.signOut(window._auth);
+  currentUser=null; firestoreCases=[]; spuriousCases=[];
+  document.getElementById('auth-gate').style.display  = 'block';
+  document.getElementById('main-tool').style.display  = 'none';
+  document.getElementById('login-user').value='';
+  document.getElementById('login-pass').value='';
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('login-user').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+// ══════════════════════════════════════════════════════
+// FILE HANDLING
+// ══════════════════════════════════════════════════════
+const fileInput = document.getElementById('file-input');
+const dropZone  = document.getElementById('drop-zone');
+
+fileInput.addEventListener('change', ()=>{ if(fileInput.files[0]) processFile(fileInput.files[0]); });
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', ()=> dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e=>{
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.xlsx')) processFile(f);
+  else alert('Please drop an .xlsx file.');
+});
+
+function processFile(file) {
+  document.getElementById('file-label').textContent = '⏳ Reading ' + file.name + '…';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb   = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, dateNF:'dd-mmm-yyyy' });
+      if (rows.length < 2) { alert('No data rows found.'); return; }
+      document.getElementById('file-label').textContent = '✅ ' + file.name + ' (' + (rows.length-1) + ' rows)';
+      buildClaimsIndex(rows);
+      identifySpurious();
+      renderReview();
+      document.getElementById('step-review').style.display = 'block';
+      document.getElementById('step-review').scrollIntoView({ behavior:'smooth', block:'start' });
+    } catch(err) {
+      alert('Could not read Excel: ' + err.message);
+      document.getElementById('file-label').textContent = 'Tap to choose file · or drag & drop';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══════════════════════════════════════════════════════
+// BUILD INDEX FROM CORRECT CLAIMS FILE
+// ══════════════════════════════════════════════════════
+// Same column map as sast-upload.html
+const COL = { cardNo:14, tpaId:15, name:2, pkg:38 };
+
+function cleanStr(v) { return (v===undefined||v===null)?'':String(v).trim(); }
+
+function pkgSlot(pkgRaw) {
+  const p = cleanStr(pkgRaw).toUpperCase();
+  if (p.startsWith('2001')||p.startsWith('3001')) return 'surg';
+  if (p.startsWith('2002')) return 'r1';
+  if (p.startsWith('2003')) return 'r2';
+  return null;
+}
+
+function buildClaimsIndex(rows) {
+  claimsCardNos = new Set();
+  claimsNames   = new Set();
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.every(v=>!v)) continue;
+    if (!pkgSlot(r[COL.pkg])) continue; // skip unknown package rows
+    const cardNo = cleanStr(r[COL.cardNo]);
+    const tpaId  = cleanStr(r[COL.tpaId]);
+    const name   = cleanStr(r[COL.name]).toUpperCase();
+    if (cardNo) claimsCardNos.add(cardNo);
+    if (tpaId)  claimsCardNos.add(tpaId);
+    if (name)   claimsNames.add(name);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// IDENTIFY SPURIOUS CASES
+// ══════════════════════════════════════════════════════
+function identifySpurious() {
+  spuriousCases = [];
+  firestoreCases.forEach(c => {
+    const cardNo  = cleanStr(c.id || c.cardNo);
+    const tpaId   = cleanStr(c.tpa);
+    const nameUp  = cleanStr(c.name).toUpperCase();
+
+    // Check if this case appears in the correct claims file
+    const inClaims = claimsCardNos.has(cardNo) ||
+                     claimsCardNos.has(tpaId)  ||
+                     claimsNames.has(nameUp);
+
+    if (inClaims) return; // legitimately in claims data — don't touch
+
+    // It's not in the claims file.
+    // Now determine how risky deletion is based on what data is present.
+    const addedByTool = (c._addedBy === 'sast-upload');
+    const hasHospData = !!(c.hospSubmitted || c.surgAdmit || c.switchOn);
+    const hasRehabData= !!(c._rehabSessionsLogged || c._lastRehabDate || c._evalQ0);
+    const hasDistData = !!(c._distConfirmed);
+
+    // Classify reason
+    let reason = '';
+    if (addedByTool && !hasHospData && !hasRehabData) {
+      reason = 'Added by upload tool, no other data entered — safe to delete';
+    } else if (addedByTool && (hasHospData || hasRehabData)) {
+      reason = '⚠ Added by upload tool but has hospital/rehab data — verify before deleting';
+    } else if (!addedByTool) {
+      reason = 'Not from upload tool — may have been added manually';
+    }
+
+    spuriousCases.push({
+      ...c,
+      _reason:      reason,
+      _hasHospData: hasHospData,
+      _hasRehabData:hasRehabData,
+      _addedByTool: addedByTool,
+      _safe:        addedByTool && !hasHospData && !hasRehabData && !hasDistData
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER REVIEW LIST
+// ══════════════════════════════════════════════════════
+function renderReview() {
+  const safe    = spuriousCases.filter(c=>c._safe).length;
+  const caution = spuriousCases.filter(c=>!c._safe && c._addedByTool).length;
+  const manual  = spuriousCases.filter(c=>!c._addedByTool).length;
+  const total   = spuriousCases.length;
+
+  document.getElementById('stat-grid').innerHTML = `
+    <div class="stat-box" style="background:#fef2f2;color:#991b1b">
+      <div class="stat-num">${total}</div>
+      <div class="stat-label">Not in claims file</div>
+    </div>
+    <div class="stat-box" style="background:#fef9c3;color:#854d0e">
+      <div class="stat-num">${safe}</div>
+      <div class="stat-label">✅ Safe to delete</div>
+    </div>
+    <div class="stat-box" style="background:#fff7ed;color:#9a3412">
+      <div class="stat-num">${caution + manual}</div>
+      <div class="stat-label">⚠ Check before deleting</div>
+    </div>`;
+
+  if (total === 0) {
+    document.getElementById('case-list').innerHTML =
+      '<div style="padding:24px;text-align:center;font-size:13px;color:#16a34a;font-weight:600">✅ No spurious cases found! Firebase matches the claims file exactly.</div>';
+    document.getElementById('delete-btn').style.display = 'none';
+    return;
+  }
+
+  // Sort: safe first, then caution, then manual
+  const sorted = [...spuriousCases].sort((a,b) => {
+    const score = c => c._safe ? 0 : c._addedByTool ? 1 : 2;
+    return score(a) - score(b);
+  });
+
+  document.getElementById('case-list').innerHTML = sorted.map((c, i) => {
+    const addedAt = c._addedAt ? new Date(c._addedAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+    const badge = c._safe
+      ? '<span class="badge badge-unmatched">Safe to delete</span>'
+      : c._addedByTool
+      ? '<span class="badge badge-preauth">⚠ Has data</span>'
+      : '<span class="badge" style="background:#f1f5f9;color:#64748b">Manual add</span>';
+
+    const extras = [];
+    if (c._hasHospData)  extras.push('🏥 Hospital data exists');
+    if (c._hasRehabData) extras.push('🎧 Rehab data exists');
+
+    return `<div class="case-row ${c._safe?'selected':''}" id="row-${i}">
+      <input type="checkbox" class="case-cb" id="cb-${i}" ${c._safe?'checked':''} onchange="onCbChange()">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="case-name">${c.name||'—'}</div>
+          ${badge}
+        </div>
+        <div class="case-detail">Card: ${c.id||'—'} · TPA: ${c.tpa||'—'} · ${c.hospital||'—'}</div>
+        <div class="case-detail">Added: ${addedAt} by ${c._addedBy||'unknown'}${extras.length?' · '+extras.join(' · '):''}</div>
+        <div class="case-reason">${c._reason}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  updateSelectedCount();
+}
+
+function showAll() {
+  // Already showing all — this is a no-op placeholder for future filtering
+}
+
+function toggleAll(checked) {
+  document.querySelectorAll('.case-cb').forEach(cb => {
+    cb.checked = checked;
+  });
+  updateSelectedCount();
+}
+
+function onCbChange() { updateSelectedCount(); }
+
+function updateSelectedCount() {
+  const total    = document.querySelectorAll('.case-cb').length;
+  const selected = document.querySelectorAll('.case-cb:checked').length;
+  document.getElementById('selected-count').textContent = selected + ' of ' + total + ' selected';
+  document.getElementById('delete-btn').disabled = selected === 0;
+}
+
+// ══════════════════════════════════════════════════════
+// DELETE
+// ══════════════════════════════════════════════════════
+async function confirmDelete() {
+  const btn   = document.getElementById('delete-btn');
+  const errEl = document.getElementById('delete-error');
+  errEl.style.display = 'none';
+
+  // Collect selected
+  const sorted = [...spuriousCases].sort((a,b) => {
+    const score = c => c._safe ? 0 : c._addedByTool ? 1 : 2;
+    return score(a) - score(b);
+  });
+  const toDelete = [];
+  document.querySelectorAll('.case-cb').forEach((cb, i) => {
+    if (cb.checked) toDelete.push(sorted[i]);
+  });
+
+  if (!toDelete.length) { errEl.textContent='Nothing selected.'; errEl.style.display='block'; return; }
+
+  const hasRisky = toDelete.some(c => !c._safe);
+  if (hasRisky) {
+    const ok = confirm(
+      '⚠️ Some selected cases have hospital or rehab data.\n\n' +
+      'Deleting will permanently remove that data too.\n\n' +
+      'Are you sure you want to proceed?'
+    );
+    if (!ok) return;
+  }
+
+  // Final confirmation
+  const ok2 = confirm(
+    `You are about to PERMANENTLY DELETE ${toDelete.length} case(s) from Firebase.\n\n` +
+    `This cannot be undone.\n\nProceed?`
+  );
+  if (!ok2) return;
+
+  btn.innerHTML = '<span class="spinner"></span>Deleting…'; btn.disabled = true;
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('progress-wrap').scrollIntoView({ behavior:'smooth' });
+
+  let deleted = 0, errors = 0;
+
+  for (const c of toDelete) {
+    const docId = c._docId || c.id;
+    try {
+      await window._fb.deleteDoc(window._fb.doc(window._db, 'cases', docId));
+
+      // Audit log
+      await window._fb.addDoc(window._fb.collection(window._db, 'submissions_state'), {
+        caseId:      docId,
+        field:       'sast_cleanup_delete',
+        fieldLabel:  'SAST Cleanup — Deleted spurious preauth case',
+        oldVal:      c.name || docId,
+        newVal:      '',
+        reason:      'Cleanup: case not found in correct SAST claims file. Deleted by ' + (currentUser?.username || 'state'),
+        tier:        3,
+        status:      'applied',
+        role:        'state',
+        submittedBy: currentUser?.username || 'state',
+        timestamp:   new Date().toISOString()
+      }).catch(() => {});
+
+      logLine(`✅ DELETED  ${c.name || '—'}  (${docId})`);
+      deleted++;
+    } catch(e) {
+      logLine(`❌ ERROR    ${c.name || '—'}  (${docId}) — ${e.message}`, 'error');
+      errors++;
+    }
+  }
+
+  logLine('', 'info');
+  logLine(`─────────────────────────────`, 'info');
+  logLine(`Done.  Deleted: ${deleted}  Errors: ${errors}`, 'info');
+
+  document.getElementById('done-title').textContent = `${deleted} spurious case${deleted!==1?'s':''} deleted from Firebase`;
+  document.getElementById('done-sub').textContent   = `${errors} errors · All deletions logged to submissions_state`;
+  document.getElementById('done-banner').style.display = 'block';
+  document.getElementById('done-banner').scrollIntoView({ behavior:'smooth' });
+}
+
+function logLine(msg, type) {
+  const logEl = document.getElementById('progress-log');
+  const span  = document.createElement('span');
+  if (type==='error') span.className='log-error';
+  else if (type==='info') span.className='log-info';
+  span.textContent = msg + '\n';
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+</script>
+</body>
+</html>
